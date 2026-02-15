@@ -29,12 +29,12 @@ final class NFormatSerializer
     }
 
     /** @throws RuntimeException */
-    public static function serialize(Resource|Literal $subject, Resource|Literal $predicate, Resource|Literal $object, Resource|null $graph = null): string
+    public static function serialize(Resource|Literal $subject, Resource $predicate, Resource|Literal $object, Resource|null $graph = null): string
     {
         $out = self::serializeTerm($subject);
 
         $out .= ' ';
-        $out .= self::serializeTerm($predicate);
+        $out .= self::serializeResource($predicate);
 
         $out .= ' ';
         $out .= self::serializeTerm($object);

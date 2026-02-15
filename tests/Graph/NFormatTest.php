@@ -59,7 +59,7 @@ final class NFormatTest extends TestCase
     #[DataProvider('statementProvider')]
     public function testSerialize(
         Resource|Literal $subject,
-        Resource|Literal $predicate,
+        Resource $predicate,
         Resource|Literal $object,
         Resource|null $graph,
         string $expected,
@@ -70,7 +70,7 @@ final class NFormatTest extends TestCase
     #[DataProvider('statementProvider')]
     public function testParseLine(
         Resource|Literal $subject,
-        Resource|Literal $predicate,
+        Resource $predicate,
         Resource|Literal $object,
         Resource|null $graph,
         string $line,
