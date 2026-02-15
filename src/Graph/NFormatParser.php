@@ -12,12 +12,10 @@ use Traversable;
 use function ctype_xdigit;
 use function hexdec;
 use function mb_chr;
-use function mb_ord;
-use function mb_substr;
-use function ord;
 use function preg_match;
 use function preg_split;
 use function sprintf;
+use function str_ends_with;
 use function strlen;
 use function substr;
 
@@ -25,48 +23,6 @@ use const PREG_SPLIT_NO_EMPTY;
 
 final class NFormatParser
 {
-    private const int COLON                = 0x3A;   // ':'
-    private const int FULL_STOP            = 0x2E;   // '.'
-    private const int HYPHEN_MINUS         = 0x2D;   // '-'
-    private const int LOW_LINE             = 0x5F;   // '_'
-    private const int DIGIT_ZERO           = 0x30;   // '0'
-    private const int DIGIT_NINE           = 0x39;   // '9'
-    private const int MIDDLE_DOT           = 0x00B7; // '·'
-    private const int COMBINING_FIRST      = 0x0300;
-    private const int COMBINING_LAST       = 0x036F;
-    private const int PERMITTED_203F_FIRST = 0x203F;
-    private const int PERMITTED_2040_LAST  = 0x2040;
-
-    // PN_CHARS_BASE ranges [A-Z] [a-z] and Unicode letter ranges
-    private const int LATIN_CAPITAL_A  = 0x41;
-    private const int LATIN_CAPITAL_Z  = 0x5A;
-    private const int LATIN_SMALL_A    = 0x61;
-    private const int LATIN_SMALL_Z    = 0x7A;
-    private const int PN_00C0_FIRST    = 0x00C0;
-    private const int PN_00D6_LAST     = 0x00D6;
-    private const int PN_00D8_FIRST    = 0x00D8;
-    private const int PN_00F6_LAST     = 0x00F6;
-    private const int PN_00F8_FIRST    = 0x00F8;
-    private const int PN_02FF_LAST     = 0x02FF;
-    private const int PN_0370_FIRST    = 0x0370;
-    private const int PN_037D_LAST     = 0x037D;
-    private const int PN_037F_FIRST    = 0x037F;
-    private const int PN_1FFF_LAST     = 0x1FFF;
-    private const int PN_200C_FIRST    = 0x200C;
-    private const int PN_200D_LAST     = 0x200D;
-    private const int PN_2070_FIRST    = 0x2070;
-    private const int PN_218F_LAST     = 0x218F;
-    private const int PN_2C00_FIRST    = 0x2C00;
-    private const int PN_2FEF_LAST     = 0x2FEF;
-    private const int PN_3001_FIRST    = 0x3001;
-    private const int PN_D7FF_LAST     = 0xD7FF;
-    private const int PN_F900_FIRST    = 0xF900;
-    private const int PN_FDCF_LAST     = 0xFDCF;
-    private const int PN_FDF0_FIRST    = 0xFDF0;
-    private const int PN_FFFD_LAST     = 0xFFFD;
-    private const int PN_10000_FIRST   = 0x10000;
-    private const int PN_EFFFF_LAST    = 0xEFFFF;
-
     /** you cannot instantiate this class */
     private function __construct()
     {
@@ -250,124 +206,32 @@ final class NFormatParser
         $labelStart = $pos;
         $pos       += 2; // skip the _: prefix
 
-        $first = self::readNextCodepoint($line, $pos, $len);
-        if ($first === null) {
-            throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
-        }
-
+        $rest = substr($line, $pos, $len - $pos);
         if (
-            $first === self::COLON
-            || $first === self::FULL_STOP
-            || $first === self::HYPHEN_MINUS
-            || $first === self::MIDDLE_DOT
-            || ($first >= self::COMBINING_FIRST && $first <= self::COMBINING_LAST)
-            || ($first >= self::PERMITTED_203F_FIRST && $first <= self::PERMITTED_2040_LAST)
+            $rest === '' || preg_match(
+                '/^[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
+                $rest,
+                $m,
+            ) !== 1
         ) {
             throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
         }
 
-        if (! self::isBlankNodeLabelFirstChar($first)) {
-            throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
+        $label = $m[0];
+        if (str_ends_with($label, '.')) {
+            $label = substr($label, 0, -1);
         }
 
-        $lastWasDot  = false;
-        $lastByteLen = 0;
-        while ($pos < $len) {
-            $prevPos = $pos;
-            $ord     = self::readNextCodepoint($line, $pos, $len);
-            if ($ord === null) {
-                break;
-            }
-
-            if ($ord === self::COLON) {
-                throw new InvalidArgumentException(sprintf('Colon not allowed in blank node label at position %d.', $pos));
-            }
-
-            if ($ord === self::FULL_STOP) {
-                $lastWasDot  = true;
-                $lastByteLen = $pos - $prevPos;
-                continue;
-            }
-
-            if (! self::isBlankNodeLabelRestChar($ord)) {
-                $pos = $prevPos;
-                break;
-            }
-
-            $lastWasDot  = false;
-            $lastByteLen = $pos - $prevPos;
+        $labelLen = strlen($label);
+        if ($labelLen < strlen($rest) && $rest[$labelLen] === ':') {
+            throw new InvalidArgumentException(sprintf('Colon not allowed in blank node label at position %d.', $pos));
         }
 
-        if ($lastWasDot) {
-            $pos -= $lastByteLen;
-        }
+        $pos += $labelLen;
 
         return substr($line, $labelStart, $pos - $labelStart);
     }
 
-  /**
-   * PN_CHARS_BASE: first character of a blank node label (letters only, or _ or digit).
-   */
-    private static function isBlankNodeLabelFirstChar(int $ord): bool
-    {
-        return self::isPnCharsBase($ord)
-            || $ord === self::LOW_LINE
-            || ($ord >= self::DIGIT_ZERO && $ord <= self::DIGIT_NINE);
-    }
-
-  /**
-   * Characters allowed in a blank node label after the first (PN_CHARS_BASE, _, digit, ., -, ·, combining, 203F–2040).
-   */
-    private static function isBlankNodeLabelRestChar(int $ord): bool
-    {
-        return self::isPnCharsBase($ord)
-            || $ord === self::LOW_LINE
-            || ($ord >= self::DIGIT_ZERO && $ord <= self::DIGIT_NINE)
-            || $ord === self::FULL_STOP
-            || $ord === self::HYPHEN_MINUS
-            || $ord === self::MIDDLE_DOT
-            || ($ord >= self::COMBINING_FIRST && $ord <= self::COMBINING_LAST)
-            || ($ord >= self::PERMITTED_203F_FIRST && $ord <= self::PERMITTED_2040_LAST);
-    }
-
-  /**
-   * PN_CHARS_BASE per grammar (letter ranges).
-   */
-    private static function isPnCharsBase(int $ord): bool
-    {
-        return ($ord >= self::LATIN_CAPITAL_A && $ord <= self::LATIN_CAPITAL_Z)
-            || ($ord >= self::LATIN_SMALL_A && $ord <= self::LATIN_SMALL_Z)
-            || ($ord >= self::PN_00C0_FIRST && $ord <= self::PN_00D6_LAST)
-            || ($ord >= self::PN_00D8_FIRST && $ord <= self::PN_00F6_LAST)
-            || ($ord >= self::PN_00F8_FIRST && $ord <= self::PN_02FF_LAST)
-            || ($ord >= self::PN_0370_FIRST && $ord <= self::PN_037D_LAST)
-            || ($ord >= self::PN_037F_FIRST && $ord <= self::PN_1FFF_LAST)
-            || ($ord >= self::PN_200C_FIRST && $ord <= self::PN_200D_LAST)
-            || ($ord >= self::PN_2070_FIRST && $ord <= self::PN_218F_LAST)
-            || ($ord >= self::PN_2C00_FIRST && $ord <= self::PN_2FEF_LAST)
-            || ($ord >= self::PN_3001_FIRST && $ord <= self::PN_D7FF_LAST)
-            || ($ord >= self::PN_F900_FIRST && $ord <= self::PN_FDCF_LAST)
-            || ($ord >= self::PN_FDF0_FIRST && $ord <= self::PN_FFFD_LAST)
-            || ($ord >= self::PN_10000_FIRST && $ord <= self::PN_EFFFF_LAST);
-    }
-
-  /**
-   * Reads the next UTF-8 code point at $pos and advances $pos.
-   */
-    private static function readNextCodepoint(string $line, int &$pos, int $len): int|null
-    {
-        if ($pos >= $len) {
-            return null;
-        }
-
-        // Extract the next character from the line.
-        // 4 is the maximum number of bytes for a UTF-8 character.
-        $chunk = substr($line, $pos, 4);
-        $char  = mb_substr($chunk, 0, 1);
-        $pos  += strlen($char);
-
-        return mb_ord($char, 'UTF-8');
-    }
   /**
    * Parses a literal: "..." with optional @lang or ^^<datatype>.
    *
@@ -384,9 +248,10 @@ final class NFormatParser
         if ($pos < $len && $line[$pos] === '@') {
             $pos++;
             $rest = substr($line, $pos, $len - $pos);
-            if ($rest === '' || preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/', $rest, $m) !== 1 || $m[0] === '') {
+            if ($rest === '' || preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/Su', $rest, $m) !== 1) {
                 throw new InvalidArgumentException(sprintf('Missing language tag at position %d.', $pos));
             }
+
             $lang = $m[0];
             $pos += strlen($lang);
         } elseif ($pos + 1 < $len && $line[$pos] === '^' && $line[$pos + 1] === '^') {
