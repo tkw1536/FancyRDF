@@ -22,5 +22,4 @@ The Makefile target `make test` runs the tests.
 
 ## License
 
-None yet, as we're still in development.
-Will probably pick one later.
+There is no license for the library and primary testing code, as the code is still in development.
