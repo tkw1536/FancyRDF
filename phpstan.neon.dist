@@ -1,0 +1,48 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+    # Bleeding edge (preview of next major version)
+    featureToggles:
+        bleedingEdge: true
+        checkNonStringableDynamicAccess: true
+        checkParameterCastableToNumberFunctions: true
+        stricterFunctionMap: true
+        reportPreciseLineForUnusedFunctionParameter: true
+        checkPrintfParameterTypes: true
+        internalTag: true
+        newStaticInAbstractClassStaticMethod: true
+        checkExtensionsForComparisonOperators: true
+        checkGenericIterableClasses: true
+        reportTooWideBool: true
+        rawMessageInBaseline: true
+        assignToByRefForeachExpr: true
+        curlSetOptArrayTypes: true
+    # Extra strict settings (phpstan-strict-rules style)
+    polluteScopeWithLoopInitialAssignments: false
+    polluteScopeWithAlwaysIterableForeach: false
+    polluteScopeWithBlock: false
+    checkExplicitMixedMissingReturn: true
+    checkFunctionNameCase: true
+    checkInternalClassCaseSensitivity: true
+    reportMaybesInMethodSignatures: true
+    reportMaybesInPropertyPhpDocTypes: true
+    reportStaticMethodSignatures: true
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkTooWideParameterOutInProtectedAndPublicMethods: true
+    checkTooWideThrowTypesInProtectedAndPublicMethods: true
+    checkUninitializedProperties: true
+    checkDynamicProperties: true
+    checkBenevolentUnionTypes: true
+    checkMissingCallableSignature: true
+    checkStrictPrintfPlaceholderTypes: true
+    checkMissingOverrideMethodAttribute: true
+    exceptions:
+        check:
+            throwTypeCovariance: true
+            tooWideImplicitThrowType: true
+    reportUnmatchedIgnoredErrors: true
+
+    errorFormat: raw
+    

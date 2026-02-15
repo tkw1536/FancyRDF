@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<ruleset name="FancySparql">
+    <description>Coding standard for FancySparql</description>
+
+    <!-- slevomat coding standard -->
+    <rule ref="Doctrine">
+        <exclude name="Generic.Files.LineLength.TooLong" />
+    </rule>
+        
+
+    <!-- files to be included -->
+    <file>src</file>
+    <file>tests</file>
+    <exclude-pattern>vendor/*</exclude-pattern>
+
+    <!-- various arguments -->
+    <arg name="colors" />
+    <arg value="sp" />
+    <arg name="parallel" value="10" />
+
+    <arg name="report" value="emacs" />
+    <arg name="report-width" value="auto" />
+</ruleset>

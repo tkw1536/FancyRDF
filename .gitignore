@@ -1,0 +1,10 @@
+# Dependencies
+/vendor/
+
+# Composer: for libraries, lock file is usually not committed so consumers control their own versions
+/composer.lock
+
+# PHPUnit
+/.phpunit.cache/
+
+/build/
