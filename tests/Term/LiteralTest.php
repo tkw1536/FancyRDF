@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace FancySparql\Tests\Term;
 
+use DOMDocument;
 use FancySparql\Term\Literal;
+use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
-use SimpleXMLElement;
-
-use function simplexml_load_string;
 
 /** @phpstan-import-type LiteralElement from Literal */
 final class LiteralTest extends TestCase
@@ -53,7 +52,9 @@ final class LiteralTest extends TestCase
         string $expectedXml,
     ): void {
         self::assertSame($expectedJson, $literal->jsonSerialize(), 'JSON serialization');
-        self::assertSame($expectedXml, $literal->xmlSerialize(null)->asXML(), 'XML serialization');
+
+        $gotXML = XMLUtils::formatXML($literal->xmlSerialize(new DOMDocument()));
+        self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
     /** @param LiteralElement $expectedJson */
@@ -63,11 +64,7 @@ final class LiteralTest extends TestCase
         array $expectedJson,
         string $expectedXml,
     ): void {
-        $element = simplexml_load_string($expectedXml);
-        self::assertInstanceOf(SimpleXMLElement::class, $element);
-
-        $literalFromXml = Literal::deserializeXML($element);
-
+        $literalFromXml = Literal::deserializeXML(XMLUtils::parseAndGetRootNode($expectedXml));
         self::assertTrue($literalFromXml->equals($literal), 'XML deserialize');
 
         $literalFromJson = Literal::deserializeJSON($expectedJson);
@@ -77,13 +74,10 @@ final class LiteralTest extends TestCase
     #[DataProvider('deserializeInvalidXMLProvider')]
     public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
     {
-        $element = simplexml_load_string($xml);
-        self::assertInstanceOf(SimpleXMLElement::class, $element);
-
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage($expectedMessage);
 
-        Literal::deserializeXML($element);
+        Literal::deserializeXML(XMLUtils::parseAndGetRootNode($xml));
     }
 
     /** @return array<string, array{string, string}> */

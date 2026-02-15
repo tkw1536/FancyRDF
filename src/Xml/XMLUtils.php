@@ -5,15 +5,9 @@ declare(strict_types=1);
 namespace FancySparql\Xml;
 
 use DOMDocument;
+use DOMElement;
+use DOMNode;
 use RuntimeException;
-use SimpleXMLElement;
-
-use function htmlspecialchars;
-use function strpos;
-use function substr;
-
-use const ENT_QUOTES;
-use const ENT_XML1;
 
 /**
  * A class that holds helper functions for XML.
@@ -26,65 +20,77 @@ final class XMLUtils
     }
 
     /**
-     * Converts a SimpleXMLElement to a formatted XML string.
+     * Parses the given XML source and returns the root element.
      *
      * @throws RuntimeException
      */
-    public static function asFormattedXml(SimpleXMLElement $element): string
+    public static function parseAndGetRootNode(string $source): DOMElement
     {
-        $dom = new DOMDocument('1.0');
-
-        $dom->preserveWhiteSpace = false;
-        $dom->formatOutput       = true;
-
-        $xml = $element->asXML();
-        if ($xml === false) {
-            throw new RuntimeException('Failed to convert SimpleXMLElement to XML string');
+        $dom     = new DOMDocument();
+        $success = $dom->loadXML($source);
+        if (! $success) {
+            throw new RuntimeException('Failed to parse XML');
         }
 
-        $dom->loadXML($xml);
-
-        $str = $dom->saveXML();
-        if ($str === false) {
-            throw new RuntimeException('Failed to convert DOMDocument to XML string');
+        $element = $dom->documentElement;
+        if ($element === null) {
+            throw new RuntimeException('Failed to get root element');
         }
 
-        return $str;
+        return $element;
     }
 
     /**
-     * Helper function to add a child element to an optional parent element.
+     * Formats the given XML node and returns the result.
      *
      * @throws RuntimeException
      */
-    public static function addChild(
-        SimpleXMLElement|null $parent,
+    public static function formatXML(DOMNode $node, bool $prettify = false): string
+    {
+        $doc = $node->ownerDocument;
+        if ($doc === null) {
+            throw new RuntimeException('Failed to get owner document');
+        }
+
+        $formatOutputBefore       = $doc->formatOutput;
+        $preserveWhiteSpaceBefore = $doc->preserveWhiteSpace;
+
+        $doc->preserveWhiteSpace = ! $prettify;
+        $doc->formatOutput       = $prettify;
+
+        try {
+            $result = $doc->saveXML($node);
+        } finally {
+            $doc->formatOutput       = $formatOutputBefore;
+            $doc->preserveWhiteSpace = $preserveWhiteSpaceBefore;
+        }
+
+        if ($result === false) {
+            throw new RuntimeException('Failed to format XML');
+        }
+
+        return $result;
+    }
+
+    /**
+     * Creates a new element inside the given document.
+     *
+     * @throws RuntimeException
+     */
+    public static function createElement(
+        DOMDocument $document,
         string $qualifiedName,
         string|null $value = null,
         string|null $namespace = null,
-    ): SimpleXMLElement {
-        if ($parent !== null) {
-            $element = $parent->addChild($qualifiedName, $value, $namespace);
-            if ($element === null) {
-                throw new RuntimeException('Failed to add child element to parent');
-            }
-
-            return $element;
-        }
-
+    ): DOMElement {
         if ($namespace !== null) {
-            $colonPos  = strpos($qualifiedName, ':');
-            $escaped   = htmlspecialchars($namespace, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-            $xmlString = $colonPos !== false
-                ? '<' . $qualifiedName . ' xmlns:' . substr($qualifiedName, 0, $colonPos) . '="' . $escaped . '" />'
-                : '<' . $qualifiedName . ' xmlns="' . $escaped . '" />';
+            $element = $document->createElementNS($namespace, $qualifiedName, $value ?? '');
         } else {
-            $xmlString = '<' . $qualifiedName . ' />';
+            $element = $document->createElement($qualifiedName, $value ?? '');
         }
 
-        $element = new SimpleXMLElement($xmlString);
-        if ($value !== null) {
-            $element[0] = $value;
+        if ($element === false) {
+            throw new RuntimeException('Failed to create element');
         }
 
         return $element;

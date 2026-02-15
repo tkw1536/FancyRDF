@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace FancySparql\Tests\Results;
 
+use DOMDocument;
 use FancySparql\Results\Result;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
+use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +32,9 @@ final class ResultTest extends TestCase
         $result = new Result($bindings);
 
         self::assertSame($expectedJson, $result->jsonSerialize(), 'JSON serialization');
-        self::assertSame($expectedXml, $result->xmlSerialize(null)->asXML(), 'XML serialization');
+
+        $gotXML = XMLUtils::formatXML($result->xmlSerialize(new DOMDocument()));
+        self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
     /** @return array<string, array{array<string, Literal|Resource>, array<string, ResourceElement|LiteralElement>, string}> */
@@ -40,22 +44,22 @@ final class ResultTest extends TestCase
             'empty bindings' => [
                 [],
                 [],
-                "<?xml version=\"1.0\"?>\n<result/>\n",
+                '<result/>',
             ],
             'single URI binding' => [
                 ['s' => new Resource('https://example.com/s')],
                 ['s' => ['type' => 'uri', 'value' => 'https://example.com/s']],
-                "<?xml version=\"1.0\"?>\n<result><binding name=\"s\"><uri>https://example.com/s</uri></binding></result>\n",
+                '<result><binding name="s"><uri>https://example.com/s</uri></binding></result>',
             ],
             'single literal binding' => [
                 ['label' => new Literal('A label')],
                 ['label' => ['type' => 'literal', 'value' => 'A label']],
-                "<?xml version=\"1.0\"?>\n<result><binding name=\"label\"><literal>A label</literal></binding></result>\n",
+                '<result><binding name="label"><literal>A label</literal></binding></result>',
             ],
             'literal with language' => [
                 ['lang' => new Literal('hello', 'en')],
                 ['lang' => ['type' => 'literal', 'value' => 'hello', 'language' => 'en']],
-                "<?xml version=\"1.0\"?>\n<result><binding name=\"lang\"><literal xml:lang=\"en\">hello</literal></binding></result>\n",
+                '<result><binding name="lang"><literal xml:lang="en">hello</literal></binding></result>',
             ],
             'two bindings' => [
                 [
@@ -66,7 +70,7 @@ final class ResultTest extends TestCase
                     'x' => ['type' => 'uri', 'value' => 'https://example.com/foo'],
                     'label' => ['type' => 'literal', 'value' => 'A label'],
                 ],
-                "<?xml version=\"1.0\"?>\n<result><binding name=\"x\"><uri>https://example.com/foo</uri></binding><binding name=\"label\"><literal>A label</literal></binding></result>\n",
+                '<result><binding name="x"><uri>https://example.com/foo</uri></binding><binding name="label"><literal>A label</literal></binding></result>',
             ],
         ];
     }

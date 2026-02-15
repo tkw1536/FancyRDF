@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace FancySparql\Term;
 
+use DOMDocument;
+use DOMElement;
+use DOMNode;
 use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
-use SimpleXMLElement;
 
 use function is_string;
 
@@ -59,24 +61,20 @@ final class Literal extends Term
 
     /** @throws InvalidArgumentException */
     #[Override]
-    public static function deserializeXML(SimpleXMLElement $element): Literal
+    public static function deserializeXML(DOMElement $element): Literal
     {
-        $elementName = $element->getName();
+        $elementName = $element->localName;
         if ($elementName !== 'literal') {
             throw new InvalidArgumentException('Invalid element name');
         }
 
-        $language = $element->attributes('http://www.w3.org/XML/1998/namespace')['lang'] ?? $element['xml:lang'] ?? null;
-        if ($language !== null) {
-            $language = (string) $language;
-        }
+        $language = $element->getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang');
+        $language = $language !== '' ? $language : null;
 
-        $datatype = $element['datatype'];
-        if ($datatype !== null) {
-            $datatype = (string) $datatype;
-        }
+        $datatype = $element->getAttribute('datatype');
+        $datatype = $datatype !== '' ? $datatype : null;
 
-        return new Literal((string) $element, $language, $datatype);
+        return new Literal($element->textContent, $language, $datatype);
     }
 
     /** @return LiteralElement */
@@ -96,18 +94,18 @@ final class Literal extends Term
     }
 
     #[Override]
-    public function xmlSerialize(SimpleXMLElement|null $parent = null): SimpleXMLElement
+    public function xmlSerialize(DOMDocument $document): DOMNode
     {
-        $element = XMLUtils::addChild($parent, 'literal', $this->value);
+        $element = XMLUtils::createElement($document, 'literal', $this->value);
 
         $datatype = $this->datatype;
         if ($datatype) {
-            $element->addAttribute('datatype', $datatype);
+            $element->setAttribute('datatype', $datatype);
         }
 
         $lang = $this->language;
         if ($lang) {
-            $element->addAttribute('xml:lang', $lang, 'http://www.w3.org/XML/1998/namespace');
+            $element->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:lang', $lang);
         }
 
         return $element;

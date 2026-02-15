@@ -7,11 +7,9 @@ namespace FancySparql\Tests\Term;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use FancySparql\Term\Term;
+use FancySparql\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use SimpleXMLElement;
-
-use function simplexml_load_string;
 
 /**
  * @phpstan-import-type LiteralElement from Literal
@@ -26,10 +24,7 @@ final class TermTest extends TestCase
         $fromJson = Term::deserializeJSON($expectedJson);
         self::assertTrue($fromJson->equals($term), 'JSON deserialize');
 
-        $element = simplexml_load_string($expectedXml);
-        self::assertInstanceOf(SimpleXMLElement::class, $element);
-        $fromXml = Term::deserializeXML($element);
-
+        $fromXml = Term::deserializeXML(XMLUtils::parseAndGetRootNode($expectedXml));
         self::assertTrue($fromXml->equals($term), 'XML deserialize');
     }
 
@@ -55,12 +50,12 @@ final class TermTest extends TestCase
             'plain literal' => [
                 new Literal('hello'),
                 ['type' => 'literal', 'value' => 'hello'],
-                "<?xml version=\"1.0\"?>\n<literal>hello</literal>\n",
+                '<literal>hello</literal>',
             ],
             'literal with language' => [
                 new Literal('hello', 'en'),
                 ['type' => 'literal', 'value' => 'hello', 'language' => 'en'],
-                "<?xml version=\"1.0\"?>\n<literal xml:lang=\"en\">hello</literal>\n",
+                '<literal xml:lang="en">hello</literal>',
             ],
             'literal with datatype' => [
                 new Literal('42', null, 'http://www.w3.org/2001/XMLSchema#integer'),
@@ -69,12 +64,12 @@ final class TermTest extends TestCase
                     'value' => '42',
                     'datatype' => 'http://www.w3.org/2001/XMLSchema#integer',
                 ],
-                "<?xml version=\"1.0\"?>\n<literal datatype=\"http://www.w3.org/2001/XMLSchema#integer\">42</literal>\n",
+                '<literal datatype="http://www.w3.org/2001/XMLSchema#integer">42</literal>',
             ],
             'empty value' => [
                 new Literal(''),
                 ['type' => 'literal', 'value' => ''],
-                "<?xml version=\"1.0\"?>\n<literal/>\n",
+                '<literal/>',
             ],
         ];
     }
@@ -86,22 +81,22 @@ final class TermTest extends TestCase
             'URI' => [
                 new Resource('https://example.com/foo'),
                 ['type' => 'uri', 'value' => 'https://example.com/foo'],
-                "<?xml version=\"1.0\"?>\n<uri>https://example.com/foo</uri>\n",
+                '<uri>https://example.com/foo</uri>',
             ],
             'URI alternative' => [
                 new Resource('https://example.com/id'),
                 ['type' => 'uri', 'value' => 'https://example.com/id'],
-                "<?xml version=\"1.0\"?>\n<uri>https://example.com/id</uri>\n",
+                '<uri>https://example.com/id</uri>',
             ],
             'blank node' => [
                 new Resource('_:b1'),
                 ['type' => 'bnode', 'value' => 'b1'],
-                "<?xml version=\"1.0\"?>\n<bnode>b1</bnode>\n",
+                '<bnode>b1</bnode>',
             ],
             'blank node alternative' => [
                 new Resource('_:n0'),
                 ['type' => 'bnode', 'value' => 'n0'],
-                "<?xml version=\"1.0\"?>\n<bnode>n0</bnode>\n",
+                '<bnode>n0</bnode>',
             ],
         ];
     }

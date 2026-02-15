@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace FancySparql\Xml;
 
-use SimpleXMLElement;
+use DOMDocument;
+use DOMNode;
 
 interface XMLSerializable
 {
     /**
      * Serializes this object to an XML element.
      */
-    public function xmlSerialize(SimpleXMLElement|null $parent = null): SimpleXMLElement;
+    public function xmlSerialize(DOMDocument $document): DOMNode;
 }

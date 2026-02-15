@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FancySparql\Results;
 
+use DOMDocument;
+use DOMElement;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use FancySparql\Xml\XMLSerializable;
@@ -12,7 +14,6 @@ use InvalidArgumentException;
 use IteratorAggregate;
 use JsonSerializable;
 use Override;
-use SimpleXMLElement;
 use Traversable;
 
 use function array_key_exists;
@@ -122,13 +123,16 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
     }
 
     #[Override]
-    public function xmlSerialize(SimpleXMLElement|null $parent = null): SimpleXMLElement
+    public function xmlSerialize(DOMDocument $document): DOMElement
     {
-        $result = XMLUtils::addChild($parent, 'result');
-        foreach ($this->bindings as $name => $binding) {
-            $element = XMLUtils::addChild($result, 'binding');
-            $element->addAttribute('name', $name);
-            $binding->xmlSerialize($element);
+        $result = XMLUtils::createElement($document, 'result');
+        foreach ($this->bindings as $name => $value) {
+            $binding = XMLUtils::createElement($document, 'binding');
+            $binding->setAttribute('name', $name);
+
+            $term = $value->xmlSerialize($document);
+            $binding->appendChild($term);
+            $result->appendChild($binding);
         }
 
         return $result;

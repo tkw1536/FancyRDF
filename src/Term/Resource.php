@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace FancySparql\Term;
 
+use DOMDocument;
+use DOMNode;
 use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
-use SimpleXMLElement;
 
 use function filter_var;
 use function is_string;
@@ -72,15 +73,15 @@ final class Resource extends Term
 
     /** @throws InvalidArgumentException */
     #[Override]
-    public static function deserializeXML(SimpleXMLElement $element): Resource
+    public static function deserializeXML(DOMNode $element): Resource
     {
-        $elementName = $element->getName();
+        $elementName = $element->localName;
         if ($elementName === 'uri') {
-            return new Resource((string) $element);
+            return new Resource($element->textContent);
         }
 
         if ($elementName === 'bnode') {
-            return new Resource('_:' . (string) $element);
+            return new Resource('_:' . $element->textContent);
         }
 
         throw new InvalidArgumentException('Invalid element name');
@@ -118,12 +119,12 @@ final class Resource extends Term
     }
 
     #[Override]
-    public function xmlSerialize(SimpleXMLElement|null $parent = null): SimpleXMLElement
+    public function xmlSerialize(DOMDocument $document): DOMNode
     {
         $blankNodeID = $this->getBlankNodeId();
 
         return $blankNodeID !== null
-            ? XMLUtils::addChild($parent, 'bnode', $blankNodeID)
-            : XMLUtils::addChild($parent, 'uri', $this->uri);
+            ? XMLUtils::createElement($document, 'bnode', $blankNodeID)
+            : XMLUtils::createElement($document, 'uri', $this->uri);
     }
 }

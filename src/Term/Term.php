@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace FancySparql\Term;
 
+use DOMElement;
 use FancySparql\Xml\XMLSerializable;
 use InvalidArgumentException;
 use JsonSerializable;
 use Override;
-use SimpleXMLElement;
 
 /**
  * Represents a SPARQL Term.
@@ -47,9 +47,9 @@ abstract class Term implements JsonSerializable, XMLSerializable
         throw new InvalidArgumentException('Invalid term type');
     }
 
-    public static function deserializeXML(SimpleXMLElement $element): Resource|Literal
+    public static function deserializeXML(DOMElement $element): Resource|Literal
     {
-        $type = $element->getName();
+        $type = $element->localName;
         if ($type === 'uri' || $type === 'bnode') {
             return Resource::deserializeXML($element);
         }

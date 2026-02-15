@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace FancySparql\Tests\Term;
 
+use DOMDocument;
 use FancySparql\Term\Resource;
+use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
-use SimpleXMLElement;
-
-use function simplexml_load_string;
 
 /** @phpstan-import-type ResourceElement from Resource */
 final class ResourceTest extends TestCase
@@ -67,7 +66,9 @@ final class ResourceTest extends TestCase
         string $expectedXml,
     ): void {
         self::assertSame($expectedJson, $resource->jsonSerialize(), 'JSON serialization');
-        self::assertSame($expectedXml, $resource->xmlSerialize(null)->asXML(), 'XML serialization');
+
+        $gotXML = XMLUtils::formatXML($resource->xmlSerialize(new DOMDocument()));
+        self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
     /** @param ResourceElement $expectedJson */
@@ -77,10 +78,7 @@ final class ResourceTest extends TestCase
         array $expectedJson,
         string $expectedXml,
     ): void {
-        $element = simplexml_load_string($expectedXml);
-        self::assertInstanceOf(SimpleXMLElement::class, $element);
-
-        $resourceFromXml = Resource::deserializeXML($element);
+        $resourceFromXml = Resource::deserializeXML(XMLUtils::parseAndGetRootNode($expectedXml));
         self::assertTrue($resourceFromXml->equals($resource), 'XML deserialize');
 
         $resourceFromJson = Resource::deserializeJSON($expectedJson);
@@ -90,13 +88,10 @@ final class ResourceTest extends TestCase
     #[DataProvider('deserializeInvalidXMLProvider')]
     public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
     {
-        $element = simplexml_load_string($xml);
-        self::assertInstanceOf(SimpleXMLElement::class, $element);
-
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage($expectedMessage);
 
-        Resource::deserializeXML($element);
+        Resource::deserializeXML(XMLUtils::parseAndGetRootNode($xml));
     }
 
     /** @return array<string, array{string, string}> */
