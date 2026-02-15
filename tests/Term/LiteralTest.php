@@ -15,6 +15,10 @@ use PHPUnit\Framework\TestCase;
 /** @phpstan-import-type LiteralElement from Literal */
 final class LiteralTest extends TestCase
 {
+    /**
+     * @param non-empty-string|null $language
+     * @param non-empty-string|null $datatype
+     */
     #[DataProvider('constructorProvider')]
     public function testConstructor(string $value, string|null $language, string|null $datatype, bool $expectValid): void
     {
@@ -110,11 +114,11 @@ final class LiteralTest extends TestCase
             ],
             'invalid language type' => [
                 ['type' => 'literal', 'value' => 'foo', 'language' => 123],
-                'Language must be a string',
+                'Language must be a non-empty string',
             ],
             'invalid datatype type' => [
                 ['type' => 'literal', 'value' => 'bar', 'datatype' => []],
-                'Datatype must be a string',
+                'Datatype must be a non-empty string',
             ],
         ];
     }

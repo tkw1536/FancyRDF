@@ -16,10 +16,14 @@ use function is_string;
 /**
  * Represents an RDF literal.
  *
- * @phpstan-type LiteralElement array{'type': 'literal', 'value': string, 'datatype'?: string, 'xml:lang'?: string}
+ * @phpstan-type LiteralElement array{'type': 'literal', 'value': string, 'datatype'?: non-empty-string, 'xml:lang'?: non-empty-string}
  */
 final class Literal extends Term
 {
+    /**
+     * @param non-empty-string|null $language
+     * @param non-empty-string|null $datatype
+     */
     public function __construct(readonly string $value, readonly string|null $language = null, readonly string|null $datatype = null)
     {
         if ($language !== null && $datatype !== null) {
@@ -47,13 +51,13 @@ final class Literal extends Term
         }
 
         $language = $data['language'] ?? null;
-        if ($language !== null && ! is_string($language)) {
-            throw new InvalidArgumentException('Language must be a string');
+        if (! ($language === null || is_string($language)) || $language === '') {
+            throw new InvalidArgumentException('Language must be a non-empty string');
         }
 
         $datatype = $data['datatype'] ?? null;
-        if ($datatype !== null && ! is_string($datatype)) {
-            throw new InvalidArgumentException('Datatype must be a string');
+        if (! ($datatype === null || is_string($datatype)) || $datatype === '') {
+            throw new InvalidArgumentException('Datatype must be a non-empty string');
         }
 
         return new Literal($value, $language, $datatype);
