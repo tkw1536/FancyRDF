@@ -7,7 +7,11 @@ namespace FancySparql\Tests\Term;
 use FancySparql\Term\Literal;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
+use SimpleXMLElement;
+
+use function simplexml_load_string;
 
 /** @phpstan-import-type LiteralElement from Literal */
 final class LiteralTest extends TestCase
@@ -42,55 +46,81 @@ final class LiteralTest extends TestCase
     }
 
     /** @param LiteralElement $expectedJson */
-    #[DataProvider('literalSerializationProvider')]
+    #[DataProviderExternal(TermTest::class, 'literalSerializationProvider')]
     public function testSerialize(
-        string $value,
-        string|null $language,
-        string|null $datatype,
+        Literal $literal,
         array $expectedJson,
         string $expectedXml,
     ): void {
-        $literal = new Literal($value, $language, $datatype);
-
         self::assertSame($expectedJson, $literal->jsonSerialize(), 'JSON serialization');
         self::assertSame($expectedXml, $literal->xmlSerialize(null)->asXML(), 'XML serialization');
     }
 
-    /** @return array<string, array{string, string|null, string|null, LiteralElement, string}> */
-    public static function literalSerializationProvider(): array
+    /** @param LiteralElement $expectedJson */
+    #[DataProviderExternal(TermTest::class, 'literalSerializationProvider')]
+    public function testDeserialize(
+        Literal $literal,
+        array $expectedJson,
+        string $expectedXml,
+    ): void {
+        $element = simplexml_load_string($expectedXml);
+        self::assertInstanceOf(SimpleXMLElement::class, $element);
+
+        $literalFromXml = Literal::deserializeXML($element);
+
+        self::assertTrue($literalFromXml->equals($literal), 'XML deserialize');
+
+        $literalFromJson = Literal::deserializeJSON($expectedJson);
+        self::assertTrue($literalFromJson->equals($literal), 'JSON deserialize');
+    }
+
+    #[DataProvider('deserializeInvalidXMLProvider')]
+    public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
+    {
+        $element = simplexml_load_string($xml);
+        self::assertInstanceOf(SimpleXMLElement::class, $element);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        Literal::deserializeXML($element);
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function deserializeInvalidXMLProvider(): array
     {
         return [
-            'plain literal' => [
-                'hello',
-                null,
-                null,
-                ['type' => 'literal', 'value' => 'hello'],
-                "<?xml version=\"1.0\"?>\n<literal>hello</literal>\n",
+            'invalid element name' => [
+                "<?xml version=\"1.0\"?>\n<other>value</other>\n",
+                'Invalid element name',
             ],
-            'literal with language' => [
-                'hello',
-                'en',
-                null,
-                ['type' => 'literal', 'value' => 'hello', 'language' => 'en'],
-                "<?xml version=\"1.0\"?>\n<literal xml:lang=\"en\">hello</literal>\n",
+        ];
+    }
+
+    /** @param mixed[] $invalidData */
+    #[DataProvider('deserializeInvalidJSONProvider')]
+    public function testDeserializeInvalidJSON(array $invalidData, string $expectedMessage): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($expectedMessage);
+        Literal::deserializeJSON($invalidData);
+    }
+
+    /** @return array<string, array{mixed[], string}> */
+    public static function deserializeInvalidJSONProvider(): array
+    {
+        return [
+            'missing value key' => [
+                ['type' => 'literal'],
+                'Value must be a string',
             ],
-            'literal with datatype' => [
-                '42',
-                null,
-                'http://www.w3.org/2001/XMLSchema#integer',
-                [
-                    'type' => 'literal',
-                    'value' => '42',
-                    'datatype' => 'http://www.w3.org/2001/XMLSchema#integer',
-                ],
-                "<?xml version=\"1.0\"?>\n<literal datatype=\"http://www.w3.org/2001/XMLSchema#integer\">42</literal>\n",
+            'invalid language type' => [
+                ['type' => 'literal', 'value' => 'foo', 'language' => 123],
+                'Language must be a string',
             ],
-            'empty value' => [
-                '',
-                null,
-                null,
-                ['type' => 'literal', 'value' => ''],
-                "<?xml version=\"1.0\"?>\n<literal/>\n",
+            'invalid datatype type' => [
+                ['type' => 'literal', 'value' => 'bar', 'datatype' => []],
+                'Datatype must be a string',
             ],
         ];
     }

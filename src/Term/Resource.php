@@ -10,6 +10,7 @@ use Override;
 use SimpleXMLElement;
 
 use function filter_var;
+use function is_string;
 use function str_starts_with;
 use function strlen;
 use function substr;
@@ -36,6 +37,53 @@ final class Resource extends Term
         if (! filter_var($uri, FILTER_VALIDATE_URL)) {
             throw new InvalidArgumentException('Invalid URI');
         }
+    }
+
+    #[Override]
+    public function equals(Term $other): bool
+    {
+        return $other instanceof Resource && $this->uri === $other->uri;
+    }
+
+    /**
+     * @param mixed[] $data
+     *
+     * @throws InvalidArgumentException
+     */
+    #[Override]
+    public static function deserializeJSON(array $data): Resource
+    {
+        $type = $data['type'] ?? null;
+        if ($type !== 'uri' && $type !== 'bnode') {
+            throw new InvalidArgumentException('Invalid resource type');
+        }
+
+        $value = $data['value'] ?? null;
+        if (! is_string($value)) {
+            throw new InvalidArgumentException('Invalid resource value');
+        }
+
+        if ($type === 'bnode') {
+            $value = '_:' . $value;
+        }
+
+        return new Resource($value);
+    }
+
+    /** @throws InvalidArgumentException */
+    #[Override]
+    public static function deserializeXML(SimpleXMLElement $element): Resource
+    {
+        $elementName = $element->getName();
+        if ($elementName === 'uri') {
+            return new Resource((string) $element);
+        }
+
+        if ($elementName === 'bnode') {
+            return new Resource('_:' . (string) $element);
+        }
+
+        throw new InvalidArgumentException('Invalid element name');
     }
 
     /**

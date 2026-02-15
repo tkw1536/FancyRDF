@@ -7,7 +7,11 @@ namespace FancySparql\Tests\Term;
 use FancySparql\Term\Resource;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
+use SimpleXMLElement;
+
+use function simplexml_load_string;
 
 /** @phpstan-import-type ResourceElement from Resource */
 final class ResourceTest extends TestCase
@@ -56,41 +60,84 @@ final class ResourceTest extends TestCase
     }
 
     /** @param ResourceElement $expectedJson */
-    #[DataProvider('resourceSerializationProvider')]
+    #[DataProviderExternal(TermTest::class, 'resourceSerializationProvider')]
     public function testSerialize(
-        string $uri,
+        Resource $resource,
         array $expectedJson,
         string $expectedXml,
     ): void {
-        $resource = new Resource($uri);
-
         self::assertSame($expectedJson, $resource->jsonSerialize(), 'JSON serialization');
         self::assertSame($expectedXml, $resource->xmlSerialize(null)->asXML(), 'XML serialization');
     }
 
-    /** @return array<string, array{string, ResourceElement, string}> */
-    public static function resourceSerializationProvider(): array
+    /** @param ResourceElement $expectedJson */
+    #[DataProviderExternal(TermTest::class, 'resourceSerializationProvider')]
+    public function testDeserialize(
+        Resource $resource,
+        array $expectedJson,
+        string $expectedXml,
+    ): void {
+        $element = simplexml_load_string($expectedXml);
+        self::assertInstanceOf(SimpleXMLElement::class, $element);
+
+        $resourceFromXml = Resource::deserializeXML($element);
+        self::assertTrue($resourceFromXml->equals($resource), 'XML deserialize');
+
+        $resourceFromJson = Resource::deserializeJSON($expectedJson);
+        self::assertTrue($resourceFromJson->equals($resource), 'JSON deserialize');
+    }
+
+    #[DataProvider('deserializeInvalidXMLProvider')]
+    public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
+    {
+        $element = simplexml_load_string($xml);
+        self::assertInstanceOf(SimpleXMLElement::class, $element);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        Resource::deserializeXML($element);
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function deserializeInvalidXMLProvider(): array
     {
         return [
-            'URI' => [
-                'https://example.com/foo',
-                ['type' => 'uri', 'value' => 'https://example.com/foo'],
-                "<?xml version=\"1.0\"?>\n<uri>https://example.com/foo</uri>\n",
+            'invalid element name' => [
+                "<?xml version=\"1.0\"?>\n<other>value</other>\n",
+                'Invalid element name',
             ],
-            'URI alternative' => [
-                'https://example.com/id',
-                ['type' => 'uri', 'value' => 'https://example.com/id'],
-                "<?xml version=\"1.0\"?>\n<uri>https://example.com/id</uri>\n",
+        ];
+    }
+
+    /** @param mixed[] $invalidData */
+    #[DataProvider('deserializeInvalidJSONProvider')]
+    public function testDeserializeInvalidJSON(array $invalidData, string $expectedMessage): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($expectedMessage);
+        Resource::deserializeJSON($invalidData);
+    }
+
+    /** @return array<string, array{mixed[], string}> */
+    public static function deserializeInvalidJSONProvider(): array
+    {
+        return [
+            'invalid resource type' => [
+                ['type' => 'literal', 'value' => 'https://example.com/foo'],
+                'Invalid resource type',
             ],
-            'blank node' => [
-                '_:b1',
-                ['type' => 'bnode', 'value' => 'b1'],
-                "<?xml version=\"1.0\"?>\n<bnode>b1</bnode>\n",
+            'missing type' => [
+                ['value' => 'https://example.com/foo'],
+                'Invalid resource type',
             ],
-            'blank node alternative' => [
-                '_:n0',
-                ['type' => 'bnode', 'value' => 'n0'],
-                "<?xml version=\"1.0\"?>\n<bnode>n0</bnode>\n",
+            'missing value' => [
+                ['type' => 'uri'],
+                'Invalid resource value',
+            ],
+            'invalid value type' => [
+                ['type' => 'uri', 'value' => 123],
+                'Invalid resource value',
             ],
         ];
     }

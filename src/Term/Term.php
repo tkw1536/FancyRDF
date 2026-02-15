@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace FancySparql\Term;
 
 use FancySparql\Xml\XMLSerializable;
+use InvalidArgumentException;
 use JsonSerializable;
 use Override;
+use SimpleXMLElement;
 
 /**
  * Represents a SPARQL Term.
@@ -25,4 +27,39 @@ abstract class Term implements JsonSerializable, XMLSerializable
      */
     #[Override]
     abstract public function jsonSerialize(): array;
+
+    /**
+     * @param mixed[] $data
+     *
+     * @throws InvalidArgumentException
+     */
+    public static function deserializeJSON(array $data): Resource|Literal
+    {
+        $type = $data['type'] ?? null;
+        if ($type === 'uri' || $type === 'bnode') {
+            return Resource::deserializeJSON($data);
+        }
+
+        if ($type === 'literal') {
+            return Literal::deserializeJSON($data);
+        }
+
+        throw new InvalidArgumentException('Invalid term type');
+    }
+
+    public static function deserializeXML(SimpleXMLElement $element): Resource|Literal
+    {
+        $type = $element->getName();
+        if ($type === 'uri' || $type === 'bnode') {
+            return Resource::deserializeXML($element);
+        }
+
+        if ($type === 'literal') {
+            return Literal::deserializeXML($element);
+        }
+
+        throw new InvalidArgumentException('Invalid element name');
+    }
+
+    abstract public function equals(Term $other): bool;
 }
