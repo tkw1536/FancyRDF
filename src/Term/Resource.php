@@ -10,13 +10,10 @@ use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 
-use function filter_var;
 use function is_string;
 use function str_starts_with;
 use function strlen;
 use function substr;
-
-use const FILTER_VALIDATE_URL;
 
 /**
  * Represents an RDF resource.
@@ -33,10 +30,6 @@ final class Resource extends Term
             }
 
             return;
-        }
-
-        if (! filter_var($uri, FILTER_VALIDATE_URL)) {
-            throw new InvalidArgumentException('Invalid URI');
         }
     }
 

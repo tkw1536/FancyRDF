@@ -7,14 +7,20 @@ namespace FancySparql\Graph;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use InvalidArgumentException;
+use Traversable;
 
 use function ctype_xdigit;
 use function hexdec;
 use function mb_chr;
+use function mb_ord;
+use function mb_substr;
 use function ord;
+use function preg_split;
 use function sprintf;
 use function strlen;
 use function substr;
+
+use const PREG_SPLIT_NO_EMPTY;
 
 final class NFormatParser
 {
@@ -23,13 +29,37 @@ final class NFormatParser
     {
     }
 
+    /**
+     * Reads content from the given string.
+     *
+     * @return Traversable<array{Literal|Resource, Resource, Literal|Resource}|array{Literal|Resource, Resource, Literal|Resource, Resource}>
+     *
+     * @throws InvalidArgumentException
+     */
+    public static function parse(string $source): Traversable
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $source, -1, PREG_SPLIT_NO_EMPTY);
+        if ($lines === false) {
+            throw new InvalidArgumentException('Failed to split lines from source.');
+        }
+
+        foreach ($lines as $line) {
+            $term = self::parseLine($line);
+            if ($term === null) {
+                continue;
+            }
+
+            yield $term;
+        }
+    }
+
   /**
    * Parses a single N-Quads line into a quad or null.
    *
    * @param string $line
    *   One line (subject predicate object [graph] .).
    *
-   * @return array{Literal|Resource, Literal|Resource, Literal|Resource}|array{Literal|Resource, Literal|Resource, Literal|Resource, Resource}|null
+   * @return array{Literal|Resource, Resource, Literal|Resource}|array{Literal|Resource, Resource, Literal|Resource, Resource}|null
    *   The triple, quad, or null if the line is empty or a comment.
    *
    * @throws InvalidArgumentException
@@ -48,7 +78,11 @@ final class NFormatParser
         // parse subject, predicate, object -- these are required.
         $subject   = self::parseTerm($line, $pos, $len);
         $predicate = self::parseTerm($line, $pos, $len);
-        $object    = self::parseTerm($line, $pos, $len);
+        if (! $predicate instanceof Resource) {
+            throw new InvalidArgumentException(sprintf('Predicate must be IRI at position %d.', $pos));
+        }
+
+        $object = self::parseTerm($line, $pos, $len);
 
         // optionally parse a graph
         $graph = null;
@@ -131,11 +165,6 @@ final class NFormatParser
    */
     private static function parseIriRef(string $line, int &$pos, int $len): string
     {
-      // read the opening <
-        if ($line[$pos] !== '<') {
-            throw new InvalidArgumentException(sprintf('Expected "<" at position %d.', $pos));
-        }
-
         $pos++;
 
         $start = $pos;
@@ -167,26 +196,98 @@ final class NFormatParser
     }
 
   /**
-   * Parses a blank node label _:label.
+   * Parses a blank node label _:label per BLANK_NODE_LABEL.
+   *
+   * BLANK_NODE_LABEL ::= '_:' (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)?
    */
     private static function parseBlankNodeLabel(string $line, int &$pos, int $len): string
     {
-        if ($pos + 2 > $len || $line[$pos] !== '_' || $line[$pos + 1] !== ':') {
-            throw new InvalidArgumentException(sprintf('Expected "_:" at position %d.', $pos));
+        $labelStart = $pos;
+        $pos       += 2;
+        $first      = self::readNextCodepoint($line, $pos, $len);
+        if ($first === null || (! self::isPnCharsU($first) && ($first < 0x30 || $first > 0x39))) {
+            throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
         }
 
-        $pos  += 2;
-        $start = $pos;
+        $lastWasDot  = false;
+        $lastByteLen = 0;
         while ($pos < $len) {
-            $ch = $line[$pos];
-            if ($ch === ' ' || $ch === "\t" || $ch === '.') {
+            $prevPos = $pos;
+            $ord     = self::readNextCodepoint($line, $pos, $len);
+            if ($ord === null) {
                 break;
             }
 
-            $pos++;
+            if ($ord === 0x2E) {
+                $lastWasDot  = true;
+                $lastByteLen = $pos - $prevPos;
+                continue;
+            }
+
+            if (! self::isPnChars($ord)) {
+                $pos = $prevPos;
+                break;
+            }
+
+            $lastWasDot  = false;
+            $lastByteLen = $pos - $prevPos;
         }
 
-        return '_:' . substr($line, $start, $pos - $start);
+        if ($lastWasDot) {
+            $pos -= $lastByteLen;
+        }
+
+        return substr($line, $labelStart, $pos - $labelStart);
+    }
+
+  /**
+   * Reads the next UTF-8 code point at $pos and advances $pos.
+   */
+    private static function readNextCodepoint(string $line, int &$pos, int $len): int|null
+    {
+        if ($pos >= $len) {
+            return null;
+        }
+
+        // Extract the next character from the line.
+        // 4 is the maximum number of bytes for a UTF-8 character.
+        $chunk = substr($line, $pos, 4);
+        $char  = mb_substr($chunk, 0, 1);
+        $pos  += strlen($char);
+
+        return mb_ord($char, 'UTF-8');
+    }
+
+  /**
+   * PN_CHARS_BASE per grammar.
+   */
+    private static function isPnCharsBase(int $ord): bool
+    {
+        return ($ord >= 0x41 && $ord <= 0x5A) || ($ord >= 0x61 && $ord <= 0x7A)
+            || ($ord >= 0x00C0 && $ord <= 0x00D6) || ($ord >= 0x00D8 && $ord <= 0x00F6)
+            || ($ord >= 0x00F8 && $ord <= 0x02FF) || ($ord >= 0x0370 && $ord <= 0x037D)
+            || ($ord >= 0x037F && $ord <= 0x1FFF) || ($ord >= 0x200C && $ord <= 0x200D)
+            || ($ord >= 0x2070 && $ord <= 0x218F) || ($ord >= 0x2C00 && $ord <= 0x2FEF)
+            || ($ord >= 0x3001 && $ord <= 0xD7FF) || ($ord >= 0xF900 && $ord <= 0xFDCF)
+            || ($ord >= 0xFDF0 && $ord <= 0xFFFD) || ($ord >= 0x10000 && $ord <= 0xEFFFF);
+    }
+
+  /**
+   * PN_CHARS_U ::= PN_CHARS_BASE | '_' | ':'
+   */
+    private static function isPnCharsU(int $ord): bool
+    {
+        return $ord === 0x5F || $ord === 0x3A || self::isPnCharsBase($ord);
+    }
+
+  /**
+   * PN_CHARS ::= PN_CHARS_U | '-' | [0-9] | #x00B7 | [#x0300-#x036F] | [#x203F-#x2040]
+   */
+    private static function isPnChars(int $ord): bool
+    {
+        return self::isPnCharsU($ord) || $ord === 0x2D || ($ord >= 0x30 && $ord <= 0x39)
+            || $ord === 0x00B7 || ($ord >= 0x0300 && $ord <= 0x036F)
+            || ($ord >= 0x203F && $ord <= 0x2040);
     }
 
   /**

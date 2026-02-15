@@ -85,7 +85,8 @@ final class NFormatTest extends TestCase
             return;
         }
 
-        self::assertTrue($parsed[3]->equals($graph), 'graph');
+        self::assertCount(4, $parsed, 'should return a quad');
+        self::assertTrue(($parsed[3] ?? null)?->equals($graph), 'graph');
     }
 
     public function testParseLineEmptyReturnsNull(): void

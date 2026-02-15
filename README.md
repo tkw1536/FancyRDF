@@ -23,3 +23,4 @@ The Makefile target `make test` runs the tests.
 ## License
 
 There is no license for the library and primary testing code, as the code is still in development.
+Some of the test data in the `rdf_tests` has been adapted from W3C, licensing information can be found in the README in that directory.
