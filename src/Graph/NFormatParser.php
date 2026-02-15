@@ -15,6 +15,7 @@ use function mb_chr;
 use function mb_ord;
 use function mb_substr;
 use function ord;
+use function preg_match;
 use function preg_split;
 use function sprintf;
 use function strlen;
@@ -246,12 +247,8 @@ final class NFormatParser
    */
     private static function parseBlankNodeLabel(string $line, int &$pos, int $len): string
     {
-        if ($pos + 2 > $len || $line[$pos] !== '_' || $line[$pos + 1] !== ':') {
-            throw new InvalidArgumentException(sprintf('Expected "_:" at position %d.', $pos));
-        }
-
         $labelStart = $pos;
-        $pos       += 2;
+        $pos       += 2; // skip the _: prefix
 
         $first = self::readNextCodepoint($line, $pos, $len);
         if ($first === null) {
@@ -386,15 +383,12 @@ final class NFormatParser
 
         if ($pos < $len && $line[$pos] === '@') {
             $pos++;
-            $start = $pos;
-            while ($pos < $len && self::isLangTagChar($line[$pos], $pos > $start)) {
-                $pos++;
-            }
-
-            $lang = substr($line, $start, $pos - $start);
-            if ($lang === '') {
+            $rest = substr($line, $pos, $len - $pos);
+            if ($rest === '' || preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/', $rest, $m) !== 1 || $m[0] === '') {
                 throw new InvalidArgumentException(sprintf('Missing language tag at position %d.', $pos));
             }
+            $lang = $m[0];
+            $pos += strlen($lang);
         } elseif ($pos + 1 < $len && $line[$pos] === '^' && $line[$pos + 1] === '^') {
             $pos     += 2;
             $datatype = self::parseIriRef($line, $pos, $len);
@@ -518,25 +512,5 @@ final class NFormatParser
             '\\' => '\\',
             default => throw new InvalidArgumentException(sprintf('Invalid escape sequence \\%s.', $char)),
         };
-    }
-
-  /**
-   * Checks if a character is allowed in a language tag (LANGTAG).
-   */
-    private static function isLangTagChar(string $ch, bool $afterFirst): bool
-    {
-        if ($ch === '-') {
-            return $afterFirst;
-        }
-
-        if (strlen($ch) !== 1) {
-            return false;
-        }
-
-        $o = ord($ch);
-
-        return ($o >= self::LATIN_SMALL_A && $o <= self::LATIN_SMALL_Z)
-            || ($o >= self::LATIN_CAPITAL_A && $o <= self::LATIN_CAPITAL_Z)
-            || ($afterFirst && $o >= self::DIGIT_ZERO && $o <= self::DIGIT_NINE);
     }
 }
