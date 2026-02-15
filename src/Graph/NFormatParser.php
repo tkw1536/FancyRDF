@@ -24,6 +24,48 @@ use const PREG_SPLIT_NO_EMPTY;
 
 final class NFormatParser
 {
+    private const int COLON                = 0x3A;   // ':'
+    private const int FULL_STOP            = 0x2E;   // '.'
+    private const int HYPHEN_MINUS         = 0x2D;   // '-'
+    private const int LOW_LINE             = 0x5F;   // '_'
+    private const int DIGIT_ZERO           = 0x30;   // '0'
+    private const int DIGIT_NINE           = 0x39;   // '9'
+    private const int MIDDLE_DOT           = 0x00B7; // '·'
+    private const int COMBINING_FIRST      = 0x0300;
+    private const int COMBINING_LAST       = 0x036F;
+    private const int PERMITTED_203F_FIRST = 0x203F;
+    private const int PERMITTED_2040_LAST  = 0x2040;
+
+    // PN_CHARS_BASE ranges [A-Z] [a-z] and Unicode letter ranges
+    private const int LATIN_CAPITAL_A  = 0x41;
+    private const int LATIN_CAPITAL_Z  = 0x5A;
+    private const int LATIN_SMALL_A    = 0x61;
+    private const int LATIN_SMALL_Z    = 0x7A;
+    private const int PN_00C0_FIRST    = 0x00C0;
+    private const int PN_00D6_LAST     = 0x00D6;
+    private const int PN_00D8_FIRST    = 0x00D8;
+    private const int PN_00F6_LAST     = 0x00F6;
+    private const int PN_00F8_FIRST    = 0x00F8;
+    private const int PN_02FF_LAST     = 0x02FF;
+    private const int PN_0370_FIRST    = 0x0370;
+    private const int PN_037D_LAST     = 0x037D;
+    private const int PN_037F_FIRST    = 0x037F;
+    private const int PN_1FFF_LAST     = 0x1FFF;
+    private const int PN_200C_FIRST    = 0x200C;
+    private const int PN_200D_LAST     = 0x200D;
+    private const int PN_2070_FIRST    = 0x2070;
+    private const int PN_218F_LAST     = 0x218F;
+    private const int PN_2C00_FIRST    = 0x2C00;
+    private const int PN_2FEF_LAST     = 0x2FEF;
+    private const int PN_3001_FIRST    = 0x3001;
+    private const int PN_D7FF_LAST     = 0xD7FF;
+    private const int PN_F900_FIRST    = 0xF900;
+    private const int PN_FDCF_LAST     = 0xFDCF;
+    private const int PN_FDF0_FIRST    = 0xFDF0;
+    private const int PN_FFFD_LAST     = 0xFFFD;
+    private const int PN_10000_FIRST   = 0x10000;
+    private const int PN_EFFFF_LAST    = 0xEFFFF;
+
     /** you cannot instantiate this class */
     private function __construct()
     {
@@ -196,16 +238,38 @@ final class NFormatParser
     }
 
   /**
-   * Parses a blank node label _:label per BLANK_NODE_LABEL.
+   * Parses a blank node label _:label.
    *
-   * BLANK_NODE_LABEL ::= '_:' (PN_CHARS_U | [0-9]) ((PN_CHARS | '.')* PN_CHARS)?
+   * Label is built on PN_CHARS_BASE, with: _ and [0-9] anywhere; . anywhere except
+   * first or last; -, U+00B7, U+0300–U+036F, U+203F–U+2040 anywhere except first.
+   * Colon is not allowed (W3C N-Triples).
    */
     private static function parseBlankNodeLabel(string $line, int &$pos, int $len): string
     {
+        if ($pos + 2 > $len || $line[$pos] !== '_' || $line[$pos + 1] !== ':') {
+            throw new InvalidArgumentException(sprintf('Expected "_:" at position %d.', $pos));
+        }
+
         $labelStart = $pos;
         $pos       += 2;
-        $first      = self::readNextCodepoint($line, $pos, $len);
-        if ($first === null || (! self::isPnCharsU($first) && ($first < 0x30 || $first > 0x39))) {
+
+        $first = self::readNextCodepoint($line, $pos, $len);
+        if ($first === null) {
+            throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
+        }
+
+        if (
+            $first === self::COLON
+            || $first === self::FULL_STOP
+            || $first === self::HYPHEN_MINUS
+            || $first === self::MIDDLE_DOT
+            || ($first >= self::COMBINING_FIRST && $first <= self::COMBINING_LAST)
+            || ($first >= self::PERMITTED_203F_FIRST && $first <= self::PERMITTED_2040_LAST)
+        ) {
+            throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
+        }
+
+        if (! self::isBlankNodeLabelFirstChar($first)) {
             throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
         }
 
@@ -218,13 +282,17 @@ final class NFormatParser
                 break;
             }
 
-            if ($ord === 0x2E) {
+            if ($ord === self::COLON) {
+                throw new InvalidArgumentException(sprintf('Colon not allowed in blank node label at position %d.', $pos));
+            }
+
+            if ($ord === self::FULL_STOP) {
                 $lastWasDot  = true;
                 $lastByteLen = $pos - $prevPos;
                 continue;
             }
 
-            if (! self::isPnChars($ord)) {
+            if (! self::isBlankNodeLabelRestChar($ord)) {
                 $pos = $prevPos;
                 break;
             }
@@ -238,6 +306,52 @@ final class NFormatParser
         }
 
         return substr($line, $labelStart, $pos - $labelStart);
+    }
+
+  /**
+   * PN_CHARS_BASE: first character of a blank node label (letters only, or _ or digit).
+   */
+    private static function isBlankNodeLabelFirstChar(int $ord): bool
+    {
+        return self::isPnCharsBase($ord)
+            || $ord === self::LOW_LINE
+            || ($ord >= self::DIGIT_ZERO && $ord <= self::DIGIT_NINE);
+    }
+
+  /**
+   * Characters allowed in a blank node label after the first (PN_CHARS_BASE, _, digit, ., -, ·, combining, 203F–2040).
+   */
+    private static function isBlankNodeLabelRestChar(int $ord): bool
+    {
+        return self::isPnCharsBase($ord)
+            || $ord === self::LOW_LINE
+            || ($ord >= self::DIGIT_ZERO && $ord <= self::DIGIT_NINE)
+            || $ord === self::FULL_STOP
+            || $ord === self::HYPHEN_MINUS
+            || $ord === self::MIDDLE_DOT
+            || ($ord >= self::COMBINING_FIRST && $ord <= self::COMBINING_LAST)
+            || ($ord >= self::PERMITTED_203F_FIRST && $ord <= self::PERMITTED_2040_LAST);
+    }
+
+  /**
+   * PN_CHARS_BASE per grammar (letter ranges).
+   */
+    private static function isPnCharsBase(int $ord): bool
+    {
+        return ($ord >= self::LATIN_CAPITAL_A && $ord <= self::LATIN_CAPITAL_Z)
+            || ($ord >= self::LATIN_SMALL_A && $ord <= self::LATIN_SMALL_Z)
+            || ($ord >= self::PN_00C0_FIRST && $ord <= self::PN_00D6_LAST)
+            || ($ord >= self::PN_00D8_FIRST && $ord <= self::PN_00F6_LAST)
+            || ($ord >= self::PN_00F8_FIRST && $ord <= self::PN_02FF_LAST)
+            || ($ord >= self::PN_0370_FIRST && $ord <= self::PN_037D_LAST)
+            || ($ord >= self::PN_037F_FIRST && $ord <= self::PN_1FFF_LAST)
+            || ($ord >= self::PN_200C_FIRST && $ord <= self::PN_200D_LAST)
+            || ($ord >= self::PN_2070_FIRST && $ord <= self::PN_218F_LAST)
+            || ($ord >= self::PN_2C00_FIRST && $ord <= self::PN_2FEF_LAST)
+            || ($ord >= self::PN_3001_FIRST && $ord <= self::PN_D7FF_LAST)
+            || ($ord >= self::PN_F900_FIRST && $ord <= self::PN_FDCF_LAST)
+            || ($ord >= self::PN_FDF0_FIRST && $ord <= self::PN_FFFD_LAST)
+            || ($ord >= self::PN_10000_FIRST && $ord <= self::PN_EFFFF_LAST);
     }
 
   /**
@@ -257,39 +371,6 @@ final class NFormatParser
 
         return mb_ord($char, 'UTF-8');
     }
-
-  /**
-   * PN_CHARS_BASE per grammar.
-   */
-    private static function isPnCharsBase(int $ord): bool
-    {
-        return ($ord >= 0x41 && $ord <= 0x5A) || ($ord >= 0x61 && $ord <= 0x7A)
-            || ($ord >= 0x00C0 && $ord <= 0x00D6) || ($ord >= 0x00D8 && $ord <= 0x00F6)
-            || ($ord >= 0x00F8 && $ord <= 0x02FF) || ($ord >= 0x0370 && $ord <= 0x037D)
-            || ($ord >= 0x037F && $ord <= 0x1FFF) || ($ord >= 0x200C && $ord <= 0x200D)
-            || ($ord >= 0x2070 && $ord <= 0x218F) || ($ord >= 0x2C00 && $ord <= 0x2FEF)
-            || ($ord >= 0x3001 && $ord <= 0xD7FF) || ($ord >= 0xF900 && $ord <= 0xFDCF)
-            || ($ord >= 0xFDF0 && $ord <= 0xFFFD) || ($ord >= 0x10000 && $ord <= 0xEFFFF);
-    }
-
-  /**
-   * PN_CHARS_U ::= PN_CHARS_BASE | '_' | ':'
-   */
-    private static function isPnCharsU(int $ord): bool
-    {
-        return $ord === 0x5F || $ord === 0x3A || self::isPnCharsBase($ord);
-    }
-
-  /**
-   * PN_CHARS ::= PN_CHARS_U | '-' | [0-9] | #x00B7 | [#x0300-#x036F] | [#x203F-#x2040]
-   */
-    private static function isPnChars(int $ord): bool
-    {
-        return self::isPnCharsU($ord) || $ord === 0x2D || ($ord >= 0x30 && $ord <= 0x39)
-            || $ord === 0x00B7 || ($ord >= 0x0300 && $ord <= 0x036F)
-            || ($ord >= 0x203F && $ord <= 0x2040);
-    }
-
   /**
    * Parses a literal: "..." with optional @lang or ^^<datatype>.
    *
@@ -454,6 +535,8 @@ final class NFormatParser
 
         $o = ord($ch);
 
-        return ($o >= 0x61 && $o <= 0x7A) || ($o >= 0x41 && $o <= 0x5A) || ($afterFirst && $o >= 0x30 && $o <= 0x39);
+        return ($o >= self::LATIN_SMALL_A && $o <= self::LATIN_SMALL_Z)
+            || ($o >= self::LATIN_CAPITAL_A && $o <= self::LATIN_CAPITAL_Z)
+            || ($afterFirst && $o >= self::DIGIT_ZERO && $o <= self::DIGIT_NINE);
     }
 }

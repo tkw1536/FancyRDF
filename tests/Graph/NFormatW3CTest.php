@@ -6,6 +6,7 @@ namespace FancySparql\Tests\Graph;
 
 use Exception;
 use FancySparql\Graph\NFormatParser;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -13,10 +14,11 @@ use function basename;
 use function dirname;
 use function file_get_contents;
 use function glob;
+use function json_encode;
 
 use const DIRECTORY_SEPARATOR;
 
-final class NTriplesRdfTestSuiteTest extends TestCase
+final class NFormatW3CTest extends TestCase
 {
     /**
      * @return array<string, array{string, string}>
@@ -87,5 +89,28 @@ final class NTriplesRdfTestSuiteTest extends TestCase
         }
 
         $this->assertEquals(0, $count, 'should return no statements');
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function badTriplesProvider(): array
+    {
+        return self::getFilesInDir(
+            dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'rdf_tests' . DIRECTORY_SEPARATOR . 'ntriples' . DIRECTORY_SEPARATOR . 'bad',
+            '*.nt',
+        );
+    }
+
+    #[DataProvider('badTriplesProvider')]
+    public function testBadTriples(string $path, string $content): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $statements = NFormatParser::parse($content);
+
+        $triples = [];
+        foreach ($statements as $statement) {
+            $triples[] = $statement;
+        }
+
+        throw new Exception(json_encode($triples));
     }
 }
