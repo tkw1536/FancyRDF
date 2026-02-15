@@ -14,6 +14,9 @@ use RuntimeException;
  */
 final class XMLUtils
 {
+    public const string XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    public const string XML_NAMESPACE   = 'http://www.w3.org/XML/1998/namespace';
+
     /** You cannot construct this class. */
     private function __construct()
     {

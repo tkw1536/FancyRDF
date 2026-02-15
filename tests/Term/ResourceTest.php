@@ -99,7 +99,7 @@ final class ResourceTest extends TestCase
     {
         return [
             'invalid element name' => [
-                "<?xml version=\"1.0\"?>\n<other>value</other>\n",
+                XMLUtils::XML_DECLARATION . "<other>value</other>\n",
                 'Invalid element name',
             ],
         ];

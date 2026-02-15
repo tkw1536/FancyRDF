@@ -2,6 +2,9 @@
 <ruleset name="FancySparql">
     <description>Coding standard for FancySparql</description>
 
+    <!-- This must work with PHP 8.3 and above -->
+    <config name="php_version" value="80300"/>
+
     <!-- slevomat coding standard -->
     <rule ref="Doctrine">
         <exclude name="Generic.Files.LineLength.TooLong" />
