@@ -23,14 +23,15 @@ use const PREG_SPLIT_NO_EMPTY;
  */
 final class NFormatSerializer
 {
-    public function __construct()
+    /** you cannot instantiate this class */
+    private function __construct()
     {
     }
 
-    public function serialize(Resource|Literal $subject, Resource|Literal $predicate, Resource|Literal $object, Resource|null $graph = null): string
+    /** @throws RuntimeException */
+    public static function serialize(Resource|Literal $subject, Resource|Literal $predicate, Resource|Literal $object, Resource|null $graph = null): string
     {
-        $out  = '';
-        $out .= self::serializeTerm($subject);
+        $out = self::serializeTerm($subject);
 
         $out .= ' ';
         $out .= self::serializeTerm($predicate);
@@ -62,9 +63,8 @@ final class NFormatSerializer
    */
     private static function serializeResource(Resource $resource): string
     {
-        $bnode = $resource->getBlankNodeId();
-        if ($bnode !== null) {
-            return '_:' . $bnode;
+        if ($resource->isBlankNode()) {
+            return $resource->uri;
         }
 
         return '<' . self::escapeIri($resource->uri) . '>';

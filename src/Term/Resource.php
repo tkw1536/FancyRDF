@@ -93,11 +93,19 @@ final class Resource extends Term
      */
     public function getBlankNodeId(): string|null
     {
-        if (! str_starts_with($this->uri, '_:')) {
+        if (! $this->isBlankNode()) {
             return null;
         }
 
         return substr($this->uri, 2);
+    }
+
+    /**
+     * Checks if this is a blank node.
+     */
+    public function isBlankNode(): bool
+    {
+        return str_starts_with($this->uri, '_:');
     }
 
     /** @return ResourceElement */
