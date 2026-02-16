@@ -21,6 +21,19 @@ use function substr;
 
 use const PREG_SPLIT_NO_EMPTY;
 
+/**
+ * Parses n-triples or n-quads from a file and streams them to the caller.
+ *
+ * The implementation guarantees that it can parse any valid Sparql 1.1 n-triples and n-quads file. This is
+ * guaranteed by being able to parse all valid triples from the RDF 1.1 test suite.
+ *
+ * This guarantee DOES NOT apply negatively: Invalid terms may serialize into an invalid Term instance,
+ * may parse into a completely different triple, or may throw an exception.
+ *
+ * @see https://www.w3.org/TR/n-triples/
+ * @see https://www.w3.org/TR/n-quads/
+ * @see https://www.w3.org/TR/rdf11-testcases/
+ */
 final class NFormatParser
 {
     /** you cannot instantiate this class */
@@ -69,16 +82,28 @@ final class NFormatParser
         $pos = 0;
 
         $len = strlen($line);
-        self::skipWhitespaceAndComments($line, $pos, $len);
-        if ($pos >= $len) {
+
+        self::skipWhitespace($line, $pos, $len);
+        if ($pos >= $len || $line[$pos] === '#') {
             return null;
         }
 
-        // parse subject, predicate, object -- these are required.
-        $subject   = self::parseTerm($line, $pos, $len);
+        $subject = self::parseTerm($line, $pos, $len);
+
+        self::skipWhitespace($line, $pos, $len);
+        if ($pos >= $len) {
+            throw new InvalidArgumentException('Unexpected end of line while reading term.');
+        }
+
         $predicate = self::parseTerm($line, $pos, $len);
+
         if (! $predicate instanceof Resource) {
             throw new InvalidArgumentException(sprintf('Predicate must be IRI at position %d.', $pos));
+        }
+
+        self::skipWhitespace($line, $pos, $len);
+        if ($pos >= $len) {
+            throw new InvalidArgumentException('Unexpected end of line while reading term.');
         }
 
         $object = self::parseTerm($line, $pos, $len);
@@ -110,12 +135,6 @@ final class NFormatParser
    */
     private static function parseTerm(string $line, int &$pos, int $len): Literal|Resource
     {
-        // skip any leading whitespace.
-        self::skipWhitespace($line, $pos, $len);
-        if ($pos >= $len) {
-            throw new InvalidArgumentException('Unexpected end of line while reading term.');
-        }
-
         // look at the current character and decide what to parse.
         $ch = $line[$pos];
         if ($ch === '<') {
@@ -131,19 +150,6 @@ final class NFormatParser
         }
 
         throw new InvalidArgumentException(sprintf('Invalid term start at position %d (char %s).', $pos, $ch));
-    }
-
-  /**
-   * Skips whitespace and comment (from # to end of line).
-   */
-    private static function skipWhitespaceAndComments(string $line, int &$pos, int $len): void
-    {
-        self::skipWhitespace($line, $pos, $len);
-        if ($pos >= $len || $line[$pos] !== '#') {
-            return;
-        }
-
-        $pos = $len;
     }
 
   /**

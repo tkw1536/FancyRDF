@@ -27,7 +27,7 @@ final class ResourceTest extends TestCase
             return;
         }
 
-        self::assertSame($uri, $resource->uri);
+        self::assertSame($uri, $resource->iri);
     }
 
     /** @return array<string, array{string, bool}> */

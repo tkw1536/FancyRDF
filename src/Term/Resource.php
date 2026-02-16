@@ -16,16 +16,30 @@ use function strlen;
 use function substr;
 
 /**
- * Represents an RDF resource.
+ * Represents an RDF1.1 IRI or Blank Node.
+ *
+ * @see https://www.w3.org/TR/rdf11-concepts/
  *
  * @phpstan-type ResourceElement array{'type': 'uri', 'value': string} | array{'type': 'bnode', 'value': string}
  */
 final class Resource extends Term
 {
-    public function __construct(readonly string $uri)
+    /**
+     * Constructs a new Resource from a URI or blank node ID.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3987
+     * @see https://www.w3.org/TR/rdf11-concepts/#section-IRIs
+     * @see https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes
+     *
+     * @param string $iri
+     *   A valid absolute IRI as per RFC3987 or a blank node identifier proceeded with '_:'.
+     *   This class makes no attempt to validate either the IRI or blank node identifier.
+     *   If passed an invalid string, the behavior of the entire class is undefined.
+     */
+    public function __construct(readonly string $iri)
     {
-        if (str_starts_with($uri, '_:')) {
-            if (strlen($uri) <= 2) {
+        if (str_starts_with($iri, '_:')) {
+            if (strlen($iri) <= 2) {
                 throw new InvalidArgumentException('Invalid blank node ID');
             }
 
@@ -36,7 +50,7 @@ final class Resource extends Term
     #[Override]
     public function equals(Term $other): bool
     {
-        return $other instanceof Resource && $this->uri === $other->uri;
+        return $other instanceof Resource && $this->iri === $other->iri;
     }
 
     /**
@@ -90,7 +104,7 @@ final class Resource extends Term
             return null;
         }
 
-        return substr($this->uri, 2);
+        return substr($this->iri, 2);
     }
 
     /**
@@ -98,7 +112,7 @@ final class Resource extends Term
      */
     public function isBlankNode(): bool
     {
-        return str_starts_with($this->uri, '_:');
+        return str_starts_with($this->iri, '_:');
     }
 
     /** @return ResourceElement */
@@ -115,7 +129,7 @@ final class Resource extends Term
 
         return [
             'type' => 'uri',
-            'value' => $this->uri,
+            'value' => $this->iri,
         ];
     }
 
@@ -126,6 +140,6 @@ final class Resource extends Term
 
         return $blankNodeID !== null
             ? XMLUtils::createElement($document, 'bnode', $blankNodeID)
-            : XMLUtils::createElement($document, 'uri', $this->uri);
+            : XMLUtils::createElement($document, 'uri', $this->iri);
     }
 }

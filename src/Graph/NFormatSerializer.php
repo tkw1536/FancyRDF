@@ -19,7 +19,20 @@ use function strlen;
 use const PREG_SPLIT_NO_EMPTY;
 
 /**
- * Serializes a triple or quad into an N-Triples or N-Quads string.
+ * Serializes a triple or quad into an N-Triples or N-Quads file.
+ *
+ * The implementation guarantees that it serializes valid Sparql 1.1 triples and quads. If the underlying
+ * Literal and Resources only contain valid data, it is guaranteed that the serialized string is also
+ * standards-compliant.
+ *
+ * This is guaranteed by being able to serialize all literals from the RDF 1.1 test suite.
+ *
+ * This guarantee does not apply negatively: For an invalid term, the library may produce a valid string, may
+ * produce an invalid term, or may throw an exception.
+ *
+ * @see https://www.w3.org/TR/n-triples/
+ * @see https://www.w3.org/TR/n-quads/
+ * @see https://www.w3.org/TR/rdf11-testcases/
  */
 final class NFormatSerializer
 {
@@ -64,10 +77,10 @@ final class NFormatSerializer
     private static function serializeResource(Resource $resource): string
     {
         if ($resource->isBlankNode()) {
-            return $resource->uri;
+            return $resource->iri;
         }
 
-        return '<' . self::escapeIri($resource->uri) . '>';
+        return '<' . self::escapeIri($resource->iri) . '>';
     }
 
   /**
@@ -75,13 +88,11 @@ final class NFormatSerializer
    */
     private static function serializeLiteral(Literal $term): string
     {
-        $out = '"' . self::escapeLiteralString($term->value) . '"';
+        $out = '"' . self::escapeLiteralString($term->lexical) . '"';
         if ($term->language !== null) {
             $out .= '@' . $term->language;
-        } else {
-            if ($term->datatype !== null) {
-                $out .= '^^<' . self::escapeIri($term->datatype) . '>';
-            }
+        } elseif ($term->datatype !== Literal::DATATYPE_STRING) {
+            $out .= '^^<' . self::escapeIri($term->datatype) . '>';
         }
 
         return $out;

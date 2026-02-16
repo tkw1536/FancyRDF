@@ -18,13 +18,13 @@ final class LiteralTest extends TestCase
     /**
      * @param non-empty-string|null $language
      * @param non-empty-string|null $datatype
+     * @param non-empty-string|null $expectDatatype
      */
     #[DataProvider('constructorProvider')]
-    public function testConstructor(string $value, string|null $language, string|null $datatype, bool $expectValid): void
+    public function testConstructor(string $value, string|null $language, string|null $datatype, string|null $expectDatatype, bool $expectValid): void
     {
         if (! $expectValid) {
             $this->expectException(InvalidArgumentException::class);
-            $this->expectExceptionMessage('Literal cannot have both language and datatype');
         }
 
         $literal = new Literal($value, $language, $datatype);
@@ -32,19 +32,23 @@ final class LiteralTest extends TestCase
             return;
         }
 
-        self::assertSame($value, $literal->value);
+        self::assertSame($value, $literal->lexical);
         self::assertSame($language, $literal->language);
-        self::assertSame($datatype, $literal->datatype);
+        self::assertSame($expectDatatype, $literal->datatype);
     }
 
-    /** @return array<string, array{string, string|null, string|null, bool}> */
+    /** @return array<string, array{string, string|null, string|null, string|null, bool}> */
     public static function constructorProvider(): array
     {
         return [
-            'value only' => ['hello', null, null, true],
-            'value with language' => ['hello', 'en', null, true],
-            'value with datatype' => ['42', null, 'http://www.w3.org/2001/XMLSchema#integer', true],
-            'both language and datatype throws' => ['x', 'en', 'http://example.com/dt', false],
+            'value only' => ['hello', null, null, Literal::DATATYPE_STRING, true],
+            'value with default datatype' => ['hello', null, Literal::DATATYPE_STRING, Literal::DATATYPE_STRING, true],
+
+            'value with only language tag' => ['hello', 'en', null, Literal::DATATYPE_LANG_STRING, true],
+            'value with language tag and valid datatype' => ['hello', 'en', Literal::DATATYPE_LANG_STRING, Literal::DATATYPE_LANG_STRING, true],
+
+            'both language and datatype throws' => ['x', 'en', 'http://example.com/dt', null, false],
+            'value with datatype' => ['42', null, 'http://www.w3.org/2001/XMLSchema#integer', 'http://www.w3.org/2001/XMLSchema#integer', true],
         ];
     }
 
