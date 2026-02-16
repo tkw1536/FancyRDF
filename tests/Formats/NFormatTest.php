@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\Graph;
+namespace FancySparql\Tests\Formats;
 
 use AssertionError;
-use FancySparql\Graph\NFormatParser;
-use FancySparql\Graph\NFormatSerializer;
+use FancySparql\Formats\NFormatParser;
+use FancySparql\Formats\NFormatSerializer;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use PHPUnit\Framework\Attributes\DataProvider;

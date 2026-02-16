@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Graph;
+namespace FancySparql\Formats;
 
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
