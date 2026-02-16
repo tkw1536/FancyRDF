@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace FancySparql\Tests\Term;
 
 use DOMDocument;
+use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
+use FancySparql\Term\Term;
 use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -109,6 +111,43 @@ final class ResourceTest extends TestCase
                 ['type' => 'uri', 'value' => 123],
                 'Resource value must be a non-empty string',
             ],
+        ];
+    }
+
+    /**
+     * @param array<string, string> $partialIn
+     * @param array<string, string> $partialOut
+     */
+    #[DataProvider('unifyProvider')]
+    public function testUnify(Resource $our, Term $other, array $partialIn, array $partialOut, bool $expected): void
+    {
+        $partial = $partialIn;
+        $result  = $our->unify($other, $partial);
+
+        self::assertSame($expected, $result, 'Return value');
+        self::assertSame($partialOut, $partial, 'Mapping after call');
+    }
+
+    /** @return array<string, array{Resource, Term, array<string, string>, array<string, string>, bool}> */
+    public static function unifyProvider(): array
+    {
+        $uriA   = new Resource('https://example.org/a');
+        $uriB   = new Resource('https://example.org/b');
+        $blank1 = new Resource('_:b1');
+        $blank2 = new Resource('_:b2');
+        $blankX = new Resource('_:x');
+        $lit    = new Literal('foo');
+
+        return [
+            'URI vs Literal' => [$uriA, $lit, [], [], false],
+            'URI vs same URI' => [$uriA, new Resource('https://example.org/a'), [], [], true],
+            'URI vs different URI' => [$uriA, $uriB, [], [], false],
+            'blank vs Literal' => [$blank1, $lit, [], [], false],
+            'blank vs blank, no partial' => [$blank1, $blankX, [], ['b1' => 'x'], true],
+            'blank vs blank, valid existing mapping' => [$blank1, $blankX, ['b1' => 'x'], ['b1' => 'x'], true],
+            'blank vs blank, invalid existing mapping' => [$blank1, $blankX, ['b1' => 'other'], ['b1' => 'other'], false],
+            'blank vs blank, them already in partial' => [$blank2, $blankX, ['b1' => 'x'], ['b1' => 'x'], false],
+            'blank vs same blank' => [$blank1, new Resource('_:b1'), [], ['b1' => 'b1'], true],
         ];
     }
 }

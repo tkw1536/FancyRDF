@@ -71,6 +71,13 @@ final class Literal extends Term
         return $other instanceof Literal && $this->lexical === $other->lexical && $this->language === $other->language && $this->datatype === $other->datatype;
     }
 
+    /** @param array<string, string> &$partial */
+    #[Override]
+    public function unify(Term $other, array &$partial): bool
+    {
+        return $this->equals($other);
+    }
+
     /**
      * @param mixed[] $data
      *

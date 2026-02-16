@@ -10,6 +10,7 @@ use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 
+use function in_array;
 use function is_string;
 use function str_starts_with;
 use function substr;
@@ -43,6 +44,36 @@ final class Resource extends Term
     public function equals(Term $other): bool
     {
         return $other instanceof Resource && $this->iri === $other->iri;
+    }
+
+    /** @param array<string, string> &$partial */
+    #[Override]
+    public function unify(Term $other, array &$partial): bool
+    {
+        if (! $other instanceof Resource) {
+            return false;
+        }
+
+        // if there is one non-blank node, they can only unify if they have the same IRI
+        $us   = $this->getBlankNodeId();
+        $them = $other->getBlankNodeId();
+        if ($us === null || $them === null) {
+            return $this->iri === $other->iri;
+        }
+
+        if (isset($partial[$us])) {
+            return $partial[$us] === $them;
+        }
+
+        // must be injective!
+        if (in_array($them, $partial, true)) {
+            return false;
+        }
+
+        // update the mapping!
+        $partial[$us] = $them;
+
+        return true;
     }
 
     /**

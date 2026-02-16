@@ -102,4 +102,24 @@ abstract class Term implements JsonSerializable, XMLSerializable
      * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-term-equality
      */
     abstract public function equals(Term $other): bool;
+
+    /**
+     * Checks if this term can unify with the other term.
+     *
+     * Two terms are called unifiable under a mapping $partial if any of the following are true:
+     * - The terms are literally term-equal.
+     * - The terms are both blank nodes and the mapping $partial contains an entry for the other blank node.
+     * - The terms are both resources and the mapping $partial contains an entry for the other resource.
+     * - The terms are both literals and the mapping $partial contains an entry for the other literal.
+     *
+     * @param Term                  $other
+     *   The other term to check for unification.
+     * @param array<string, string> &$partial
+     *   The partial mapping of terms to be used for unification.
+     *   Will be updated with the mapping if the terms are unifiable.
+     *
+     * @return bool
+     *   True if the terms are unifiable, false otherwise.
+     */
+    abstract public function unify(Term $other, array &$partial): bool;
 }

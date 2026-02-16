@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancySparql\Formats;
 
+use FancySparql\Graph\GraphElement;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use GuzzleHttp\Psr7\Utils;
@@ -37,6 +38,8 @@ use const PREG_SPLIT_NO_EMPTY;
  * @see https://www.w3.org/TR/n-quads/
  * @see https://www.w3.org/TR/rdf11-testcases/
  * @see https://www.php.net/manual/en/function.assert.php
+ *
+ * @phpstan-import-type TripleOrQuad from GraphElement
  */
 final class NFormatParser
 {
@@ -48,7 +51,7 @@ final class NFormatParser
     /**
      * Reads content from the given string.
      *
-     * @return Traversable<array{Literal|Resource, Resource, Literal|Resource, Resource|null}>
+     * @return Traversable<TripleOrQuad>
      */
     public static function parse(string $source): Traversable
     {
@@ -70,7 +73,7 @@ final class NFormatParser
      *
      * This function closes the stream once it is no longer needed.
      *
-     * @return Traversable<array{Literal|Resource, Resource, Literal|Resource, Resource|null}>
+     * @return Traversable<TripleOrQuad>
      */
     public static function parseStream(StreamInterface $stream): Traversable
     {
@@ -99,7 +102,7 @@ final class NFormatParser
    * @param string $line
    *   One line (subject predicate object [graph] .).
    *
-   * @return array{Literal|Resource, Resource, Literal|Resource, Resource|null}|null
+   * @return TripleOrQuad|null
    *   The triple, quad, or null if the line is empty or a comment.
    */
     public static function parseLine(string $line): array|null
@@ -114,12 +117,13 @@ final class NFormatParser
         }
 
         $subject = self::parseTerm($line, $pos, $len);
+        assert($subject instanceof Resource, 'subject must be a resource at position ' . $pos);
 
         self::skipWhitespace($line, $pos, $len);
         assert($pos < $len, 'unexpected end of line while reading term at position ' . $pos);
 
         $predicate = self::parseTerm($line, $pos, $len);
-        assert($predicate instanceof Resource, 'predicate must be a resource at position ' . $pos);
+        assert($predicate instanceof Resource && ! $predicate->isBlankNode(), 'predicate must be an IRI at position ' . $pos);
 
         self::skipWhitespace($line, $pos, $len);
         assert($pos < $len, 'unexpected end of line while reading term at position ' . $pos);
