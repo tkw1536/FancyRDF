@@ -25,10 +25,10 @@ use const PREG_SPLIT_NO_EMPTY;
  * Parses n-triples or n-quads from a file and streams them to the caller.
  *
  * The implementation guarantees that it can parse any valid Sparql 1.1 n-triples and n-quads file. This is
- * guaranteed by being able to parse all valid triples from the RDF 1.1 test suite.
+ * guaranteed by being able to parse all valid ntriples and nquads from the RDF 1.1 test suite.
  *
- * This guarantee DOES NOT apply negatively: Invalid terms may serialize into an invalid Term instance,
- * may parse into a completely different triple, or may throw an exception.
+ * This guarantee DOES NOT apply negatively: Invalid terms may serialize into an invalid Term instances,
+ * may parse into a completely unrelated terms, or may throw an exception.
  *
  * @see https://www.w3.org/TR/n-triples/
  * @see https://www.w3.org/TR/n-quads/
