@@ -165,7 +165,7 @@ final class NFormatParser
   /**
    * Parses an IRI reference <...>, with \u and \U unescaping.
    *
-   * @return string
+   * @return non-empty-string
    *   The IRI string.
    */
     private static function parseIriRef(string $line, int &$pos, int $len): string
@@ -182,7 +182,12 @@ final class NFormatParser
                 $end = $pos;
                 $pos++;
 
-                return $buf . substr($line, $start, $end - $start);
+                $buf .= $buf . substr($line, $start, $end - $start);
+                if ($buf === '') {
+                    throw new InvalidArgumentException('Empty IRI reference.');
+                }
+
+                return $buf;
             }
 
             // parse an escape sequence.
@@ -206,6 +211,8 @@ final class NFormatParser
    * Label is built on PN_CHARS_BASE, with: _ and [0-9] anywhere; . anywhere except
    * first or last; -, U+00B7, U+0300–U+036F, U+203F–U+2040 anywhere except first.
    * Colon is not allowed (W3C N-Triples).
+   *
+   * @return non-empty-string
    */
     private static function parseBlankNodeLabel(string $line, int &$pos, int $len): string
     {
@@ -235,7 +242,12 @@ final class NFormatParser
 
         $pos += $labelLen;
 
-        return substr($line, $labelStart, $pos - $labelStart);
+        $result = substr($line, $labelStart, $pos - $labelStart);
+        if ($result === '') {
+            throw new InvalidArgumentException('Empty blank node label.');
+        }
+
+        return $result;
     }
 
   /**
@@ -263,9 +275,6 @@ final class NFormatParser
         } elseif ($pos + 1 < $len && $line[$pos] === '^' && $line[$pos + 1] === '^') {
             $pos     += 2;
             $datatype = self::parseIriRef($line, $pos, $len);
-            if ($datatype === '') {
-                throw new InvalidArgumentException(sprintf('Missing datatype at position %d.', $pos));
-            }
         }
 
         return new Literal($lexical, $lang, $datatype);

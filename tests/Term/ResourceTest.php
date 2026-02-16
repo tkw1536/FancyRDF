@@ -15,33 +15,7 @@ use PHPUnit\Framework\TestCase;
 /** @phpstan-import-type ResourceElement from Resource */
 final class ResourceTest extends TestCase
 {
-    #[DataProvider('constructorProvider')]
-    public function testConstructor(string $uri, bool $expectValid): void
-    {
-        if (! $expectValid) {
-            $this->expectException(InvalidArgumentException::class);
-        }
-
-        $resource = new Resource($uri);
-        if (! $expectValid) {
-            return;
-        }
-
-        self::assertSame($uri, $resource->iri);
-    }
-
-    /** @return array<string, array{string, bool}> */
-    public static function constructorProvider(): array
-    {
-        return [
-            'valid URI' => ['https://example.com/foo', true],
-            'valid blank node' => ['_:b1', true],
-            'invalid blank node (empty id)' => ['_:', false],
-            // TODO: parse these properly
-            // 'invalid URI' => ['not-a-uri', false],
-        ];
-    }
-
+    /** @param non-empty-string $uri */
     #[DataProvider('getBlankNodeIdProvider')]
     public function testGetBlankNodeId(string $uri, string|null $expectedId): void
     {
@@ -49,7 +23,7 @@ final class ResourceTest extends TestCase
         self::assertSame($expectedId, $resource->getBlankNodeId());
     }
 
-    /** @return array<string, array{string, string|null}> */
+    /** @return array<string, array{non-empty-string, string|null}> */
     public static function getBlankNodeIdProvider(): array
     {
         return [
@@ -129,11 +103,11 @@ final class ResourceTest extends TestCase
             ],
             'missing value' => [
                 ['type' => 'uri'],
-                'Invalid resource value',
+                'Resource value must be a non-empty string',
             ],
             'invalid value type' => [
                 ['type' => 'uri', 'value' => 123],
-                'Invalid resource value',
+                'Resource value must be a non-empty string',
             ],
         ];
     }

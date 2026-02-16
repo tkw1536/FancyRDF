@@ -12,7 +12,6 @@ use Override;
 
 use function is_string;
 use function str_starts_with;
-use function strlen;
 use function substr;
 
 /**
@@ -31,20 +30,13 @@ final class Resource extends Term
      * @see https://www.w3.org/TR/rdf11-concepts/#section-IRIs
      * @see https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes
      *
-     * @param string $iri
+     * @param non-empty-string $iri
      *   A valid absolute IRI as per RFC3987 or a blank node identifier proceeded with '_:'.
      *   This class makes no attempt to validate either the IRI or blank node identifier.
      *   If passed an invalid string, the behavior of the entire class is undefined.
      */
     public function __construct(readonly string $iri)
     {
-        if (str_starts_with($iri, '_:')) {
-            if (strlen($iri) <= 2) {
-                throw new InvalidArgumentException('Invalid blank node ID');
-            }
-
-            return;
-        }
     }
 
     #[Override]
@@ -67,8 +59,8 @@ final class Resource extends Term
         }
 
         $value = $data['value'] ?? null;
-        if (! is_string($value)) {
-            throw new InvalidArgumentException('Invalid resource value');
+        if (! is_string($value) || $value === '') {
+            throw new InvalidArgumentException('Resource value must be a non-empty string');
         }
 
         if ($type === 'bnode') {
@@ -84,7 +76,12 @@ final class Resource extends Term
     {
         $elementName = $element->localName;
         if ($elementName === 'uri') {
-            return new Resource($element->textContent);
+            $literal = $element->textContent;
+            if ($literal === '') {
+                throw new InvalidArgumentException('Empty URI');
+            }
+
+            return new Resource($literal);
         }
 
         if ($elementName === 'bnode') {
