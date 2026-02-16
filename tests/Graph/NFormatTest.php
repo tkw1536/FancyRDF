@@ -78,16 +78,17 @@ final class NFormatTest extends TestCase
     ): void {
         $parsed = NFormatParser::parseLine($line);
         self::assertNotNull($parsed);
-        self::assertCount($graph === null ? 3 : 4, $parsed);
         self::assertTrue($parsed[0]->equals($subject), 'subject');
         self::assertTrue($parsed[1]->equals($predicate), 'predicate');
         self::assertTrue($parsed[2]->equals($object), 'object');
         if ($graph === null) {
+            self::assertNull($parsed[3], 'no graph');
+
             return;
         }
 
-        self::assertCount(4, $parsed, 'should return a quad');
-        self::assertTrue(($parsed[3] ?? null)?->equals($graph), 'graph');
+        self::assertNotNull($parsed[3], 'graph must not be null');
+        self::assertTrue($parsed[3]->equals($graph), 'graph');
     }
 
     public function testParseLineEmptyReturnsNull(): void

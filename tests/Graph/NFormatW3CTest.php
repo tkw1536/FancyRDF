@@ -69,7 +69,7 @@ final class NFormatW3CTest extends TestCase
 
         $count = 0;
         foreach ($statements as $statement) {
-            $this->assertCount(3, $statement, 'should only return a triple');
+            $this->assertNull($statement[3], 'should only return a triple');
             $count++;
         }
 
@@ -92,7 +92,7 @@ final class NFormatW3CTest extends TestCase
 
         $count = 0;
         foreach ($statements as $statement) {
-            $this->assertCount(4, $statement, 'must return a quadruple');
+            $this->assertNotNull($statement[3], 'must return a quadruple');
             $count++;
         }
 
@@ -132,7 +132,17 @@ final class NFormatW3CTest extends TestCase
             $s2 = $second[$i];
             $this->assertSame(count($s1), count($s2), 'statement ' . $i . ' size must match');
             for ($j = 0; $j < count($s1); $j++) {
-                $this->assertTrue($s1[$j]->equals($s2[$j]), 'statement ' . $i . ' term ' . $j . ' must match after round-trip');
+                $msg = 'statement ' . $i . ' term ' . $j . ' must match after round-trip';
+                if ($s1[$j] === null || $s2[$j] === null) {
+                    $this->assertNull($s1[$j], $msg);
+                    $this->assertNull($s2[$j], $msg);
+                    continue;
+                }
+
+                $this->assertNotNull($s1[$j], $msg);
+                $this->assertNotNull($s2[$j], $msg);
+
+                $this->assertTrue($s1[$j]->equals($s2[$j]), $msg);
             }
         }
     }

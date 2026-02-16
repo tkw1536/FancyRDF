@@ -6,6 +6,8 @@ namespace FancySparql\Graph;
 
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
+use GuzzleHttp\Psr7\Utils;
+use Psr\Http\Message\StreamInterface;
 use Traversable;
 
 use function assert;
@@ -46,7 +48,7 @@ final class NFormatParser
     /**
      * Reads content from the given string.
      *
-     * @return Traversable<array{Literal|Resource, Resource, Literal|Resource}|array{Literal|Resource, Resource, Literal|Resource, Resource}>
+     * @return Traversable<array{Literal|Resource, Resource, Literal|Resource, Resource|null}>
      */
     public static function parse(string $source): Traversable
     {
@@ -63,13 +65,41 @@ final class NFormatParser
         }
     }
 
+    /**
+     * Reads content from the given stream.
+     *
+     * This function closes the stream once it is no longer needed.
+     *
+     * @return Traversable<array{Literal|Resource, Resource, Literal|Resource, Resource|null}>
+     */
+    public static function parseStream(StreamInterface $stream): Traversable
+    {
+        try {
+            while (true) {
+                $line = Utils::readLine($stream);
+                if ($line === '') {
+                    break;
+                }
+
+                $term = self::parseLine($line);
+                if ($term === null) {
+                    continue;
+                }
+
+                yield $term;
+            }
+        } finally {
+            $stream->close();
+        }
+    }
+
   /**
    * Parses a single N-Quads line into a quad or null.
    *
    * @param string $line
    *   One line (subject predicate object [graph] .).
    *
-   * @return array{Literal|Resource, Resource, Literal|Resource}|array{Literal|Resource, Resource, Literal|Resource, Resource}|null
+   * @return array{Literal|Resource, Resource, Literal|Resource, Resource|null}|null
    *   The triple, quad, or null if the line is empty or a comment.
    */
     public static function parseLine(string $line): array|null
@@ -109,7 +139,7 @@ final class NFormatParser
         // require the trailing dot.
         assert($pos < $len && $line[$pos] === '.', 'expected "." at end of statement at position ' . $pos);
 
-        return $graph === null ? [$subject, $predicate, $object] : [$subject, $predicate, $object, $graph];
+        return [$subject, $predicate, $object, $graph];
     }
 
   /**
