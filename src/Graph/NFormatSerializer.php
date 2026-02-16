@@ -27,7 +27,7 @@ use const PREG_SPLIT_NO_EMPTY;
  *
  * This is guaranteed by being able to serialize all literals from the RDF 1.1 test suite.
  *
- * This guarantee does not apply negatively: For an invalid term, the library may produce a valid string, may
+ * This guarantee DOES NOT apply negatively: For an invalid term, the library may produce valid string, may
  * produce an invalid string, or may throw an exception.
  *
  * @see https://www.w3.org/TR/n-triples/

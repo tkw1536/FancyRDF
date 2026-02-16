@@ -6,15 +6,14 @@ namespace FancySparql\Graph;
 
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
-use InvalidArgumentException;
 use Traversable;
 
+use function assert;
 use function ctype_xdigit;
 use function hexdec;
 use function mb_chr;
 use function preg_match;
 use function preg_split;
-use function sprintf;
 use function str_ends_with;
 use function strlen;
 use function substr;
@@ -27,12 +26,15 @@ use const PREG_SPLIT_NO_EMPTY;
  * The implementation guarantees that it can parse any valid Sparql 1.1 n-triples and n-quads file. This is
  * guaranteed by being able to parse all valid ntriples and nquads from the RDF 1.1 test suite.
  *
- * This guarantee DOES NOT apply negatively: Invalid terms may serialize into an invalid Term instances,
- * may parse into a completely unrelated terms, or may throw an exception.
+ * This guarantee DOES NOT apply negatively: Invalid terms may serialize into invalid Term instances,
+ * may parse into completely unrelated terms, or may throw.
+ * In practice, the code makes use of assert calls to check validity, and may throw for certain invalid
+ * terms iff assertions are enabled.
  *
  * @see https://www.w3.org/TR/n-triples/
  * @see https://www.w3.org/TR/n-quads/
  * @see https://www.w3.org/TR/rdf11-testcases/
+ * @see https://www.php.net/manual/en/function.assert.php
  */
 final class NFormatParser
 {
@@ -45,15 +47,11 @@ final class NFormatParser
      * Reads content from the given string.
      *
      * @return Traversable<array{Literal|Resource, Resource, Literal|Resource}|array{Literal|Resource, Resource, Literal|Resource, Resource}>
-     *
-     * @throws InvalidArgumentException
      */
     public static function parse(string $source): Traversable
     {
         $lines = preg_split('/\r\n|\r|\n/', $source, -1, PREG_SPLIT_NO_EMPTY);
-        if ($lines === false) {
-            throw new InvalidArgumentException('Failed to split lines from source.');
-        }
+        assert($lines !== false, 'failed to split lines from source');
 
         foreach ($lines as $line) {
             $term = self::parseLine($line);
@@ -73,9 +71,6 @@ final class NFormatParser
    *
    * @return array{Literal|Resource, Resource, Literal|Resource}|array{Literal|Resource, Resource, Literal|Resource, Resource}|null
    *   The triple, quad, or null if the line is empty or a comment.
-   *
-   * @throws InvalidArgumentException
-   *   When the line is not valid N-Quads.
    */
     public static function parseLine(string $line): array|null
     {
@@ -91,20 +86,13 @@ final class NFormatParser
         $subject = self::parseTerm($line, $pos, $len);
 
         self::skipWhitespace($line, $pos, $len);
-        if ($pos >= $len) {
-            throw new InvalidArgumentException('Unexpected end of line while reading term.');
-        }
+        assert($pos < $len, 'unexpected end of line while reading term at position ' . $pos);
 
         $predicate = self::parseTerm($line, $pos, $len);
-
-        if (! $predicate instanceof Resource) {
-            throw new InvalidArgumentException(sprintf('Predicate must be IRI at position %d.', $pos));
-        }
+        assert($predicate instanceof Resource, 'predicate must be a resource at position ' . $pos);
 
         self::skipWhitespace($line, $pos, $len);
-        if ($pos >= $len) {
-            throw new InvalidArgumentException('Unexpected end of line while reading term.');
-        }
+        assert($pos < $len, 'unexpected end of line while reading term at position ' . $pos);
 
         $object = self::parseTerm($line, $pos, $len);
 
@@ -113,30 +101,24 @@ final class NFormatParser
         self::skipWhitespace($line, $pos, $len);
         if ($pos < $len && $line[$pos] !== '.') {
             $graph = self::parseTerm($line, $pos, $len);
-            if (! $graph instanceof Resource) {
-                throw new InvalidArgumentException(sprintf('Graph label must be IRI or blank node at position %d.', $pos));
-            }
+            assert($graph instanceof Resource, 'graph must be a resource at position ' . $pos);
 
             self::skipWhitespace($line, $pos, $len);
         }
 
-        // require the trailing dot..
-        if ($pos >= $len || $line[$pos] !== '.') {
-            throw new InvalidArgumentException(sprintf('Expected "." at end of statement around position %d.', $pos));
-        }
+        // require the trailing dot.
+        assert($pos < $len && $line[$pos] === '.', 'expected "." at end of statement at position ' . $pos);
 
         return $graph === null ? [$subject, $predicate, $object] : [$subject, $predicate, $object, $graph];
     }
 
   /**
    * Parses a single RDF term (IRI, blank node, or literal).
-   *
-   * @throws InvalidArgumentException
    */
     private static function parseTerm(string $line, int &$pos, int $len): Literal|Resource
     {
         // look at the current character and decide what to parse.
-        $ch = $line[$pos];
+        $ch = $line[$pos] ?? '';
         if ($ch === '<') {
             return new Resource(self::parseIriRef($line, $pos, $len));
         }
@@ -145,11 +127,9 @@ final class NFormatParser
             return new Resource(self::parseBlankNodeLabel($line, $pos, $len));
         }
 
-        if ($ch === '"') {
-            return self::parseLiteral($line, $pos, $len);
-        }
+        assert($ch === '"', 'invalid term start: must be "<" or "_:" or "" at position ' . $pos);
 
-        throw new InvalidArgumentException(sprintf('Invalid term start at position %d (char %s).', $pos, $ch));
+        return self::parseLiteral($line, $pos, $len);
     }
 
   /**
@@ -183,9 +163,7 @@ final class NFormatParser
                 $pos++;
 
                 $buf .= $buf . substr($line, $start, $end - $start);
-                if ($buf === '') {
-                    throw new InvalidArgumentException('Empty IRI reference.');
-                }
+                assert($buf !== '', 'empty IRI reference at position ' . $pos);
 
                 return $buf;
             }
@@ -202,7 +180,12 @@ final class NFormatParser
             $pos++;
         }
 
-        throw new InvalidArgumentException('Unclosed IRI reference.');
+        // @phpstan-ignore function.impossibleType (GIGO)
+        assert(false, 'unclosed IRI reference at position ' . $pos);
+
+        // GIGO: Return a random blank node.
+        // This branch can only be triggered if assertions are disabled.
+        return '_:gigo';
     }
 
   /**
@@ -216,44 +199,39 @@ final class NFormatParser
    */
     private static function parseBlankNodeLabel(string $line, int &$pos, int $len): string
     {
-        $labelStart = $pos;
-        $pos       += 2; // skip the _: prefix
+        assert($line[$pos] === '_' && $line[$pos + 1] === ':', 'expected _: at position ' . $pos);
+
+        $start = $pos;
+        $pos  += 2; // skip the _: prefix
 
         $rest = substr($line, $pos, $len - $pos);
-        if (
-            $rest === '' || preg_match(
-                '/^[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
-                $rest,
-                $m,
-            ) !== 1
-        ) {
-            throw new InvalidArgumentException(sprintf('Invalid blank node label at position %d.', $pos));
-        }
+        assert($rest !== '', 'empty blank node label at position ' . $pos);
+        $matchCount = preg_match(
+            '/^[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
+            $rest,
+            $m,
+        );
 
-        $label = $m[0];
+        $label = $m[0] ?? '';
+        assert($matchCount === 1, 'invalid blank node label at position ' . $pos);
+
         if (str_ends_with($label, '.')) {
             $label = substr($label, 0, -1);
         }
 
         $labelLen = strlen($label);
-        if ($labelLen < strlen($rest) && $rest[$labelLen] === ':') {
-            throw new InvalidArgumentException(sprintf('Colon not allowed in blank node label at position %d.', $pos));
-        }
+        assert($labelLen >= strlen($rest) || $rest[$labelLen] !== ':', 'colon not allowed in blank node label at position ' . $pos);
 
         $pos += $labelLen;
 
-        $result = substr($line, $labelStart, $pos - $labelStart);
-        if ($result === '') {
-            throw new InvalidArgumentException('Empty blank node label.');
-        }
+        $result = substr($line, $start, $pos - $start);
+        assert($result !== '', 'empty blank node label at position ' . $pos);
 
         return $result;
     }
 
   /**
    * Parses a literal: "..." with optional @lang or ^^<datatype>.
-   *
-   * @throws InvalidArgumentException
    */
     private static function parseLiteral(string $line, int &$pos, int $len): Literal
     {
@@ -266,11 +244,10 @@ final class NFormatParser
         if ($pos < $len && $line[$pos] === '@') {
             $pos++;
             $rest = substr($line, $pos, $len - $pos);
-            if ($rest === '' || preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/Su', $rest, $m) !== 1) {
-                throw new InvalidArgumentException(sprintf('Missing language tag at position %d.', $pos));
-            }
+            preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/Su', $rest, $m);
+            $lang = $m[0] ?? '';
+            assert($lang !== '', 'missing language tag at position ' . $pos);
 
-            $lang = $m[0];
             $pos += strlen($lang);
         } elseif ($pos + 1 < $len && $line[$pos] === '^' && $line[$pos + 1] === '^') {
             $pos     += 2;
@@ -288,10 +265,7 @@ final class NFormatParser
    */
     private static function parseStringLiteralQuote(string $line, int &$pos, int $len): string
     {
-      // Read the starting quote.
-        if ($line[$pos] !== '"') {
-            throw new InvalidArgumentException(sprintf('Expected \'"\' at position %d.', $pos));
-        }
+        assert($line[$pos] === '"', 'expected quote at position ' . $pos);
 
         $pos++;
 
@@ -315,7 +289,7 @@ final class NFormatParser
                 if ($next === 'u' || $next === 'U') {
                     $buf .= self::decodeUchar($line, $pos, $len);
                 } else {
-                    $buf .= self::decodeEchar($next);
+                    $buf .= self::decodeEchar($next, $pos + 1);
                     $pos += 2;
                 }
 
@@ -327,7 +301,10 @@ final class NFormatParser
             $pos++;
         }
 
-        throw new InvalidArgumentException('Unclosed string literal.');
+        // @phpstan-ignore function.impossibleType (GIGO)
+        assert(false, 'unclosed string literal at position ' . $pos);
+
+        return '';
     }
 
   /**
@@ -335,43 +312,28 @@ final class NFormatParser
    */
     private static function decodeUchar(string $line, int &$pos, int $len): string
     {
-        // consume the backslash character.
-        if ($line[$pos] !== '\\') {
-            throw new InvalidArgumentException(sprintf('Expected backslash at position %d.', $pos));
-        }
+        assert($line[$pos] === '\\', 'expected backslash at position ' . $pos);
 
         $pos++;
-        if ($pos >= $len) {
-            throw new InvalidArgumentException('Unexpected end in escape sequence.');
-        }
-
-        // Check if we have a small u or a large U.
-        if ($line[$pos] !== 'u' && $line[$pos] !== 'U') {
-            throw new InvalidArgumentException(sprintf('Expected \\u or \\U at position %d.', $pos));
-        }
+        assert($pos < $len, 'unexpected end in escape sequence at position ' . $pos);
+        assert($line[$pos] === 'u' || $line[$pos] === 'U', 'expected \\u or \\U at position ' . $pos);
 
         $u = $line[$pos] === 'u';
         $pos++;
 
         // determine the number of characters to read.
         $hexLen = $u ? 4 : 8;
-        if ($pos + $hexLen > $len) {
-            throw new InvalidArgumentException(sprintf('Incomplete \\%s escape at position %d.', $u ? 'u' : 'U', $pos));
-        }
+        assert($pos + $hexLen <= $len, 'incomplete \\u or \\U escape at position ' . $pos);
 
         // read the escape sequence.
         $hex = substr($line, $pos, $hexLen);
-        if (! ctype_xdigit($hex)) {
-            throw new InvalidArgumentException(sprintf('Invalid hex in \\%s escape at position %d.', $u ? 'u' : 'U', $pos));
-        }
+        assert(ctype_xdigit($hex), 'invalid hex in \\u or \\U escape at position ' . $pos);
 
         $pos += $hexLen;
 
         // do the actual decoding.
         $ord = (int) hexdec($hex);
-        if ($ord > 0x10FFFF) {
-            throw new InvalidArgumentException(sprintf('Code point U+%X out of range.', $ord));
-        }
+        assert($ord <= 0x10FFFF, 'code point out of range at position ' . $pos);
 
         return mb_chr($ord, 'UTF-8');
     }
@@ -379,7 +341,7 @@ final class NFormatParser
   /**
    * Decodes one ECHAR (single character escape).
    */
-    private static function decodeEchar(string $char): string
+    private static function decodeEchar(string $char, int $pos): string
     {
         return match ($char) {
             't' => "\t",
@@ -390,7 +352,12 @@ final class NFormatParser
             '"' => '"',
             '\'' => "'",
             '\\' => '\\',
-            default => throw new InvalidArgumentException(sprintf('Invalid escape sequence \\%s.', $char)),
+            default => (static function () use ($pos): string {
+                // @phpstan-ignore function.impossibleType (GIGO)
+                assert(false, 'invalid escape sequence at position ' . $pos);
+
+                return '';
+            })()
         };
     }
 }

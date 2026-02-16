@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace FancySparql\Tests\Graph;
 
+use AssertionError;
 use FancySparql\Graph\NFormatParser;
 use FancySparql\Graph\NFormatSerializer;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\TestCase;
 
 final class NFormatTest extends TestCase
@@ -101,10 +102,11 @@ final class NFormatTest extends TestCase
         self::assertNull(NFormatParser::parseLine('  # rest is comment'));
     }
 
+    #[RequiresSetting('zend.assertions', '1')]
     public function testParseLineInvalidThrows(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Expected "." at end of statement');
+        $this->expectException(AssertionError::class);
+        $this->expectExceptionMessage('expected "." at end of statement at position 71');
         NFormatParser::parseLine('<https://example.com/s> <https://example.com/p> <https://example.com/o>');
     }
 }

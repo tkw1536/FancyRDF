@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace FancySparql\Tests\Graph;
 
+use AssertionError;
 use Exception;
 use FancySparql\Graph\NFormatParser;
 use FancySparql\Graph\NFormatSerializer;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
+use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\TestCase;
 
 use function array_merge;
@@ -166,12 +169,25 @@ final class NFormatW3CTest extends TestCase
     }
 
     #[DataProvider('badTriplesProvider')]
-    public function testBadTriples(string $path, string $content): void
+    #[RequiresSetting('zend.assertions', '1')]
+    public function testBadTriplesWithAssertions(string $path, string $content): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(AssertionError::class);
 
         $statements = NFormatParser::parse($content);
-        iterator_to_array($statements); // exhause the iterator!
+        iterator_to_array($statements); // exhaust the iterator!
+    }
+
+    #[DataProvider('badTriplesProvider')]
+    #[IgnoreDeprecations]
+    #[RequiresSetting('zend.assertions', '0')]
+    #[DoesNotPerformAssertions]
+    public function testBadTriplesWithoutAssertions(string $path, string $content): void
+    {
+        // Without assertions, this should produce something.
+        // We don't care what it is, just that it doesn't throw.
+        $statements = NFormatParser::parse($content);
+        iterator_to_array($statements); // exhaust the iterator!
     }
 
     /** @return array<string, array{string, string}> */
@@ -184,11 +200,24 @@ final class NFormatW3CTest extends TestCase
     }
 
     #[DataProvider('badQuadsProvider')]
-    public function testBadQuads(string $path, string $content): void
+    #[RequiresSetting('zend.assertions', '1')]
+    public function testBadQuadsWithAssertions(string $path, string $content): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(AssertionError::class);
 
         $statements = NFormatParser::parse($content);
-        iterator_to_array($statements); // exhause the iterator!
+        iterator_to_array($statements); // exhaust the iterator!
+    }
+
+    #[DataProvider('badQuadsProvider')]
+    #[IgnoreDeprecations]
+    #[RequiresSetting('zend.assertions', '0')]
+    #[DoesNotPerformAssertions]
+    public function testBadQuadsWithoutAssertions(string $path, string $content): void
+    {
+        // Without assertions, this should produce something.
+        // We don't care what it is, just that it doesn't throw.
+        $statements = NFormatParser::parse($content);
+        iterator_to_array($statements); // exhaust the iterator!
     }
 }

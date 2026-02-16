@@ -17,5 +17,7 @@ fmt:
 	@vendor/bin/phpcbf
 
 test:
-	@echo "=> vendor/bin/phpunit"
-	@vendor/bin/phpunit
+	@echo "=> vendor/bin/phpunit (with assertions)"
+	@php -dzend.assertions=1 vendor/bin/phpunit --display-deprecations
+	@echo "=> vendor/bin/phpunit (without assertions)"
+	@php -dzend.assertions=0 vendor/bin/phpunit  --display-deprecations
