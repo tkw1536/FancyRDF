@@ -97,11 +97,16 @@ abstract class Term implements JsonSerializable, XMLSerializable
     }
 
     /**
-     * Checks if this term and the other term are RDF1.1 literally term-equal.
+     * Checks if this term and the other term are equal.
      *
      * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-term-equality
+     *
+     * @param bool $literal
+     *   If set to true, check for RDF1.1 literal term-equality.
+     *   Otherwise, attempt to check for value equality.
+     *   Note that value equality only supports a specific subset of data types.
      */
-    abstract public function equals(Term $other): bool;
+    abstract public function equals(Term $other, bool $literal = true): bool;
 
     /**
      * Compares this term with the other term using lexiographical ordering.
@@ -130,11 +135,15 @@ abstract class Term implements JsonSerializable, XMLSerializable
      * @param array<string, string> &$partial
      *   The partial mapping of terms to be used for unification.
      *   Will be updated with the mapping if the terms are unifiable.
+     * @param bool                  $literal
+     *   If set to true, check for RDF1.1 literal term-equality.
+     *   Otherwise, attempt to check for value equality.
+     *   Note that value equality only supports a specific subset of data types.
      *
      * @return bool
      *   True if the terms are unifiable, false otherwise.
      */
-    abstract public function unify(Term $other, array &$partial): bool;
+    abstract public function unify(Term $other, array &$partial, bool $literal = true): bool;
 
     /**
      * Checks if this term is grounded, meaning if it is not a blank node.

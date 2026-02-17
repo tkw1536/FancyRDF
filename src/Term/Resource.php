@@ -51,14 +51,14 @@ final class Resource extends Term
     }
 
     #[Override]
-    public function equals(Term $other): bool
+    public function equals(Term $other, bool $literal = true): bool
     {
         return $other instanceof Resource && $this->iri === $other->iri;
     }
 
     /** @param array<string, string> &$partial */
     #[Override]
-    public function unify(Term $other, array &$partial): bool
+    public function unify(Term $other, array &$partial, bool $literal = true): bool
     {
         if (! $other instanceof Resource) {
             return false;

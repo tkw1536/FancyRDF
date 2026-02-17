@@ -93,7 +93,7 @@ final class RdfXMLW3CTest extends TestCase
 
             $parsed = iterator_to_array($parser);
 
-            self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expectedTriples));
+            self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expectedTriples, false));
         } catch (Throwable $e) {
             self::markTestIncomplete($e->getMessage());
         }

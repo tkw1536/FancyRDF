@@ -20,7 +20,7 @@ use function sort;
 final class IsomorphicAsDatasetsConstraint extends Constraint
 {
     /** @param list<TripleOrQuadArray> $expected */
-    public function __construct(private readonly array $expected)
+    public function __construct(private readonly array $expected, private readonly bool $literal = true)
     {
     }
 
@@ -52,19 +52,19 @@ final class IsomorphicAsDatasetsConstraint extends Constraint
 
         $partial = [];
 
-        return $expectedDataset->isIsomorphicTo($actualDataset, $partial);
+        return $expectedDataset->isIsomorphicTo($actualDataset, $partial, $this->literal);
     }
 
     #[Override]
     public function toString(): string
     {
-        return 'two datasets are isomorphic';
+        return 'two datasets are isomorphic ' . ($this->literal ? 'term-equal' : 'value-equal');
     }
 
     #[Override]
     protected function failureDescription(mixed $other): string
     {
-        return 'two datasets are isomorphic';
+        return 'two datasets are isomorphic ' . ($this->literal ? 'term-equal' : 'value-equal');
     }
 
     #[Override]

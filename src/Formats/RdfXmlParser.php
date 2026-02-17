@@ -490,13 +490,13 @@ class RdfXmlParser implements IteratorAggregate
         }
 
         // Get the inner element (first child element)
-        $innerElement = $outerElement->firstElementChild;
-        if ($innerElement === null) {
-            throw new Exception('Inner element must exist');
+        $innerNode = $outerElement->firstChild;
+        if ($innerNode === null) {
+            return '';
         }
 
         // Return the serialized inner XML
-        $result = $innerElement->C14N();
+        $result = $innerNode->C14N();
         if ($result === false) {
             throw new Exception('Failed to canonicalize inner XML');
         }

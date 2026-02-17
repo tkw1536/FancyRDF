@@ -139,7 +139,7 @@ final class TermTest extends TestCase
         foreach ($terms as $i => $term) {
             foreach ($terms as $j => $other) {
                 $shouldEquals = $i === $j;
-                self::assertSame($shouldEquals, $term->equals($other), 'Term ' . $i . ' equals ' . $j);
+                self::assertSame($shouldEquals, $term->equals($other, true), 'Term ' . $i . ' equals ' . $j);
             }
         }
     }

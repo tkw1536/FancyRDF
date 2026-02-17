@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace FancySparql\Tests\FancySparql\Term;
 
 use DOMDocument;
+use FancySparql\Term\Datatype\LangString;
+use FancySparql\Term\Datatype\XSDString;
 use FancySparql\Term\Literal;
 use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
@@ -41,11 +43,11 @@ final class LiteralTest extends TestCase
     public static function constructorProvider(): array
     {
         return [
-            'value only' => ['hello', null, null, Literal::DATATYPE_STRING, true],
-            'value with default datatype' => ['hello', null, Literal::DATATYPE_STRING, Literal::DATATYPE_STRING, true],
+            'value only' => ['hello', null, null, XSDString::IRI, true],
+            'value with default datatype' => ['hello', null, XSDString::IRI, XSDString::IRI, true],
 
-            'value with only language tag' => ['hello', 'en', null, Literal::DATATYPE_LANG_STRING, true],
-            'value with language tag and valid datatype' => ['hello', 'en', Literal::DATATYPE_LANG_STRING, Literal::DATATYPE_LANG_STRING, true],
+            'value with only language tag' => ['hello', 'en', null, LangString::IRI, true],
+            'value with language tag and valid datatype' => ['hello', 'en', LangString::IRI, LangString::IRI, true],
 
             'both language and datatype throws' => ['x', 'en', 'http://example.com/dt', null, false],
             'value with datatype' => ['42', null, 'http://www.w3.org/2001/XMLSchema#integer', 'http://www.w3.org/2001/XMLSchema#integer', true],

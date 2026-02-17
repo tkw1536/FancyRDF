@@ -7,6 +7,9 @@ namespace FancySparql\Term;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
+use FancySparql\Term\Datatype\Datatype;
+use FancySparql\Term\Datatype\LangString;
+use FancySparql\Term\Datatype\XSDString;
 use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
@@ -24,8 +27,32 @@ use function strcmp;
  */
 final class Literal extends Term
 {
-    public const string DATATYPE_STRING      = 'http://www.w3.org/2001/XMLSchema#string';
-    public const string DATATYPE_LANG_STRING = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#langString';
+    /**
+     * Returns the RDF1.1 literal value of this literal as a php value.
+     *
+     * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-value
+     */
+    public function getValue(): mixed
+    {
+        return $this->getDatatypeInstance()->toValue();
+    }
+
+    /** @var Datatype<mixed>|null */
+    private Datatype|null $datatypeInstance = null;
+
+    /**
+     * Returns the RDF1.1 datatype of this literal.
+     *
+     * @return Datatype<mixed>
+     */
+    public function getDatatypeInstance(): Datatype
+    {
+        if ($this->datatypeInstance === null) {
+            $this->datatypeInstance = Datatypes::getDatatype($this->datatype, $this->lexical, $this->language);
+        }
+
+        return $this->datatypeInstance;
+    }
 
     /**
      * The RDF1.1 datatype IRI of this literal.
@@ -57,19 +84,30 @@ final class Literal extends Term
      */
     public function __construct(public readonly string $lexical, public readonly string|null $language = null, string|null $datatype = null)
     {
-        $this->datatype = $datatype ?? ($language === null ? self::DATATYPE_STRING : self::DATATYPE_LANG_STRING);
+        $this->datatype = $datatype ?? ($language === null ? XSDString::IRI : LangString::IRI);
 
-        if (($this->datatype === self::DATATYPE_LANG_STRING) !== ($language !== null)) {
+        if (($this->datatype === LangString::IRI) !== ($language !== null)) {
             // Per the RDF 1.1. Standard: "if and only if the datatype IRI is [self::DATATYPE_LANG_STRING]
             // a non-empty language tag as defined by [BCP47]."
-            throw new InvalidArgumentException('Literal must have a language tag if and only if the datatype IRI is ' . self::DATATYPE_LANG_STRING);
+            throw new InvalidArgumentException('Literal must have a language tag if and only if the datatype IRI is ' . LangString::IRI);
         }
     }
 
     #[Override]
-    public function equals(Term $other): bool
+    public function equals(Term $other, bool $literal = true): bool
     {
-        return $other instanceof Literal && $this->lexical === $other->lexical && $this->language === $other->language && $this->datatype === $other->datatype;
+        // first check for exact equality of language and datatype
+        if (! $other instanceof Literal || $this->language !== $other->language || $this->datatype !== $other->datatype) {
+            return false;
+        }
+
+        // if asking for literal equality, just compare the lexical forms.
+        if ($literal) {
+            return $this->lexical === $other->lexical;
+        }
+
+        // if not, compare their values
+        return $this->getDatatypeInstance()->equals($other->getDatatypeInstance());
     }
 
     #[Override]
@@ -104,9 +142,9 @@ final class Literal extends Term
 
     /** @param array<string, string> &$partial */
     #[Override]
-    public function unify(Term $other, array &$partial): bool
+    public function unify(Term $other, array &$partial, bool $literal = true): bool
     {
-        return $this->equals($other);
+        return $this->equals($other, $literal);
     }
 
     #[Override]
@@ -118,10 +156,10 @@ final class Literal extends Term
     private function getTypeForCompare(): int
     {
         switch ($this->datatype) {
-            case self::DATATYPE_STRING:
+            case XSDString::IRI:
                 return 0;
 
-            case self::DATATYPE_LANG_STRING:
+            case LangString::IRI:
                 return 1;
 
             default:
@@ -178,10 +216,10 @@ final class Literal extends Term
     public function jsonSerialize(): array
     {
         $data = ['type' => 'literal', 'value' => $this->lexical];
-        if ($this->datatype === self::DATATYPE_LANG_STRING) {
+        if ($this->datatype === LangString::IRI) {
             assert($this->language !== null, 'Datatype indicates a language string');
             $data['language'] = $this->language;
-        } elseif ($this->datatype !== self::DATATYPE_STRING) {
+        } elseif ($this->datatype !== XSDString::IRI) {
             $data['datatype'] = $this->datatype;
         }
 
@@ -193,10 +231,10 @@ final class Literal extends Term
     {
         $element = XMLUtils::createElement($document, 'literal', $this->lexical);
 
-        if ($this->datatype === self::DATATYPE_LANG_STRING) {
+        if ($this->datatype === LangString::IRI) {
             assert($this->language !== null, 'Datatype indicates a language string');
             $element->setAttributeNS(XMLUtils::XML_NAMESPACE, 'xml:lang', $this->language);
-        } elseif ($this->datatype !== self::DATATYPE_STRING) {
+        } elseif ($this->datatype !== XSDString::IRI) {
             $element->setAttribute('datatype', $this->datatype);
         }
 

@@ -106,13 +106,13 @@ final class Quad
      * @param TripleOrQuadArray $left
      * @param TripleOrQuadArray $right
      */
-    public static function equals(array $left, array $right): bool
+    public static function equals(array $left, array $right, bool $literal = true): bool
     {
         if (self::size($left) !== self::size($right)) {
             return false;
         }
 
-        if (! $left[0]->equals($right[0]) || ! $left[1]->equals($right[1]) || ! $left[2]->equals($right[2])) {
+        if (! $left[0]->equals($right[0], $literal) || ! $left[1]->equals($right[1], $literal) || ! $left[2]->equals($right[2], $literal)) {
             return false;
         }
 
@@ -120,7 +120,7 @@ final class Quad
             return $left[3] === null && $right[3] === null;
         }
 
-        return $left[3]->equals($right[3]);
+        return $left[3]->equals($right[3], $literal);
     }
 
     /**
@@ -136,7 +136,7 @@ final class Quad
      * @param array<string, string> &$partial
      *   The partial mapping of terms to be used for unification.
      */
-    public static function unify(array $left, array $right, array &$partial): bool
+    public static function unify(array $left, array $right, array &$partial, bool $literal = true): bool
     {
         // early exit: if one's a quad and the other's a triple, they cannot unify.
         if ($left[3] === null || $right[3] === null) {
@@ -146,15 +146,15 @@ final class Quad
         }
 
         // unify subject, predicate, object
-        if (! $left[0]->unify($right[0], $partial)) {
+        if (! $left[0]->unify($right[0], $partial, $literal)) {
             return false;
         }
 
-        if (! $left[1]->unify($right[1], $partial)) {
+        if (! $left[1]->unify($right[1], $partial, $literal)) {
             return false;
         }
 
-        if (! $left[2]->unify($right[2], $partial)) {
+        if (! $left[2]->unify($right[2], $partial, $literal)) {
             return false;
         }
 
@@ -163,6 +163,6 @@ final class Quad
             return true;
         }
 
-        return $left[3]->unify($right[3], $partial);
+        return $left[3]->unify($right[3], $partial, $literal);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancySparql\Formats;
 
+use FancySparql\Term\Datatype\XSDString;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use RuntimeException;
@@ -91,7 +92,7 @@ final class NFormatSerializer
         $out = '"' . self::escapeLiteralString($term->lexical) . '"';
         if ($term->language !== null) {
             $out .= '@' . $term->language;
-        } elseif ($term->datatype !== Literal::DATATYPE_STRING) {
+        } elseif ($term->datatype !== XSDString::IRI) {
             $out .= '^^<' . self::escapeIri($term->datatype) . '>';
         }
 
