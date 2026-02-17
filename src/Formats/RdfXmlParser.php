@@ -202,6 +202,8 @@ class RdfXmlParser implements IteratorAggregate
                     $this->subject = $this->nextBNode();
                 }
 
+                $descriptionLang = $this->reader->xmlLang ?: null;
+
                 // Process attributes on Description element as property-value pairs
                 if ($this->reader->hasAttributes) {
                     $this->reader->moveToFirstAttribute();
@@ -222,7 +224,7 @@ class RdfXmlParser implements IteratorAggregate
                         $this->emit([
                             $this->subject,
                             $predicate,
-                            new Literal($value),
+                            new Literal($value, $descriptionLang),
                             null,
                         ]);
                     } while ($this->reader->moveToNextAttribute());
@@ -249,6 +251,7 @@ class RdfXmlParser implements IteratorAggregate
                 $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
                 $parseType    = $this->reader->getAttribute('rdf:parseType');
                 $idAttr       = $this->reader->getAttribute('rdf:ID');
+                $propertyLang = $this->reader->xmlLang ?: null;
 
                 // Handle rdf:ID on property element (reification)
                 $reificationURI = null;
@@ -323,7 +326,7 @@ class RdfXmlParser implements IteratorAggregate
                     continue;
                 }
 
-                $object = new Literal($this->reader->value);
+                $object = new Literal($this->reader->value, $propertyLang);
 
                 $this->emit([
                     $this->subject,
@@ -397,6 +400,7 @@ class RdfXmlParser implements IteratorAggregate
             $predicate    = new Resource($iri);
             $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
             $idAttr       = $this->reader->getAttribute('rdf:ID');
+            $elementLang  = $this->reader->xmlLang ?: null;
 
             // Handle rdf:ID on property element (reification)
             $reificationURI = null;
@@ -451,7 +455,7 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
-            $object = new Literal($this->reader->value);
+            $object = new Literal($this->reader->value, $elementLang);
 
             assert($this->subject !== null, 'subject must be set');
 
