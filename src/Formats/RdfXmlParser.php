@@ -129,7 +129,32 @@ class RdfXmlParser implements IteratorAggregate
     }
 
     /**
-     * Internal parsing method that uses Fiber to emit quads.
+     * Emits reification triples for a statement.
+     *
+     * @param non-empty-string $reificationURI The URI of the reification statement
+     * @param Resource         $subject        The subject of the original triple
+     * @param Resource         $predicate      The predicate of the original triple
+     * @param Resource|Literal $object         The object of the original triple
+     */
+    private function emitReification(string $reificationURI, Resource $subject, Resource $predicate, Resource|Literal $object): void
+    {
+        $statement         = new Resource($reificationURI);
+        $typeResource      = new Resource(self::RDF_NAMESPACE . 'type');
+        $statementType     = new Resource(self::RDF_NAMESPACE . 'Statement');
+        $subjectResource   = new Resource(self::RDF_NAMESPACE . 'subject');
+        $predicateResource = new Resource(self::RDF_NAMESPACE . 'predicate');
+        $objectResource    = new Resource(self::RDF_NAMESPACE . 'object');
+
+        $this->emit(
+            [$statement, $typeResource, $statementType, null],
+            [$statement, $subjectResource, $subject, null],
+            [$statement, $predicateResource, $predicate, null],
+            [$statement, $objectResource, $object, null],
+        );
+    }
+
+    /**
+     * Function that does the actual parsing.
      */
     private function doParse(): void
     {
@@ -249,13 +274,8 @@ class RdfXmlParser implements IteratorAggregate
 
                     // If rdf:ID is present, create reification triples
                     if ($reificationURI !== null) {
-                        $statement = new Resource($reificationURI);
-
-                        $this->emit([$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null]);
                         assert($this->subject !== null, 'subject must be set for reification');
-                        $this->emit([$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null]);
-                        $this->emit([$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null]);
-                        $this->emit([$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null]);
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                     }
 
                     continue;
@@ -274,15 +294,8 @@ class RdfXmlParser implements IteratorAggregate
 
                     // If rdf:ID is present, create reification triples
                     if ($reificationURI !== null) {
-                        $statement = new Resource($reificationURI);
-
                         assert($this->subject !== null, 'subject must be set for reification');
-                        $this->emit(
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null],
-                        );
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                     }
 
                     continue;
@@ -295,18 +308,16 @@ class RdfXmlParser implements IteratorAggregate
                     $this->reader->nodeType !== XMLReader::CDATA
                 ) {
                     // If rdf:ID is present but no content, still create reification
-                    if ($reificationURI !== null) {
+                    if (
+                        $reificationURI !== null
+                    ) {
                         // Create a blank node for the object if there's no content
-                        $object    = $this->nextBNode();
-                        $statement = new Resource($reificationURI);
+                        $object = $this->nextBNode();
 
-                        $this->emit(
-                            [$this->subject, $predicate, $object, null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null],
-                            [$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null],
-                        );
+                        $this->emit([$this->subject, $predicate, $object, null]);
+
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                     }
 
                     continue;
@@ -323,15 +334,8 @@ class RdfXmlParser implements IteratorAggregate
 
                 // If rdf:ID is present, create reification triples
                 if ($reificationURI !== null) {
-                    $statement = new Resource($reificationURI);
-
                     assert($this->subject !== null, 'subject must be set for reification');
-                    $this->emit(
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null],
-                    );
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                 }
 
                 continue;
@@ -416,14 +420,7 @@ class RdfXmlParser implements IteratorAggregate
                 // If rdf:ID is present, create reification triples
                 if ($reificationURI !== null) {
                     assert($this->subject !== null, 'subject must be set for reification');
-                    $statement = new Resource($reificationURI);
-
-                    $this->emit(
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null],
-                    );
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                 }
 
                 continue;
@@ -436,8 +433,7 @@ class RdfXmlParser implements IteratorAggregate
                 $this->reader->nodeType !== XMLReader::CDATA
             ) {
                 // If rdf:ID is present but no content, still create reification
-                if ($reificationURI !== null) {
-                    assert($this->subject !== null, 'subject must be set for reification');
+                if ($reificationURI !== null && $this->subject !== null) {
                     // Create a blank node for the object if there's no content
                     $object = $this->nextBNode();
 
@@ -448,15 +444,8 @@ class RdfXmlParser implements IteratorAggregate
                         null,
                     ]);
 
-                    $statement = new Resource($reificationURI);
-
                     assert($this->subject !== null, 'subject must be set for reification');
-                    $this->emit(
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null],
-                        [$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null],
-                    );
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                 }
 
                 continue;
@@ -478,15 +467,8 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
-            $statement = new Resource($reificationURI);
-
             assert($this->subject !== null, 'subject must be set for reification');
-            $this->emit(
-                [$statement, new Resource(self::RDF_NAMESPACE . 'type'), new Resource(self::RDF_NAMESPACE . 'Statement'), null],
-                [$statement, new Resource(self::RDF_NAMESPACE . 'subject'), $this->subject, null],
-                [$statement, new Resource(self::RDF_NAMESPACE . 'predicate'), $predicate, null],
-                [$statement, new Resource(self::RDF_NAMESPACE . 'object'), $object, null],
-            );
+            $this->emitReification($reificationURI, $this->subject, $predicate, $object);
         }
     }
 
