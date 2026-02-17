@@ -10,9 +10,11 @@ use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 
+use function assert;
 use function in_array;
 use function is_string;
 use function str_starts_with;
+use function strcmp;
 use function substr;
 
 /**
@@ -141,6 +143,28 @@ final class Resource extends Term
     public function isBlankNode(): bool
     {
         return str_starts_with($this->iri, '_:');
+    }
+
+    #[Override]
+    public function isGrounded(): bool
+    {
+        return ! $this->isBlankNode();
+    }
+
+    #[Override]
+    public function compare(Term $other): int
+    {
+        if ($other instanceof Literal) {
+            return $this->isBlankNode() ? 1 : -1;
+        }
+
+        assert($other instanceof Resource);
+
+        if ($this->isBlankNode() !== $other->isBlankNode()) {
+            return $this->isBlankNode() ? 1 : -1;
+        }
+
+        return strcmp($this->iri, $other->iri);
     }
 
     /** @return ResourceElement */

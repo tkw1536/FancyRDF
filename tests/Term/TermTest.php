@@ -11,6 +11,8 @@ use FancySparql\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function gmp_sign;
+
 /**
  * @phpstan-import-type LiteralElement from Literal
  * @phpstan-import-type ResourceElement from Resource
@@ -101,25 +103,60 @@ final class TermTest extends TestCase
         ];
     }
 
-    public function testEquals(): void
+    /** @return list<Term> */
+    private function getTerms(): array
     {
-        // A set of distinct terms.
-        // This test checks that a term is only equal to itself.
-        $terms = [
-            new Literal('hello'),
-            new Literal('hello', 'en'),
-            new Literal('hello', null, 'http://www.w3.org/2001/XMLSchema#integer'),
-            new Literal(''),
+        return [
+            // IRIs
             new Resource('https://example.com/foo'),
             new Resource('https://example.com/id'),
+
+            // String literals
+            new Literal('abc'),
+            new Literal('hello'),
+
+            // Language tagged string literals
+            new Literal('abc', 'de'),
+            new Literal('hello', 'de'),
+            new Literal('abc', 'en'),
+            new Literal('hello', 'en'),
+
+            // Typed literals
+            new Literal('abc', null, 'https://example.com/datatype_a'),
+            new Literal('hello', null, 'https://example.com/datatype_a'),
+            new Literal('abc', null, 'https://example.com/datatype_b'),
+            new Literal('hello', null, 'https://example.com/datatype_b'),
+
+            // Blank nodes
             new Resource('_:b1'),
             new Resource('_:n0'),
         ];
+    }
 
+    public function testEquals(): void
+    {
+        $terms = $this->getTerms();
         foreach ($terms as $i => $term) {
             foreach ($terms as $j => $other) {
                 $shouldEquals = $i === $j;
                 self::assertSame($shouldEquals, $term->equals($other), 'Term ' . $i . ' equals ' . $j);
+            }
+        }
+    }
+
+    public function testCompare(): void
+    {
+        $terms = $this->getTerms();
+        foreach ($terms as $i => $term) {
+            foreach ($terms as $j => $other) {
+                $shouldCompare = $i - $j;
+                $gotCompare    = $term->compare($other);
+
+                self::assertSame(
+                    gmp_sign($shouldCompare),
+                    gmp_sign($gotCompare),
+                    'Term ' . $i . ' compares ' . $j,
+                );
             }
         }
     }

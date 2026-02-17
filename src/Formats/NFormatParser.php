@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FancySparql\Formats;
 
-use FancySparql\Graph\GraphElement;
+use FancySparql\Graph\Quad;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use GuzzleHttp\Psr7\Utils;
@@ -39,7 +39,7 @@ use const PREG_SPLIT_NO_EMPTY;
  * @see https://www.w3.org/TR/rdf11-testcases/
  * @see https://www.php.net/manual/en/function.assert.php
  *
- * @phpstan-import-type TripleOrQuad from GraphElement
+ * @phpstan-import-type TripleOrQuadArray from Quad
  */
 final class NFormatParser
 {
@@ -51,7 +51,7 @@ final class NFormatParser
     /**
      * Reads content from the given string.
      *
-     * @return Traversable<TripleOrQuad>
+     * @return Traversable<TripleOrQuadArray>
      */
     public static function parse(string $source): Traversable
     {
@@ -73,7 +73,7 @@ final class NFormatParser
      *
      * This function closes the stream once it is no longer needed.
      *
-     * @return Traversable<TripleOrQuad>
+     * @return Traversable<TripleOrQuadArray>
      */
     public static function parseStream(StreamInterface $stream): Traversable
     {
@@ -102,7 +102,7 @@ final class NFormatParser
    * @param string $line
    *   One line (subject predicate object [graph] .).
    *
-   * @return TripleOrQuad|null
+   * @return TripleOrQuadArray|null
    *   The triple, quad, or null if the line is empty or a comment.
    */
     public static function parseLine(string $line): array|null

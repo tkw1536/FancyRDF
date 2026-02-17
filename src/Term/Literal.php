@@ -13,6 +13,7 @@ use Override;
 
 use function assert;
 use function is_string;
+use function strcmp;
 
 /**
  * Represents an RDF1.1 Literal.
@@ -71,11 +72,61 @@ final class Literal extends Term
         return $other instanceof Literal && $this->lexical === $other->lexical && $this->language === $other->language && $this->datatype === $other->datatype;
     }
 
+    #[Override]
+    public function compare(Term $other): int
+    {
+        if ($other instanceof Resource) {
+            return $other->isBlankNode() ? -1 : 1;
+        }
+
+        assert($other instanceof Literal);
+
+        $ourType   = $this->getTypeForCompare();
+        $theirType = $other->getTypeForCompare();
+        if ($ourType !== $theirType) {
+            return $ourType - $theirType;
+        }
+
+        $ourLanguage   = $this->language ?? '';
+        $theirLanguage = $other->language ?? '';
+        if ($ourLanguage !== $theirLanguage) {
+            return strcmp($ourLanguage, $theirLanguage);
+        }
+
+        $ourDatatype   = $this->datatype;
+        $theirDatatype = $other->datatype;
+        if ($ourDatatype !== $theirDatatype) {
+            return strcmp($ourDatatype, $theirDatatype);
+        }
+
+        return strcmp($this->lexical, $other->lexical);
+    }
+
     /** @param array<string, string> &$partial */
     #[Override]
     public function unify(Term $other, array &$partial): bool
     {
         return $this->equals($other);
+    }
+
+    #[Override]
+    public function isGrounded(): bool
+    {
+        return true;
+    }
+
+    private function getTypeForCompare(): int
+    {
+        switch ($this->datatype) {
+            case self::DATATYPE_STRING:
+                return 0;
+
+            case self::DATATYPE_LANG_STRING:
+                return 1;
+
+            default:
+                return 2;
+        }
     }
 
     /**

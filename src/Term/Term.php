@@ -104,6 +104,19 @@ abstract class Term implements JsonSerializable, XMLSerializable
     abstract public function equals(Term $other): bool;
 
     /**
+     * Compares this term with the other term using lexiographical ordering.
+     *
+     * @param Term $other
+     *   The other term to compare.
+     *
+     * @return int
+     *   a negative integer if $this is less than $other
+     *   zero if $this is equal to $other
+     *   a positive integer if $this is greater than $other
+     */
+    abstract public function compare(Term $other): int;
+
+    /**
      * Checks if this term can unify with the other term.
      *
      * Two terms are called unifiable under a mapping $partial if any of the following are true:
@@ -122,4 +135,9 @@ abstract class Term implements JsonSerializable, XMLSerializable
      *   True if the terms are unifiable, false otherwise.
      */
     abstract public function unify(Term $other, array &$partial): bool;
+
+    /**
+     * Checks if this term is grounded, meaning if it is not a blank node.
+     */
+    abstract public function isGrounded(): bool;
 }

@@ -35,6 +35,25 @@ final class ResourceTest extends TestCase
         ];
     }
 
+    /** @return array<string, array{string, bool, bool}> */
+    public static function isBlankNodeProvider(): array
+    {
+        return [
+            'URI returns false' => ['https://example.com/s', false, true],
+            'blank node returns true' => ['_:b1', true, false],
+            'blank node alternative returns true' => ['_:n0', true, false],
+        ];
+    }
+
+    /** @param non-empty-string $uri */
+    #[DataProvider('isBlankNodeProvider')]
+    public function testIsBlankNode(string $uri, bool $wantBlankNode, bool $wantGrounded): void
+    {
+        $resource = new Resource($uri);
+        self::assertSame($wantBlankNode, $resource->isBlankNode());
+        self::assertSame($wantGrounded, $resource->isGrounded());
+    }
+
     /** @param ResourceElement $expectedJson */
     #[DataProviderExternal(TermTest::class, 'resourceSerializationProvider')]
     public function testSerialize(
