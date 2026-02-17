@@ -10,7 +10,7 @@ lint:
 	@vendor/bin/phpcs
 
 	@echo "=> vendor/bin/phpstan"
-	@vendor/bin/phpstan analyse
+	@vendor/bin/phpstan analyse --memory-limit=1G
 
 fmt:
 	@echo "=> vendor/bin/phpcbf"
@@ -18,6 +18,6 @@ fmt:
 
 test:
 	@echo "=> vendor/bin/phpunit (with assertions)"
-	@php -dzend.assertions=1 vendor/bin/phpunit --display-deprecations
+	@php -dzend.assertions=1 vendor/bin/phpunit --display-deprecations --display-warnings 
 	@echo "=> vendor/bin/phpunit (without assertions)"
-	@php -dzend.assertions=0 vendor/bin/phpunit  --display-deprecations
+	@php -dzend.assertions=0 vendor/bin/phpunit  --display-deprecations --display-warnings

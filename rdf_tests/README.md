@@ -1,5 +1,4 @@
 All data in the subfolders of this directory has been retrieved from the W3C RDF Test Suite at https://github.com/w3c/rdf-tests. 
-This only files with the `.nt` and `.nq` endings.
 Data is ```Copyright © 2004-2023 <a href="https://www.w3.org/">World Wide Web Consortium</a>```.
 The data is licensed under the <a href="https://www.w3.org/copyright/3-clause-bsd-license-2008/">W3C 3-clause BSD license</a>, which is reproduced below:
 

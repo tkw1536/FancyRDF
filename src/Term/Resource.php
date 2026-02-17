@@ -10,11 +10,19 @@ use FancySparql\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 
+use function array_pop;
+use function array_shift;
 use function assert;
+use function count;
+use function explode;
+use function implode;
 use function in_array;
 use function is_string;
+use function preg_match;
 use function str_starts_with;
 use function strcmp;
+use function strpos;
+use function strrpos;
 use function substr;
 
 /**
@@ -193,5 +201,137 @@ final class Resource extends Term
         return $blankNodeID !== null
             ? XMLUtils::createElement($document, 'bnode', $blankNodeID)
             : XMLUtils::createElement($document, 'uri', $this->iri);
+    }
+
+    /**
+     * Joins a base URI with a relative URI according to RFC 3986.
+     *
+     * @param string $base     The base URI
+     * @param string $relative The relative URI (may be empty, relative, or absolute)
+     *
+     * @return string The resolved absolute URI
+     */
+    public static function joinURLs(string $base, string $relative): string
+    {
+        // Handle empty relative URI - return base without fragment
+        if ($relative === '') {
+            $fragmentPos = strpos($base, '#');
+
+            return $fragmentPos !== false ? substr($base, 0, $fragmentPos) : $base;
+        }
+
+        // Handle network path (starts with //)
+        if (str_starts_with($relative, '//')) {
+            $schemeEnd = strpos($base, '://');
+            if ($schemeEnd !== false) {
+                $scheme = substr($base, 0, $schemeEnd + 3);
+
+                return $scheme . substr($relative, 2);
+            }
+
+            return $relative;
+        }
+
+        // Handle absolute URI (has scheme)
+        if (preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $relative)) {
+            return $relative;
+        }
+
+        // Handle fragment-only (starts with #)
+        if (str_starts_with($relative, '#')) {
+            $baseWithoutFragment = strpos($base, '#') !== false ? substr($base, 0, strpos($base, '#')) : $base;
+
+            return $baseWithoutFragment . $relative;
+        }
+
+        // Remove fragment from base for resolution
+        $baseWithoutFragment = strpos($base, '#') !== false ? substr($base, 0, strpos($base, '#')) : $base;
+
+        // Handle absolute path (starts with /)
+        if (str_starts_with($relative, '/')) {
+            // Absolute path relative to base's authority
+            $schemeEnd = strpos($baseWithoutFragment, '://');
+            if ($schemeEnd !== false) {
+                $authorityEnd = strpos($baseWithoutFragment, '/', $schemeEnd + 3);
+                if ($authorityEnd !== false) {
+                    return substr($baseWithoutFragment, 0, $authorityEnd) . $relative;
+                }
+
+                return $baseWithoutFragment . $relative;
+            }
+
+            return $relative;
+        }
+
+        // Relative path - resolve against base
+        // Get base path (everything up to last /)
+        $schemeEnd = strpos($baseWithoutFragment, '://');
+        if ($schemeEnd === false) {
+            // No scheme, treat as simple path
+            $lastSlash = strrpos($baseWithoutFragment, '/');
+            if ($lastSlash === false) {
+                $baseDir = $baseWithoutFragment . '/';
+            } else {
+                $baseDir = substr($baseWithoutFragment, 0, $lastSlash + 1);
+            }
+
+            $combined = $baseDir . $relative;
+            $parts    = explode('/', $combined);
+        } else {
+            // Has scheme - need to preserve scheme://authority
+            $authorityStart = $schemeEnd + 3;
+            $authorityEnd   = strpos($baseWithoutFragment, '/', $authorityStart);
+            if ($authorityEnd === false) {
+                // No path after authority
+                $schemeAndAuthority = $baseWithoutFragment;
+                $basePath           = '/';
+            } else {
+                $schemeAndAuthority = substr($baseWithoutFragment, 0, $authorityEnd);
+                $basePath           = substr($baseWithoutFragment, $authorityEnd);
+            }
+
+            // Get directory part of base path
+            $lastSlash = strrpos($basePath, '/');
+            if ($lastSlash === false) {
+                $baseDir = '/';
+            } else {
+                $baseDir = substr($basePath, 0, $lastSlash + 1);
+            }
+
+            $combined = $baseDir . $relative;
+            $parts    = explode('/', $combined);
+            // Remove empty first element (from leading /)
+            if ($parts[0] === '') {
+                array_shift($parts);
+            }
+        }
+
+        // Normalize: handle ../
+        $result = [];
+        foreach ($parts as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+
+            if ($part === '..') {
+                if (! empty($result) && $result[count($result) - 1] !== '..') {
+                    array_pop($result);
+                } elseif (empty($result)) {
+                    // Can't go above root - ignore
+                    continue;
+                } else {
+                    $result[] = $part;
+                }
+            } else {
+                $result[] = $part;
+            }
+        }
+
+        if ($schemeEnd !== false) {
+            // Reconstruct URL with scheme://authority
+            return $schemeAndAuthority . '/' . implode('/', $result);
+        }
+
+        return implode('/', $result);
     }
 }

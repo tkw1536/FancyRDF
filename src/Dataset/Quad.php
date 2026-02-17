@@ -7,6 +7,10 @@ namespace FancySparql\Dataset;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 
+use function array_is_list;
+use function count;
+use function is_array;
+
 /**
  * Functions acting on RDF triples and quads.
  *
@@ -41,6 +45,18 @@ final class Quad
     public static function isGrounded(array $quad): bool
     {
         return $quad[0]->isGrounded() && $quad[1]->isGrounded() && $quad[2]->isGrounded() && ($quad[3]?->isGrounded() ?? true);
+    }
+
+    /** @phpstan-assert-if-true TripleOrQuadArray $quad */
+    public static function isTripleOrQuadArray(mixed $quad): bool
+    {
+        return is_array($quad) &&
+            array_is_list($quad) &&
+            count($quad) === 4 &&
+            $quad[0] instanceof Resource &&
+            $quad[1] instanceof Resource &&
+            ($quad[2] instanceof Resource || $quad[2] instanceof Literal) &&
+            ($quad[3] === null || $quad[3] instanceof Resource);
     }
 
     /**
