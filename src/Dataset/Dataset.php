@@ -1,0 +1,148 @@
+<?php
+
+declare(strict_types=1);
+
+namespace FancySparql\Dataset;
+
+use IteratorAggregate;
+use Override;
+use Traversable;
+
+use function array_shift;
+use function array_splice;
+use function assert;
+use function count;
+use function usort;
+
+/**
+ * Represents an RDF dataset.
+ *
+ * A dataset is a collection of quads.
+ *
+ * @phpstan-import-type TripleOrQuadArray from Quad
+ * @implements IteratorAggregate<TripleOrQuadArray>
+ */
+final class Dataset implements IteratorAggregate
+{
+    /**
+     * Constructs a new dataset.
+     *
+     * @param list<TripleOrQuadArray> $quads
+     *
+     * @return void
+     */
+    public function __construct(
+        public readonly array $quads = [],
+    ) {
+    }
+
+    /** @return Traversable<TripleOrQuadArray> */
+    #[Override]
+    public function getIterator(): Traversable
+    {
+        yield from $this->quads;
+    }
+
+    /**
+     * Splits the quads into grounded and non-grounded quads.
+     *
+     * @return array<list<TripleOrQuadArray>, list<TripleOrQuadArray>>
+     *   The first array contains the grounded quads, the second array contains the non-grounded quads.
+     */
+    public function splitQuads(): array
+    {
+        $grounded    = [];
+        $nonGrounded = [];
+
+        foreach ($this->quads as $quad) {
+            if (Quad::isGrounded($quad)) {
+                $grounded[] = $quad;
+            } else {
+                $nonGrounded[] = $quad;
+            }
+        }
+
+        return [$grounded, $nonGrounded];
+    }
+
+    /**
+     * Checks if this dataset is isomorphic to the other dataset.
+     *
+     * @param array<string, string> &$partial
+     *   Blank node mapping from this dataset's blank node IDs to the other's (updated when matching non-grounded quads).
+     */
+    public function isIsomorphicTo(Dataset $other, array &$partial): bool
+    {
+        if (count($this->quads) !== count($other->quads)) {
+            return false;
+        }
+
+        // Split quads into grounded and non-grounded.
+        [$groundedThis, $nonGroundedThis]   = $this->splitQuads();
+        [$groundedOther, $nonGroundedOther] = $other->splitQuads();
+
+        if (count($groundedThis) !== count($groundedOther)) {
+            return false;
+        }
+
+        if (count($nonGroundedThis) !== count($nonGroundedOther)) {
+            return false;
+        }
+
+        // Compare grounded quads by lexicographical ordering (sort then compare).
+        usort($groundedThis, [Quad::class, 'compare']);
+        usort($groundedOther, [Quad::class, 'compare']);
+        for ($i = 0; $i < count($groundedThis); $i++) {
+            if (! Quad::equals($groundedThis[$i], $groundedOther[$i])) {
+                return false;
+            }
+        }
+
+        // Backtrack to find a blank-node mapping that makes non-grounded quads match.
+        return $this->matchNonGroundedQuads($nonGroundedThis, $nonGroundedOther, $partial);
+    }
+
+    /**
+     * Tries to find a permutation of $otherQuads that unifies with $thisQuads under a consistent $partial.
+     *
+     * @param list<TripleOrQuadArray> $ours
+     * @param list<TripleOrQuadArray> $theirs
+     * @param array<string, string>   &$partial
+     */
+    private function matchNonGroundedQuads(array $ours, array $theirs, array &$partial): bool
+    {
+        assert(count($ours) === count($theirs), 'by precondition');
+
+        // no quads on either side, so we match for sure!
+        if (count($ours) === 0) {
+            return true;
+        }
+
+        // Pick a 'hero' quad to compare with remaining ones first.
+        $hero = array_shift($ours);
+
+        // Check each possible candidate if they can unify with the here.
+        // For each check we need to reset the mapping back to the current one.
+        // This is because it's passed by value and may make abitrary changes.
+        $oldPartial = $partial;
+        foreach ($theirs as $k => $candidate) {
+            // reset to the old partial before trying the next candidate.
+            $partial = $oldPartial;
+
+            // the candidate must unify with our hero.
+            if (! Quad::unify($hero, $candidate, $partial)) {
+                continue;
+            }
+
+            // whatever is left over must unify.
+            $newTheirs = $theirs;
+            array_splice($newTheirs, $k, 1);
+            if ($this->matchNonGroundedQuads($ours, $newTheirs, $partial)) {
+                return true;
+            }
+        }
+
+        // we didn't find a match for our hero.
+        return false;
+    }
+}

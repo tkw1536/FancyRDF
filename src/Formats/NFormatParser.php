@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FancySparql\Formats;
 
-use FancySparql\Graph\Quad;
+use FancySparql\Dataset\Quad;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 use GuzzleHttp\Psr7\Utils;

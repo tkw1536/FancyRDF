@@ -6,6 +6,7 @@ namespace FancySparql\Tests\Formats;
 
 use AssertionError;
 use Exception;
+use FancySparql\Dataset\Quad;
 use FancySparql\Formats\NFormatParser;
 use FancySparql\Formats\NFormatSerializer;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -25,6 +26,7 @@ use function iterator_to_array;
 
 use const DIRECTORY_SEPARATOR;
 
+/** @phpstan-import-type TripleOrQuadArray from Quad */
 final class NFormatW3CTest extends TestCase
 {
     /**

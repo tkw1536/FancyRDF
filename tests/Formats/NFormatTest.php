@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancySparql\Tests\Formats;
 
 use AssertionError;
+use FancySparql\Dataset\Quad;
 use FancySparql\Formats\NFormatParser;
 use FancySparql\Formats\NFormatSerializer;
 use FancySparql\Term\Literal;
@@ -15,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 
 final class NFormatTest extends TestCase
 {
-    /** @return array<string, array{Resource|Literal, Resource|Literal, Resource|Literal, Resource|null, string}> */
+    /** @return array<string, array{Resource, Resource, Resource|Literal, Resource|null, string}> */
     public static function statementProvider(): array
     {
         return [
@@ -59,7 +60,7 @@ final class NFormatTest extends TestCase
 
     #[DataProvider('statementProvider')]
     public function testSerialize(
-        Resource|Literal $subject,
+        Resource $subject,
         Resource $predicate,
         Resource|Literal $object,
         Resource|null $graph,
@@ -70,7 +71,7 @@ final class NFormatTest extends TestCase
 
     #[DataProvider('statementProvider')]
     public function testParseLine(
-        Resource|Literal $subject,
+        Resource $subject,
         Resource $predicate,
         Resource|Literal $object,
         Resource|null $graph,
@@ -78,17 +79,7 @@ final class NFormatTest extends TestCase
     ): void {
         $parsed = NFormatParser::parseLine($line);
         self::assertNotNull($parsed);
-        self::assertTrue($parsed[0]->equals($subject), 'subject');
-        self::assertTrue($parsed[1]->equals($predicate), 'predicate');
-        self::assertTrue($parsed[2]->equals($object), 'object');
-        if ($graph === null) {
-            self::assertNull($parsed[3], 'no graph');
-
-            return;
-        }
-
-        self::assertNotNull($parsed[3], 'graph must not be null');
-        self::assertTrue($parsed[3]->equals($graph), 'graph');
+        self::assertTrue(Quad::equals($parsed, [$subject, $predicate, $object, $graph]));
     }
 
     public function testParseLineEmptyReturnsNull(): void

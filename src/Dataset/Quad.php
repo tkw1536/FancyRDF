@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Graph;
+namespace FancySparql\Dataset;
 
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
 
 /**
- * Reprensets a
+ * Functions acting on RDF triples and quads.
  *
  * @phpstan-type TripleArray array{Resource, Resource, Resource|Literal, null}
  * @phpstan-type QuadArray array{Resource, Resource, Resource|Literal, Resource}
