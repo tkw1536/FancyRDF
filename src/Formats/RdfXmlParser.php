@@ -344,14 +344,15 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
-            // Typed node (e.g. <ex:Book rdf:about="...">) – only when it has node-identifying attributes
+            // Typed node (e.g. <ex:Book rdf:about="..."> or <rdf:Property rdf:about="...">) – only when it has node-identifying attributes
             // Must check after property elements, as property elements can have rdf:ID for reification
             $about         = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
             $nodeId        = $this->reader->getAttribute('rdf:nodeID');
             $idAttr        = $this->reader->getAttribute('rdf:ID');
             $isNodeElement = $about !== null || $nodeId !== null || ($idAttr !== null && $this->subject === null);
+            $isTypedNode   = $localName !== 'RDF' && $isNodeElement && ($namespace !== self::RDF_NAMESPACE || $localName !== 'Description');
 
-            if ($namespace !== self::RDF_NAMESPACE && $localName !== 'RDF' && $isNodeElement) {
+            if ($isTypedNode) {
                 $typedNodeDepth = $this->reader->depth;
 
                 if ($idAttr !== null) {
