@@ -96,83 +96,103 @@ final class NFormatParser
         }
     }
 
+    private static string $line = '';
+    private static int $len     = 0;
+    private static int $pos     = 0;
+
   /**
    * Parses a single N-Quads line into a quad or null.
    *
    * @param string $line
-   *   One line (subject predicate object [graph] .).
+   *   One line (subject predicate object [graph]).
    *
    * @return TripleOrQuadArray|null
    *   The triple, quad, or null if the line is empty or a comment.
    */
     public static function parseLine(string $line): array|null
     {
-        $pos = 0;
+        self::$line = $line;
+        self::$len  = strlen($line);
+        self::$pos  = 0;
 
-        $len = strlen($line);
+        try {
+            self::skipWhitespace();
+            if (self::$pos >= self::$len || self::$line[self::$pos] === '#') {
+                return null;
+            }
 
-        self::skipWhitespace($line, $pos, $len);
-        if ($pos >= $len || $line[$pos] === '#') {
-            return null;
+            $subject = self::parseAnyResource();
+            self::skipWhitespace();
+            assert(self::$pos < self::$len, 'unexpected end of line while reading term at position ' . self::$pos);
+
+            $predicate = self::parseIRI();
+            assert(! $predicate->isBlankNode(), 'predicate must be an IRI at position ' . self::$pos);
+
+            self::skipWhitespace();
+            assert(self::$pos < self::$len, 'unexpected end of line while reading term at position ' . self::$pos);
+
+            $object = self::parseAnyTerm();
+
+            // optionally parse a graph
+            $graph = null;
+            self::skipWhitespace();
+            if (self::$pos < self::$len && self::$line[self::$pos] !== '.') {
+                $graph = self::parseAnyResource();
+                self::skipWhitespace();
+            }
+
+            // require the trailing dot.
+            assert(self::$pos < self::$len && self::$line[self::$pos] === '.', 'expected "." at end of statement at position ' . self::$pos);
+
+            return [$subject, $predicate, $object, $graph];
+        } finally {
+            self::$line = '';
+            self::$len  = 0;
+            self::$pos  = 0;
         }
-
-        $subject = self::parseTerm($line, $pos, $len);
-        assert($subject instanceof Resource, 'subject must be a resource at position ' . $pos);
-
-        self::skipWhitespace($line, $pos, $len);
-        assert($pos < $len, 'unexpected end of line while reading term at position ' . $pos);
-
-        $predicate = self::parseTerm($line, $pos, $len);
-        assert($predicate instanceof Resource && ! $predicate->isBlankNode(), 'predicate must be an IRI at position ' . $pos);
-
-        self::skipWhitespace($line, $pos, $len);
-        assert($pos < $len, 'unexpected end of line while reading term at position ' . $pos);
-
-        $object = self::parseTerm($line, $pos, $len);
-
-        // optionally parse a graph
-        $graph = null;
-        self::skipWhitespace($line, $pos, $len);
-        if ($pos < $len && $line[$pos] !== '.') {
-            $graph = self::parseTerm($line, $pos, $len);
-            assert($graph instanceof Resource, 'graph must be a resource at position ' . $pos);
-
-            self::skipWhitespace($line, $pos, $len);
-        }
-
-        // require the trailing dot.
-        assert($pos < $len && $line[$pos] === '.', 'expected "." at end of statement at position ' . $pos);
-
-        return [$subject, $predicate, $object, $graph];
     }
 
-  /**
-   * Parses a single RDF term (IRI, blank node, or literal).
-   */
-    private static function parseTerm(string $line, int &$pos, int $len): Literal|Resource
+    /**
+     * Parses an object of a triple.
+     */
+    private static function parseAnyTerm(): Literal|Resource
     {
         // look at the current character and decide what to parse.
-        $ch = $line[$pos] ?? '';
+        $ch = self::$line[self::$pos] ?? '';
+        if ($ch === '"') {
+            return self::parseLiteral();
+        }
+
+        return self::parseAnyResource();
+    }
+
+    private static function parseAnyResource(): Resource
+    {
+        // look at the current character and decide what to parse.
+        $ch = self::$line[self::$pos] ?? '';
         if ($ch === '<') {
-            return new Resource(self::parseIriRef($line, $pos, $len));
+            return self::parseIRI();
         }
 
-        if ($ch === '_' && $pos + 1 < $len && $line[$pos + 1] === ':') {
-            return new Resource(self::parseBlankNodeLabel($line, $pos));
-        }
+        assert($ch === '_' && self::$pos + 1 < self::$len && self::$line[self::$pos + 1] === ':', 'invalid blank node start at position ' . self::$pos);
 
-        assert($ch === '"', 'invalid term start: must be "<" or "_:" or "" at position ' . $pos);
+        return new Resource(self::parseBlankNodeLabel());
+    }
 
-        return self::parseLiteral($line, $pos, $len);
+    private static function parseIRI(): Resource
+    {
+        assert(self::$pos < self::$len && self::$line[self::$pos] === '<', 'expected "<" at position ' . self::$pos);
+
+        return new Resource(self::parseIriRef());
     }
 
   /**
    * Skips space and tab.
    */
-    private static function skipWhitespace(string $line, int &$pos, int $len): void
+    private static function skipWhitespace(): void
     {
-        while ($pos < $len && ($line[$pos] === ' ' || $line[$pos] === "\t")) {
-            $pos++;
+        while (self::$pos < self::$len && (self::$line[self::$pos] === ' ' || self::$line[self::$pos] === "\t")) {
+            self::$pos++;
         }
     }
 
@@ -182,40 +202,41 @@ final class NFormatParser
    * @return non-empty-string
    *   The IRI string.
    */
-    private static function parseIriRef(string $line, int &$pos, int $len): string
+    private static function parseIriRef(): string
     {
-        $pos++;
+        assert(self::$line[self::$pos] === '<', 'expected "<" at position ' . self::$pos);
+        self::$pos++;
 
-        $start = $pos;
+        $start = self::$pos;
         $buf   = '';
-        while ($pos < $len) {
-            $ch = $line[$pos];
+        while (self::$pos < self::$len) {
+            $ch = self::$line[self::$pos];
 
             // closing '>' found, end of the IRI reference.
             if ($ch === '>') {
-                $end = $pos;
-                $pos++;
+                $end = self::$pos;
+                self::$pos++;
 
-                $buf .= substr($line, $start, $end - $start);
-                assert($buf !== '', 'empty IRI reference at position ' . $pos);
+                $buf .= substr(self::$line, $start, $end - $start);
+                assert($buf !== '', 'empty IRI reference at position ' . self::$pos);
 
                 return $buf;
             }
 
             // parse an escape sequence.
-            if ($ch === '\\' && $pos + 1 < $len) {
-                $buf  .= substr($line, $start, $pos - $start);
-                $buf  .= self::decodeUchar($line, $pos, $len);
-                $start = $pos;
+            if ($ch === '\\' && self::$pos + 1 < self::$len) {
+                $buf  .= substr(self::$line, $start, self::$pos - $start);
+                $buf  .= self::decodeUchar();
+                $start = self::$pos;
                 continue;
             }
 
             // move to the next character.
-            $pos++;
+            self::$pos++;
         }
 
         // @phpstan-ignore function.impossibleType (GIGO)
-        assert(false, 'unclosed IRI reference at position ' . $pos);
+        assert(false, 'unclosed IRI reference at position ' . self::$pos);
 
         // GIGO: Return a random blank node.
         // This branch can only be triggered if assertions are disabled.
@@ -231,33 +252,33 @@ final class NFormatParser
    *
    * @return non-empty-string
    */
-    private static function parseBlankNodeLabel(string $line, int &$pos): string
+    private static function parseBlankNodeLabel(): string
     {
-        assert($line[$pos] === '_' && $line[$pos + 1] === ':', 'expected _: at position ' . $pos);
+        assert(self::$line[self::$pos] === '_' && self::$line[self::$pos + 1] === ':', 'expected _: at position ' . self::$pos);
 
-        $start = $pos;
-        $pos  += 2; // skip the _: prefix
+        $start      = self::$pos;
+        self::$pos += 2; // skip the _: prefix
 
         $matchCount = preg_match(
             '/\G[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
-            $line,
+            self::$line,
             $m,
             0,
-            $pos,
+            self::$pos,
         );
 
         $label = $m[0] ?? '';
-        assert($matchCount === 1, 'invalid blank node label at position ' . $pos);
+        assert($matchCount === 1, 'invalid blank node label at position ' . self::$pos);
 
         $labelLen = strlen($label);
         if (str_ends_with($label, '.')) {
             $labelLen--;
         }
 
-        $pos += $labelLen;
+        self::$pos += $labelLen;
 
-        $label = substr($line, $start, $labelLen + 2);
-        assert($label !== '', 'empty blank node label at position ' . $pos);
+        $label = substr(self::$line, $start, $labelLen + 2);
+        assert($label !== '', 'empty blank node label at position ' . self::$pos);
 
         return $label;
     }
@@ -265,25 +286,25 @@ final class NFormatParser
   /**
    * Parses a literal: "..." with optional @lang or ^^<datatype>.
    */
-    private static function parseLiteral(string $line, int &$pos, int $len): Literal
+    private static function parseLiteral(): Literal
     {
-        $lexical = self::parseStringLiteralQuote($line, $pos, $len);
-        self::skipWhitespace($line, $pos, $len);
+        $lexical = self::parseStringLiteralQuote();
+        self::skipWhitespace();
 
         $lang     = null;
         $datatype = null;
 
-        if ($pos < $len && $line[$pos] === '@') {
-            $pos++;
-            $rest = substr($line, $pos, $len - $pos);
+        if (self::$pos < self::$len && self::$line[self::$pos] === '@') {
+            self::$pos++;
+            $rest = substr(self::$line, self::$pos, self::$len - self::$pos);
             preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/Su', $rest, $m);
             $lang = $m[0] ?? '';
-            assert($lang !== '', 'missing language tag at position ' . $pos);
+            assert($lang !== '', 'missing language tag at position ' . self::$pos);
 
-            $pos += strlen($lang);
-        } elseif ($pos + 1 < $len && $line[$pos] === '^' && $line[$pos + 1] === '^') {
-            $pos     += 2;
-            $datatype = self::parseIriRef($line, $pos, $len);
+            self::$pos += strlen($lang);
+        } elseif (self::$pos + 1 < self::$len && self::$line[self::$pos] === '^' && self::$line[self::$pos + 1] === '^') {
+            self::$pos += 2;
+            $datatype   = self::parseIriRef();
         }
 
         return new Literal($lexical, $lang, $datatype);
@@ -295,46 +316,46 @@ final class NFormatParser
    * @return string
    *   The lexical form.
    */
-    private static function parseStringLiteralQuote(string $line, int &$pos, int $len): string
+    private static function parseStringLiteralQuote(): string
     {
-        assert($line[$pos] === '"', 'expected quote at position ' . $pos);
+        assert(self::$line[self::$pos] === '"', 'expected quote at position ' . self::$pos);
 
-        $pos++;
+        self::$pos++;
 
         // Read the string contents.
         $buf   = '';
-        $start = $pos;
-        while ($pos < $len) {
-            $ch = $line[$pos];
+        $start = self::$pos;
+        while (self::$pos < self::$len) {
+            $ch = self::$line[self::$pos];
 
             // Closing quote found, end of string.
             if ($ch === '"') {
-                $pos++;
+                self::$pos++;
 
-                return $buf . substr($line, $start, $pos - 1 - $start);
+                return $buf . substr(self::$line, $start, self::$pos - 1 - $start);
             }
 
             // Parse an escape sequence.
-            if ($ch === '\\' && $pos + 1 < $len) {
-                $buf .= substr($line, $start, $pos - $start);
-                $next = $line[$pos + 1];
+            if ($ch === '\\' && self::$pos + 1 < self::$len) {
+                $buf .= substr(self::$line, $start, self::$pos - $start);
+                $next = self::$line[self::$pos + 1];
                 if ($next === 'u' || $next === 'U') {
-                    $buf .= self::decodeUchar($line, $pos, $len);
+                    $buf .= self::decodeUchar();
                 } else {
-                    $buf .= self::decodeEchar($next, $pos + 1);
-                    $pos += 2;
+                    $buf       .= self::decodeEchar($next, self::$pos + 1);
+                    self::$pos += 2;
                 }
 
-                $start = $pos;
+                $start = self::$pos;
                 continue;
             }
 
             // and move to the next character.
-            $pos++;
+            self::$pos++;
         }
 
         // @phpstan-ignore function.impossibleType (GIGO)
-        assert(false, 'unclosed string literal at position ' . $pos);
+        assert(false, 'unclosed string literal at position ' . self::$pos);
 
         return '';
     }
@@ -342,30 +363,30 @@ final class NFormatParser
   /**
    * Decodes one \uXXXX or \UXXXXXXXX sequence; $pos is advanced.
    */
-    private static function decodeUchar(string $line, int &$pos, int $len): string
+    private static function decodeUchar(): string
     {
-        assert($line[$pos] === '\\', 'expected backslash at position ' . $pos);
+        assert(self::$line[self::$pos] === '\\', 'expected backslash at position ' . self::$pos);
 
-        $pos++;
-        assert($pos < $len, 'unexpected end in escape sequence at position ' . $pos);
-        assert($line[$pos] === 'u' || $line[$pos] === 'U', 'expected \\u or \\U at position ' . $pos);
+        self::$pos++;
+        assert(self::$pos < self::$len, 'unexpected end in escape sequence at position ' . self::$pos);
+        assert(self::$line[self::$pos] === 'u' || self::$line[self::$pos] === 'U', 'expected \\u or \\U at position ' . self::$pos);
 
-        $u = $line[$pos] === 'u';
-        $pos++;
+        $u = self::$line[self::$pos] === 'u';
+        self::$pos++;
 
         // determine the number of characters to read.
         $hexLen = $u ? 4 : 8;
-        assert($pos + $hexLen <= $len, 'incomplete \\u or \\U escape at position ' . $pos);
+        assert(self::$pos + $hexLen <= self::$len, 'incomplete \\u or \\U escape at position ' . self::$pos);
 
         // read the escape sequence.
-        $hex = substr($line, $pos, $hexLen);
-        assert(ctype_xdigit($hex), 'invalid hex in \\u or \\U escape at position ' . $pos);
+        $hex = substr(self::$line, self::$pos, $hexLen);
+        assert(ctype_xdigit($hex), 'invalid hex in \\u or \\U escape at position ' . self::$pos);
 
-        $pos += $hexLen;
+        self::$pos += $hexLen;
 
         // do the actual decoding.
         $ord = (int) hexdec($hex);
-        assert($ord <= 0x10FFFF, 'code point out of range at position ' . $pos);
+        assert($ord <= 0x10FFFF, 'code point out of range at position ' . self::$pos);
 
         return mb_chr($ord, 'UTF-8');
     }
