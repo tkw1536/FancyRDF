@@ -251,6 +251,7 @@ class RdfXmlParser implements IteratorAggregate
                 $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
                 $parseType    = $this->reader->getAttribute('rdf:parseType');
                 $idAttr       = $this->reader->getAttribute('rdf:ID');
+                $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
                 $propertyLang = $this->reader->xmlLang ?: null;
 
                 // Handle rdf:ID on property element (reification)
@@ -326,7 +327,9 @@ class RdfXmlParser implements IteratorAggregate
                     continue;
                 }
 
-                $object = new Literal($this->reader->value, $propertyLang);
+                $object = $datatypeAttr !== null
+                    ? new Literal($this->reader->value, null, $this->resolveURI($datatypeAttr))
+                    : new Literal($this->reader->value, $propertyLang);
 
                 $this->emit([
                     $this->subject,
@@ -401,6 +404,7 @@ class RdfXmlParser implements IteratorAggregate
             $predicate    = new Resource($iri);
             $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
             $idAttr       = $this->reader->getAttribute('rdf:ID');
+            $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
             $elementLang  = $this->reader->xmlLang ?: null;
 
             // Handle rdf:ID on property element (reification)
@@ -456,7 +460,9 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
-            $object = new Literal($this->reader->value, $elementLang);
+            $object = $datatypeAttr !== null
+                ? new Literal($this->reader->value, null, $this->resolveURI($datatypeAttr))
+                : new Literal($this->reader->value, $elementLang);
 
             assert($this->subject !== null, 'subject must be set');
 
