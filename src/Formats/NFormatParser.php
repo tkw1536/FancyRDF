@@ -196,7 +196,7 @@ final class NFormatParser
                 $end = $pos;
                 $pos++;
 
-                $buf .= $buf . substr($line, $start, $end - $start);
+                $buf .= substr($line, $start, $end - $start);
                 assert($buf !== '', 'empty IRI reference at position ' . $pos);
 
                 return $buf;
