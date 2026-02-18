@@ -158,7 +158,7 @@ final class NFormatParser
         }
 
         if ($ch === '_' && $pos + 1 < $len && $line[$pos + 1] === ':') {
-            return new Resource(self::parseBlankNodeLabel($line, $pos, $len));
+            return new Resource(self::parseBlankNodeLabel($line, $pos));
         }
 
         assert($ch === '"', 'invalid term start: must be "<" or "_:" or "" at position ' . $pos);
@@ -231,14 +231,14 @@ final class NFormatParser
    *
    * @return non-empty-string
    */
-    private static function parseBlankNodeLabel(string $line, int &$pos, int $len): string
+    private static function parseBlankNodeLabel(string $line, int &$pos): string
     {
         assert($line[$pos] === '_' && $line[$pos + 1] === ':', 'expected _: at position ' . $pos);
 
         $start = $pos;
         $pos  += 2; // skip the _: prefix
 
-        $rest = substr($line, $pos, $len - $pos);
+        $rest = substr($line, $pos);
         assert($rest !== '', 'empty blank node label at position ' . $pos);
         $matchCount = preg_match(
             '/^[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
