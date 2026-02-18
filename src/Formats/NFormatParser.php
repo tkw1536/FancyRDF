@@ -238,30 +238,28 @@ final class NFormatParser
         $start = $pos;
         $pos  += 2; // skip the _: prefix
 
-        $rest = substr($line, $pos);
-        assert($rest !== '', 'empty blank node label at position ' . $pos);
         $matchCount = preg_match(
-            '/^[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
-            $rest,
+            '/\G[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
+            $line,
             $m,
+            0,
+            $pos,
         );
 
         $label = $m[0] ?? '';
         assert($matchCount === 1, 'invalid blank node label at position ' . $pos);
 
-        if (str_ends_with($label, '.')) {
-            $label = substr($label, 0, -1);
-        }
-
         $labelLen = strlen($label);
-        assert($labelLen >= strlen($rest) || $rest[$labelLen] !== ':', 'colon not allowed in blank node label at position ' . $pos);
+        if (str_ends_with($label, '.')) {
+            $labelLen--;
+        }
 
         $pos += $labelLen;
 
-        $result = substr($line, $start, $pos - $start);
-        assert($result !== '', 'empty blank node label at position ' . $pos);
+        $label = substr($line, $start, $labelLen + 2);
+        assert($label !== '', 'empty blank node label at position ' . $pos);
 
-        return $result;
+        return $label;
     }
 
   /**
