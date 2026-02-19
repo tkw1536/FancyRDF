@@ -164,6 +164,7 @@ final class NFormatW3CTest extends TestCase
         return W3CTestLoader::load(['*.nq'], 'nquads', 'bad');
     }
 
+    /** When assertions are enabled, the parser should fail with the bad cases. */
     #[DataProvider('badQuadsProvider')]
     #[RequiresSetting('zend.assertions', '1')]
     public function testBadQuadsWithAssertions(string $path, string $content): void
@@ -174,6 +175,7 @@ final class NFormatW3CTest extends TestCase
         iterator_to_array($statements); // exhaust the iterator!
     }
 
+    /** When assertions are disabled, the parser should not crash. */
     #[DataProvider('badQuadsProvider')]
     #[IgnoreDeprecations]
     #[RequiresSetting('zend.assertions', '0')]

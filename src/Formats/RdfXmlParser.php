@@ -20,6 +20,9 @@ use function array_pop;
 use function assert;
 use function count;
 use function in_array;
+use function mb_substr;
+use function preg_match;
+use function str_contains;
 
 /**
  * @phpstan-import-type TripleArray from Quad
@@ -110,6 +113,9 @@ class RdfXmlParser implements IteratorAggregate
 
     /** @var array<int, int> li counter per depth level */
     private array $liCounters = [];
+
+    /** @var array<string, true> Track rdf:ID values to detect duplicates */
+    private array $seenIds = [];
 
     /** return the next li property name for the current depth */
     private function nextLiProperty(): Resource
@@ -268,6 +274,20 @@ class RdfXmlParser implements IteratorAggregate
             $localName = $this->reader->localName;
             $namespace = $this->reader->namespaceURI;
 
+            // Property element (check first, as property elements can have rdf:ID for reification)
+            // Also handle rdf:li elements which should be converted to numbered properties
+            // RDF container elements (Bag, Seq, Alt, List) can be property elements when there's a subject
+            // Error: Certain RDF namespace elements cannot be used as property elements
+            // NOTE: rdf:Description is only forbidden as a property element when it has rdf:resource
+            if ($this->subject !== null && $namespace === self::RDF_NAMESPACE) {
+                assert($localName !== 'RDF', 'rdf:RDF cannot be used as a property element');
+                // rdf:ID, rdf:about, rdf:resource, rdf:parseType, rdf:datatype, rdf:nodeID, rdf:bagID, rdf:aboutEach, rdf:aboutEachPrefix are attributes/elements that cannot be property elements
+                // Note: rdf:Description is handled separately below
+                assert(! in_array($localName, ['ID', 'about', 'resource', 'parseType', 'datatype', 'nodeID', 'bagID', 'aboutEach', 'aboutEachPrefix'], true), 'rdf:' . $localName . ' cannot be used as a property element');
+                // rdf:Description cannot be used as a property element (only when it has rdf:resource)
+                assert($localName !== 'Description' || $this->reader->getAttribute('rdf:resource') === null, 'rdf:Description cannot be used as a property element');
+            }
+
             // rdf:Description block starting
             if ($namespace === self::RDF_NAMESPACE && $localName === 'Description') {
                 $descriptionDepth     = $this->reader->depth;
@@ -277,19 +297,41 @@ class RdfXmlParser implements IteratorAggregate
                 // Reset at the depth where rdf:li elements will appear (one level deeper)
                 unset($this->liCounters[$descriptionDepth + 1]);
 
+                // Check for deprecated rdf:aboutEach and rdf:aboutEachPrefix attributes
+                assert($this->reader->getAttribute('rdf:aboutEach') === null, 'rdf:aboutEach has been removed from RDF specifications');
+                assert($this->reader->getAttribute('rdf:aboutEachPrefix') === null, 'rdf:aboutEachPrefix has been removed from RDF specifications');
+
+                // Check for deprecated rdf:bagID attribute
+                assert($this->reader->getAttribute('rdf:bagID') === null, 'rdf:bagID has been removed from RDF specifications');
+
                 $about  = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
                 $nodeId = $this->reader->getAttribute('rdf:nodeID');
                 $idAttr = $this->reader->getAttribute('rdf:ID');
 
+                // Error: rdf:nodeID and rdf:ID cannot be used together
+                assert($nodeId === null || $idAttr === null, 'Cannot have rdf:nodeID and rdf:ID');
+
+                // Error: rdf:nodeID and rdf:about cannot be used together
+                assert($nodeId === null || $about === null, 'Cannot have rdf:nodeID and rdf:about');
+
                 if ($idAttr !== null) {
-                    // rdf:ID resolves to base + #id
-                    $resolvedURI   = $this->resolveURI('#' . $idAttr);
-                    $this->subject = new Resource($resolvedURI);
+                    // Validate rdf:ID value matches XML Name production
+                    assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
+
+                    // Check for duplicate rdf:ID values
+                    $resolvedURI = $this->resolveURI('#' . $idAttr);
+                    assert(! isset($this->seenIds[$resolvedURI]), 'Duplicate rdf:ID value: ' . $idAttr);
+
+                    $this->seenIds[$resolvedURI] = true;
+                    $this->subject               = new Resource($resolvedURI);
                 } elseif ($about !== null) {
                     // rdf:about - empty string resolves to base URI
                     $resolvedURI   = $this->resolveURI($about);
                     $this->subject = new Resource($resolvedURI);
                 } elseif ($nodeId !== null) {
+                    // Validate rdf:nodeID value matches XML Name production
+                    assert(self::isValidXmlName($nodeId), 'rdf:nodeID value must match XML Name production: ' . $nodeId);
+
                     // rdf:nodeID creates a blank node with the given ID
                     $this->subject = new Resource('_:' . $nodeId);
                 } else {
@@ -297,6 +339,9 @@ class RdfXmlParser implements IteratorAggregate
                 }
 
                 $descriptionLang = $this->reader->xmlLang ?: null;
+
+                // Check for rdf:li used as an attribute on Description (only allowed as element)
+                assert($this->reader->getAttribute('rdf:li') === null, 'rdf:li cannot be used as an attribute');
 
                 // Process attributes on Description element as property-value pairs
                 if ($this->reader->hasAttributes) {
@@ -361,6 +406,8 @@ class RdfXmlParser implements IteratorAggregate
             // Property element (check first, as property elements can have rdf:ID for reification)
             // Also handle rdf:li elements which should be converted to numbered properties
             // RDF container elements (Bag, Seq, Alt, List) can be property elements when there's a subject
+            // NOTE: The check for forbidden property element names was moved above, before the rdf:Description check
+
             $isRdfContainerProperty = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true) && $this->subject !== null;
             if ($this->subject !== null && (($namespace !== '' && $namespace !== self::RDF_NAMESPACE) || ($namespace === self::RDF_NAMESPACE && $localName === 'li') || $isRdfContainerProperty)) {
                 // For rdf:li, convert to numbered property
@@ -371,6 +418,9 @@ class RdfXmlParser implements IteratorAggregate
                     $predicate = new Resource($namespace . $localName);
                 }
 
+                // Check for deprecated rdf:bagID attribute on property elements
+                assert($this->reader->getAttribute('rdf:bagID') === null, 'rdf:bagID has been removed from RDF specifications');
+
                 $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
                 $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
                 $parseType    = $this->reader->getAttribute('rdf:parseType');
@@ -378,9 +428,17 @@ class RdfXmlParser implements IteratorAggregate
                 $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
                 $propertyLang = $this->reader->xmlLang ?: null;
 
+                // Error: rdf:nodeID and rdf:resource cannot be used together
+                assert($nodeIdAttr === null || $resourceAttr === null, 'rdf:nodeID and rdf:resource cannot be used together');
+
+                assert($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr), 'rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
+
                 // Handle rdf:ID on property element (reification)
                 $reificationURI = null;
                 if ($idAttr !== null) {
+                    // Validate rdf:ID value matches XML Name production
+                    assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
+
                     $reificationURI = $this->resolveURI('#' . $idAttr);
                 }
 
@@ -525,6 +583,31 @@ class RdfXmlParser implements IteratorAggregate
 
                 // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
                 if ($parseType === 'Literal') {
+                    // Error: rdf:parseType="Literal" cannot be combined with rdf:resource
+                    assert($resourceAttr === null, 'rdf:parseType="Literal" cannot be combined with rdf:resource attribute');
+
+                    // Error: rdf:parseType="Literal" cannot be combined with non-RDF attributes
+                    if ($this->reader->hasAttributes) {
+                        $this->reader->moveToFirstAttribute();
+                        do {
+                            $attrNamespace = $this->reader->namespaceURI;
+                            $attrLocalName = $this->reader->localName;
+                            // Check if it's a non-RDF, non-XML attribute
+                            assert(
+                                ! (
+                                    $attrNamespace !== self::RDF_NAMESPACE
+                                    && $attrNamespace !== XMLUtils::XML_NAMESPACE
+                                    && $attrNamespace !== XMLUtils::XMLNS_NAMESPACE
+                                    && $attrNamespace !== ''
+                                    && ! in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
+                                ),
+                                'rdf:parseType="Literal" cannot be combined with non-RDF attributes',
+                            );
+                        } while ($this->reader->moveToNextAttribute());
+
+                        $this->reader->moveToElement();
+                    }
+
                     $outerXml = $this->reader->readOuterXml();
 
                     $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
@@ -720,10 +803,34 @@ class RdfXmlParser implements IteratorAggregate
             // Typed node (e.g. <ex:Book rdf:about="..."> or <rdf:Property rdf:about="...">)
             // Also includes typed nodes without node-identifying attributes (creates blank node)
             // Must check after property elements, as property elements can have rdf:ID for reification
+            // Check for deprecated rdf:aboutEach and rdf:aboutEachPrefix attributes on typed nodes
+            assert($this->reader->getAttribute('rdf:aboutEach') === null, 'rdf:aboutEach has been removed from RDF specifications');
+            assert($this->reader->getAttribute('rdf:aboutEachPrefix') === null, 'rdf:aboutEachPrefix has been removed from RDF specifications');
+            // Check for rdf:li used as an attribute (only allowed as element)
+            assert($this->reader->getAttribute('rdf:li') === null, 'rdf:li cannot be used as an attribute');
+
+            // Check for deprecated rdf:bagID attribute on typed nodes
+            assert($this->reader->getAttribute('rdf:bagID') === null, 'rdf:bagID has been removed from RDF specifications');
+
             $about         = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
             $nodeId        = $this->reader->getAttribute('rdf:nodeID');
             $idAttr        = $this->reader->getAttribute('rdf:ID');
             $isNodeElement = $about !== null || $nodeId !== null || ($idAttr !== null && $this->subject === null);
+
+            // Check for duplicate rdf:ID values on typed nodes
+            if ($idAttr !== null) {
+                // Validate rdf:ID value matches XML Name production
+                assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
+
+                $resolvedURI = $this->resolveURI('#' . $idAttr);
+                assert(! isset($this->seenIds[$resolvedURI]), 'Duplicate rdf:ID value: ' . $idAttr);
+
+                $this->seenIds[$resolvedURI] = true;
+            }
+
+            // Validate rdf:nodeID value matches XML Name production on typed nodes
+            assert($nodeId === null || self::isValidXmlName($nodeId), 'rdf:nodeID value must match XML Name production: ' . $nodeId);
+
             // RDF container elements (Bag, Seq, Alt, List) are typed nodes only when there's no subject (top-level)
             $isRdfContainer = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true) && $this->subject === null;
             // Typed node: non-RDF namespace element OR RDF container element (only when no subject), but not RDF or Description
@@ -741,6 +848,9 @@ class RdfXmlParser implements IteratorAggregate
                     $resolvedURI = $this->resolveURI($about);
                     $subject     = new Resource($resolvedURI);
                 } elseif ($nodeId !== null) {
+                    // Validate rdf:nodeID value matches XML Name production
+                    assert(self::isValidXmlName($nodeId), 'rdf:nodeID value must match XML Name production: ' . $nodeId);
+
                     $subject = new Resource('_:' . $nodeId);
                 } else {
                     $subject = $this->nextBNode();
@@ -972,6 +1082,28 @@ class RdfXmlParser implements IteratorAggregate
 
             // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
             if ($parseType === 'Literal') {
+                assert($resourceAttr === null, 'rdf:parseType="Literal" cannot be combined with rdf:resource attribute');
+
+                // Error: rdf:parseType="Literal" cannot be combined with non-RDF attributes
+                if ($this->reader->hasAttributes) {
+                    $this->reader->moveToFirstAttribute();
+                    do {
+                        $attrNamespace = $this->reader->namespaceURI;
+                        $attrLocalName = $this->reader->localName;
+                        // Check if it's a non-RDF, non-XML attribute
+                        assert(
+                            $attrNamespace === self::RDF_NAMESPACE
+                            || $attrNamespace === XMLUtils::XML_NAMESPACE
+                            || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
+                            || $attrNamespace === ''
+                            || in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true),
+                            'rdf:parseType="Literal" cannot be combined with non-RDF attributes',
+                        );
+                    } while ($this->reader->moveToNextAttribute());
+
+                    $this->reader->moveToElement();
+                }
+
                 $outerXml = $this->reader->readOuterXml();
 
                 $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
@@ -1178,5 +1310,40 @@ class RdfXmlParser implements IteratorAggregate
             assert($this->subject !== null, 'subject must be set for reification');
             $this->emitReification($reificationURI, $this->subject, $predicate, $object);
         }
+    }
+
+    /**
+     * Check if a string matches the XML Name production.
+     * XML Name: NameStartChar (NameChar)*
+     * NameStartChar: ":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
+     * NameChar: NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
+     *
+     * For rdf:ID and rdf:nodeID, we disallow colons (they're not namespace-qualified).
+     * Use XMLReader's built-in validation by checking if the attribute value would be valid as an XML name.
+     * Simplified check: must not start with digit, must not contain colon, and must be valid UTF-8.
+     *
+     * @phpstan-assert non-empty-string $name
+     */
+    private static function isValidXmlName(string $name): bool
+    {
+        if ($name === '') {
+            return false;
+        }
+
+        // For rdf:ID and rdf:nodeID, disallow colons (they're not namespace-qualified)
+        if (str_contains($name, ':')) {
+            return false;
+        }
+
+        // Check first character: must not be a digit
+        $first = mb_substr($name, 0, 1, 'UTF-8');
+        if ($first >= '0' && $first <= '9') {
+            return false;
+        }
+
+        // Use a simple regex to check if it's a valid XML name
+        // Allow letters, digits, underscores, hyphens, periods, and Unicode characters
+        // This is a simplified check - for full XML Name validation, we'd need more complex logic
+        return (bool) preg_match('/^[\p{L}_][\p{L}\p{N}_\\.\\-]*$/u', $name);
     }
 }

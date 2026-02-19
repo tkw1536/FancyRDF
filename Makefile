@@ -10,7 +10,7 @@ lint:
 	@vendor/bin/phpcs
 
 	@echo "=> vendor/bin/phpstan"
-	@vendor/bin/phpstan analyse --memory-limit=1G
+	@vendor/bin/phpstan analyse --memory-limit=1G -v
 
 fmt:
 	@echo "=> vendor/bin/phpcbf"

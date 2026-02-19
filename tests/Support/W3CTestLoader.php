@@ -13,6 +13,7 @@ use function glob;
 use function implode;
 use function str_starts_with;
 use function strlen;
+use function strpos;
 use function substr;
 
 use const DIRECTORY_SEPARATOR;
@@ -29,8 +30,8 @@ final class W3CTestLoader
      *
      * @param list<string> $patterns
      *
-     * @return non-empty-array<string, array{string, string}>
-     *   A data provider result in the form of [name => [path, content]]
+     * @return non-empty-array<string, array{string, string, string|null}>
+     *   A data provider result in the form of [name => [path, content, documentPath]]
      */
     public static function load(array $patterns, string ...$paths): array
     {
@@ -72,7 +73,16 @@ final class W3CTestLoader
                 throw new Exception('Failed to read file: ' . $path);
             }
 
-            $cases[$name] = [$path, $content];
+            // Get the document base url.
+            $rdfTestsPos = strpos($path, 'rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR);
+            if ($rdfTestsPos !== false) {
+                $relativePath = substr($path, $rdfTestsPos + strlen('rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR));
+                $documentBase = 'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-xml/' . $relativePath;
+            } else {
+                $documentBase = null;
+            }
+
+            $cases[$name] = [$path, $content, $documentBase];
         }
 
         return $cases;
