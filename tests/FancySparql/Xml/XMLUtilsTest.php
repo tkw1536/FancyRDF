@@ -103,4 +103,59 @@ final class XMLUtilsTest extends TestCase
         self::assertNotFalse($xml);
         self::assertSame($expected, $xml);
     }
+
+    /** @return array<string, array{string, string}> */
+    public static function serializerInnerXMLProvider(): array
+    {
+        return [
+            'empty root' => [
+                '<root></root>',
+                '',
+            ],
+            'single text' => [
+                '<root>hello</root>',
+                'hello',
+            ],
+            'single child element' => [
+                '<root><a>text</a></root>',
+                '<a>text</a>',
+            ],
+            'multiple child elements' => [
+                '<root><a>one</a><b>two</b><c/></root>',
+                '<a>one</a><b>two</b><c></c>',
+            ],
+            'nested elements' => [
+                '<root><wrap><inner>value</inner></wrap></root>',
+                '<wrap><inner>value</inner></wrap>',
+            ],
+            'namespace' => [
+                '<my:Name xmlns:my="http://my.example.org/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:html="http://NoHTML.example.org" xmlns="http://www.w3.org/1999/xhtml" rdf:parseType="Literal"><html:h1><b>John</b></html:h1></my:Name>',
+                '<html:h1 xmlns:html="http://NoHTML.example.org"><b xmlns="http://www.w3.org/1999/xhtml">John</b></html:h1>',
+            ],
+            'namespace 2' => [
+                '<eg:prop rdf:ID="reif" rdf:parseType="Literal" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:eg="http://example.org/"><br /></eg:prop>',
+                '<br xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:eg="http://example.org/"></br>',
+            ],
+        ];
+    }
+
+    #[DataProvider('serializerInnerXMLProvider')]
+    public function testSerializerInnerXML(string $input, string $expected): void
+    {
+        $actual = XMLUtils::serializerInnerXML($input);
+
+        $expectedDom = new DOMDocument();
+        @$expectedDom->loadXML('<added-by-testcase>' . $expected . '</added-by-testcase>');
+        $expectedDom = $expectedDom->C14N();
+
+        $actualDom = new DOMDocument();
+        @$actualDom->loadXML('<added-by-testcase>' . $actual . '</added-by-testcase>');
+        $actualDom = $actualDom->C14N();
+
+        $this->assertSame(
+            $expectedDom,
+            $actualDom,
+            'SerializerInnerXML output is not equal to expected',
+        );
+    }
 }

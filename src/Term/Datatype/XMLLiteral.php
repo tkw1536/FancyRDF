@@ -7,8 +7,11 @@ namespace FancySparql\Term\Datatype;
 use DOMDocument;
 use DOMNode;
 use Override;
+use RuntimeException;
 
-/** @extends Datatype<DOMNode> */
+use function iterator_to_array;
+
+/** @extends Datatype<list<DOMNode>> */
 final class XMLLiteral extends Datatype
 {
     public const string IRI = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral';
@@ -23,18 +26,26 @@ final class XMLLiteral extends Datatype
     #[Override]
     public function toCanonicalForm(): string
     {
-        return $this->toValue()->C14N(false, true) ?: $this->lexical;
+        $result = '';
+        foreach ($this->toValue() as $node) {
+            $norm = $node->C14N(false, true);
+            if ($norm === false) {
+                throw new RuntimeException('failed to canonicalize node');
+            }
+
+            $result .= $norm;
+        }
+
+        return $result;
     }
 
+    /** @return list<DOMNode> */
     #[Override]
-    public function toValue(): DOMNode
+    public function toValue(): array
     {
         $dom = new DOMDocument();
+        $dom->loadXML('<root>' . $this->lexical . '</root>');
 
-        // Ignoring the error is intended behavior.
-        // This can happen if the XML is empty.
-        @$dom->loadXML($this->lexical);
-
-        return $dom;
+        return iterator_to_array($dom->documentElement->childNodes ?? [], false);
     }
 }

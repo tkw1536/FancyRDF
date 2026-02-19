@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancySparql\Formats;
 
-use DOMDocument;
 use Exception;
 use FancySparql\Dataset\Quad;
 use FancySparql\Term\Literal;
@@ -19,9 +18,6 @@ use XMLReader;
 use function array_key_last;
 use function array_pop;
 use function assert;
-
-use const LIBXML_NOERROR;
-use const LIBXML_NOWARNING;
 
 /**
  * @phpstan-import-type TripleArray from Quad
@@ -211,8 +207,13 @@ class RdfXmlParser implements IteratorAggregate
                         $attrLocalName = $this->reader->localName;
                         $attrNamespace = $this->reader->namespaceURI;
 
-                        // Skip RDF namespace attributes and xml:base
-                        if ($attrNamespace === self::RDF_NAMESPACE || $attrNamespace === XMLUtils::XML_NAMESPACE || $attrNamespace === '') {
+                        // Skip RDF namespace attributes, xml:base, and xmlns declarations
+                        if (
+                            $attrNamespace === self::RDF_NAMESPACE
+                            || $attrNamespace === XMLUtils::XML_NAMESPACE
+                            || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
+                            || $attrNamespace === ''
+                        ) {
                             continue;
                         }
 
@@ -262,11 +263,9 @@ class RdfXmlParser implements IteratorAggregate
 
                 // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
                 if ($parseType === 'Literal') {
-                    // Use readOuterXml to get the element with full context
                     $outerXml = $this->reader->readOuterXml();
 
-                    // Canonicalize: add namespace declarations from ancestor elements
-                    $canonicalXml = $this->canonicalizeXmlLiteral($outerXml);
+                    $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
                     $object       = new Literal($canonicalXml, null, self::RDF_NAMESPACE . 'XMLLiteral');
 
                     $this->emit([
@@ -281,6 +280,9 @@ class RdfXmlParser implements IteratorAggregate
                         assert($this->subject !== null, 'subject must be set for reification');
                         $this->emitReification($reificationURI, $this->subject, $predicate, $object);
                     }
+
+                    // Skip past this element so the main loop does not re-parse inner content as RDF
+                    $this->reader->next();
 
                     continue;
                 }
@@ -481,37 +483,5 @@ class RdfXmlParser implements IteratorAggregate
             assert($this->subject !== null, 'subject must be set for reification');
             $this->emitReification($reificationURI, $this->subject, $predicate, $object);
         }
-    }
-
-    /**
-     * Canonicalizes XML literal content by adding namespace declarations from ancestor elements.
-     *
-     * @param string $outerXml The outer XML of the property element (includes full context)
-     *
-     * @return string The canonicalized XML with namespace declarations
-     */
-    private function canonicalizeXmlLiteral(string $outerXml): string
-    {
-        // Parse the outer XML into a new document
-        $dom = new DOMDocument();
-        $dom->loadXML($outerXml, LIBXML_NOERROR | LIBXML_NOWARNING);
-        $outerElement = $dom->documentElement;
-        if ($outerElement === null) {
-            throw new Exception('Failed to parse outer XML');
-        }
-
-        // Get the inner element (first child element)
-        $innerNode = $outerElement->firstChild;
-        if ($innerNode === null) {
-            return '';
-        }
-
-        // Return the serialized inner XML
-        $result = $innerNode->C14N();
-        if ($result === false) {
-            throw new Exception('Failed to canonicalize inner XML');
-        }
-
-        return $result;
     }
 }
