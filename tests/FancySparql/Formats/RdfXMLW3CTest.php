@@ -10,8 +10,8 @@ use FancySparql\Formats\RdfXmlParser;
 use FancySparql\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancySparql\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\TestCase;
-use Throwable;
 use XMLReader;
 
 use function array_values;
@@ -71,31 +71,28 @@ final class RdfXMLW3CTest extends TestCase
 
     /** @param list<TripleOrQuadArray> $expectedTriples */
     #[DataProvider('goodTriplesProvider')]
+    #[RequiresSetting('zend.assertions', '1')]
     public function testGoodTriplesAreIsomorphic(string $path, array $expectedTriples): void
     {
-        try {
-            // Get the document base URL.
-            $rdfTestsPos = strpos($path, 'rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR);
-            if ($rdfTestsPos !== false) {
-                $relativePath = substr($path, $rdfTestsPos + strlen('rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR));
-                $documentBase = 'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-xml/' . $relativePath;
-            } else {
-                $documentBase = null;
-            }
-
-            $stream = fopen($path, 'r');
-            if ($stream === false) {
-                self::fail('Failed to open file: ' . $path);
-            }
-
-            $reader = XMLReader::fromStream($stream, null, 0, $documentBase);
-            $parser = new RdfXmlParser($reader);
-
-            $parsed = iterator_to_array($parser);
-
-            self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expectedTriples, false));
-        } catch (Throwable $e) {
-            self::markTestIncomplete($e->getMessage());
+        // Get the document base URL.
+        $rdfTestsPos = strpos($path, 'rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR);
+        if ($rdfTestsPos !== false) {
+            $relativePath = substr($path, $rdfTestsPos + strlen('rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR));
+            $documentBase = 'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-xml/' . $relativePath;
+        } else {
+            $documentBase = null;
         }
+
+        $stream = fopen($path, 'r');
+        if ($stream === false) {
+            self::fail('Failed to open file: ' . $path);
+        }
+
+        $reader = XMLReader::fromStream($stream, null, 0, $documentBase);
+        $parser = new RdfXmlParser($reader);
+
+        $parsed = iterator_to_array($parser);
+
+        self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expectedTriples, false));
     }
 }

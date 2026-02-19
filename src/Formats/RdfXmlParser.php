@@ -19,6 +19,7 @@ use function array_key_last;
 use function array_pop;
 use function assert;
 use function count;
+use function in_array;
 
 /**
  * @phpstan-import-type TripleArray from Quad
@@ -107,13 +108,29 @@ class RdfXmlParser implements IteratorAggregate
         return new Resource('_:b' . $this->bnodeCounter);
     }
 
+    /** @var array<int, int> li counter per depth level */
+    private array $liCounters = [];
+
+    /** return the next li property name for the current depth */
+    private function nextLiProperty(): Resource
+    {
+        $depth = $this->reader->depth;
+        if (! isset($this->liCounters[$depth])) {
+            $this->liCounters[$depth] = 0;
+        }
+
+        $this->liCounters[$depth]++;
+
+        return new Resource(self::RDF_NAMESPACE . '_' . $this->liCounters[$depth]);
+    }
+
     /** @var Resource|null the currently active subject */
     private Resource|null $subject = null;
 
     /** @var list<array{subject: Resource|null, depth: int}> a stack of subjects within the current nesting level */
     private array $subjectStack = [];
 
-    /** @var array{subject: Resource, predicate: Resource, depth: int}|null pending property waiting for nested object */
+    /** @var array{subject: Resource, predicate: Resource, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
     private array|null $pendingProperty = null;
 
     /**
@@ -154,6 +171,48 @@ class RdfXmlParser implements IteratorAggregate
     }
 
     /**
+     * Processes non-RDF attributes on a property element as properties of the object.
+     *
+     * @param Resource              $object The object (Resource) to add properties to
+     * @param non-empty-string|null $lang   The language for literal values
+     */
+    private function processPropertyElementAttributes(Resource $object, string|null $lang): void
+    {
+        if (! $this->reader->hasAttributes) {
+            return;
+        }
+
+        $this->reader->moveToFirstAttribute();
+        do {
+            $attrNamespace = $this->reader->namespaceURI;
+            $attrLocalName = $this->reader->localName;
+            $attrValue     = $this->reader->value;
+
+            // Skip RDF namespace attributes, xml:base, xml:lang, and xmlns declarations
+            if (
+                $attrNamespace === self::RDF_NAMESPACE
+                || $attrNamespace === XMLUtils::XML_NAMESPACE
+                || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
+                || $attrNamespace === ''
+            ) {
+                continue;
+            }
+
+            $attrPredicate = new Resource($attrNamespace . $attrLocalName);
+            $attrObject    = new Literal($attrValue, $lang);
+
+            $this->emit([
+                $object,
+                $attrPredicate,
+                $attrObject,
+                null,
+            ]);
+        } while ($this->reader->moveToNextAttribute());
+
+        $this->reader->moveToElement();
+    }
+
+    /**
      * Function that does the actual parsing.
      */
     private function doParse(): void
@@ -168,20 +227,35 @@ class RdfXmlParser implements IteratorAggregate
                     $this->subjectStack !== [] &&
                     $this->subjectStack[$lastKey]['depth'] === $this->reader->depth
                 ) {
-                    $popped = array_pop($this->subjectStack);
+                    $popped             = array_pop($this->subjectStack);
+                    $thePendingProperty = $this->pendingProperty;
                     // If there's a pending property, emit the triple with the closing element's subject as object
-                    if ($this->pendingProperty !== null && $this->pendingProperty['depth'] === $this->reader->depth) {
+                    if ($thePendingProperty !== null && $thePendingProperty['depth'] === $this->reader->depth) {
                         assert($this->subject !== null, 'subject must be set for pending property');
+                        $object = $this->subject;
                         $this->emit([
-                            $this->pendingProperty['subject'],
-                            $this->pendingProperty['predicate'],
-                            $this->subject,
+                            $thePendingProperty['subject'],
+                            $thePendingProperty['predicate'],
+                            $object,
                             null,
                         ]);
+                        // If rdf:ID was present, create reification triples
+                        if ($thePendingProperty['reificationURI'] !== null) {
+                            $this->emitReification($thePendingProperty['reificationURI'], $thePendingProperty['subject'], $thePendingProperty['predicate'], $object);
+                        }
+
                         $this->pendingProperty = null;
                     }
 
                     $this->subject = $popped['subject'];
+                }
+
+                // Clean up li counter for container elements when they close
+                $closingLocalName   = $this->reader->localName;
+                $closingNamespace   = $this->reader->namespaceURI;
+                $isContainerClosing = $closingNamespace === self::RDF_NAMESPACE && in_array($closingLocalName, ['Bag', 'Seq', 'Alt', 'List'], true);
+                if ($isContainerClosing) {
+                    unset($this->liCounters[$this->reader->depth]);
                 }
 
                 continue;
@@ -198,6 +272,10 @@ class RdfXmlParser implements IteratorAggregate
             if ($namespace === self::RDF_NAMESPACE && $localName === 'Description') {
                 $descriptionDepth     = $this->reader->depth;
                 $this->subjectStack[] = ['subject' => $this->subject, 'depth' => $descriptionDepth];
+
+                // Reset li counter when a new Description starts
+                // Reset at the depth where rdf:li elements will appear (one level deeper)
+                unset($this->liCounters[$descriptionDepth + 1]);
 
                 $about  = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
                 $nodeId = $this->reader->getAttribute('rdf:nodeID');
@@ -227,9 +305,15 @@ class RdfXmlParser implements IteratorAggregate
                         $attrLocalName = $this->reader->localName;
                         $attrNamespace = $this->reader->namespaceURI;
 
-                        // Skip RDF namespace attributes, xml:base, and xmlns declarations
+                        // Skip structural RDF namespace attributes, xml:base, and xmlns declarations
+                        // Note: rdf:type is NOT skipped - it's processed as a property attribute
+                        $skipRdfAttr = $attrNamespace === self::RDF_NAMESPACE && in_array(
+                            $attrLocalName,
+                            ['about', 'ID', 'nodeID', 'resource', 'parseType', 'datatype'],
+                            true,
+                        );
                         if (
-                            $attrNamespace === self::RDF_NAMESPACE
+                            $skipRdfAttr
                             || $attrNamespace === XMLUtils::XML_NAMESPACE
                             || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
                             || $attrNamespace === ''
@@ -242,10 +326,18 @@ class RdfXmlParser implements IteratorAggregate
 
                         assert($this->subject !== null, 'subject must be set when processing Description attributes');
 
+                        // rdf:type attribute values are URIs, not literals
+                        if ($attrNamespace === self::RDF_NAMESPACE && $attrLocalName === 'type') {
+                            $resolvedURI = $this->resolveURI($value);
+                            $object      = new Resource($resolvedURI);
+                        } else {
+                            $object = new Literal($value, $descriptionLang);
+                        }
+
                         $this->emit([
                             $this->subject,
                             $predicate,
-                            new Literal($value, $descriptionLang),
+                            $object,
                             null,
                         ]);
                     } while ($this->reader->moveToNextAttribute());
@@ -267,8 +359,18 @@ class RdfXmlParser implements IteratorAggregate
             }
 
             // Property element (check first, as property elements can have rdf:ID for reification)
-            if ($this->subject !== null && $namespace !== '' && $namespace !== self::RDF_NAMESPACE) {
-                $predicate    = new Resource($namespace . $localName);
+            // Also handle rdf:li elements which should be converted to numbered properties
+            // RDF container elements (Bag, Seq, Alt, List) can be property elements when there's a subject
+            $isRdfContainerProperty = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true) && $this->subject !== null;
+            if ($this->subject !== null && (($namespace !== '' && $namespace !== self::RDF_NAMESPACE) || ($namespace === self::RDF_NAMESPACE && $localName === 'li') || $isRdfContainerProperty)) {
+                // For rdf:li, convert to numbered property
+                if ($namespace === self::RDF_NAMESPACE && $localName === 'li') {
+                    $predicate = $this->nextLiProperty();
+                } else {
+                    assert($localName !== '', 'local name must be non-empty');
+                    $predicate = new Resource($namespace . $localName);
+                }
+
                 $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
                 $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
                 $parseType    = $this->reader->getAttribute('rdf:parseType');
@@ -458,6 +560,9 @@ class RdfXmlParser implements IteratorAggregate
                         null,
                     ]);
 
+                    // Process non-RDF attributes as properties of the object
+                    $this->processPropertyElementAttributes($object, $propertyLang);
+
                     // If rdf:ID is present, create reification triples
                     if ($reificationURI !== null) {
                         assert($this->subject !== null, 'subject must be set for reification');
@@ -486,31 +591,108 @@ class RdfXmlParser implements IteratorAggregate
                     continue;
                 }
 
+                // Check for non-RDF attributes on property element
+                $hasNonRdfAttributes = false;
+                if ($this->reader->hasAttributes) {
+                    $this->reader->moveToFirstAttribute();
+                    do {
+                        $attrNamespace = $this->reader->namespaceURI;
+                        $attrLocalName = $this->reader->localName;
+                        // Check if it's a non-RDF, non-XML attribute
+                        if (
+                            $attrNamespace !== self::RDF_NAMESPACE
+                            && $attrNamespace !== XMLUtils::XML_NAMESPACE
+                            && $attrNamespace !== XMLUtils::XMLNS_NAMESPACE
+                            && $attrNamespace !== ''
+                            && ! in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
+                        ) {
+                            $hasNonRdfAttributes = true;
+                            break;
+                        }
+                    } while ($this->reader->moveToNextAttribute());
+
+                    $this->reader->moveToElement();
+                }
+
+                // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
+                if ($hasNonRdfAttributes) {
+                    $object = $this->nextBNode();
+
+                    $this->emit([
+                        $this->subject,
+                        $predicate,
+                        $object,
+                        null,
+                    ]);
+
+                    // Process non-RDF attributes as properties of the object
+                    $this->processPropertyElementAttributes($object, $propertyLang);
+
+                    // If rdf:ID is present, create reification triples
+                    if ($reificationURI !== null) {
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                    }
+
+                    continue;
+                }
+
+                // Check if element is empty (self-closing)
+                if ($this->reader->isEmptyElement) {
+                    // Empty property element creates empty string literal
+                    $object = new Literal('', $propertyLang);
+
+                    $this->emit([
+                        $this->subject,
+                        $predicate,
+                        $object,
+                        null,
+                    ]);
+
+                    // If rdf:ID is present, create reification triples
+                    if ($reificationURI !== null) {
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                    }
+
+                    continue;
+                }
+
                 // Read text content
                 $this->reader->read();
                 if (
                     $this->reader->nodeType !== XMLReader::TEXT &&
                     $this->reader->nodeType !== XMLReader::CDATA
                 ) {
-                    // If rdf:ID is present but no content, still create reification
-                    if (
-                        $reificationURI !== null
-                    ) {
-                        // Create a blank node for the object if there's no content
-                        $object = $this->nextBNode();
+                    // Check if we're at the end of the element (empty content)
+                    if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
+                        // Empty property element creates empty string literal
+                        $object = new Literal('', $propertyLang);
 
-                        $this->emit([$this->subject, $predicate, $object, null]);
+                        $this->emit([
+                            $this->subject,
+                            $predicate,
+                            $object,
+                            null,
+                        ]);
 
-                        assert($this->subject !== null, 'subject must be set for reification');
-                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
-                    } else {
-                        // Nested content - store property info to emit when nested element closes
-                        $this->pendingProperty = [
-                            'subject' => $this->subject,
-                            'predicate' => $predicate,
-                            'depth' => $this->reader->depth,
-                        ];
+                        // If rdf:ID is present, create reification triples
+                        if ($reificationURI !== null) {
+                            assert($this->subject !== null, 'subject must be set for reification');
+                            $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                        }
+
+                        continue;
                     }
+
+                    // Nested content - store property info to emit when nested element closes
+                    // This handles both cases: with and without rdf:ID
+                    $this->pendingProperty = [
+                        'subject' => $this->subject,
+                        'predicate' => $predicate,
+                        'depth' => $this->reader->depth,
+                        'reificationURI' => $reificationURI,
+                    ];
 
                     continue;
                 }
@@ -535,13 +717,17 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
-            // Typed node (e.g. <ex:Book rdf:about="..."> or <rdf:Property rdf:about="...">) – only when it has node-identifying attributes
+            // Typed node (e.g. <ex:Book rdf:about="..."> or <rdf:Property rdf:about="...">)
+            // Also includes typed nodes without node-identifying attributes (creates blank node)
             // Must check after property elements, as property elements can have rdf:ID for reification
             $about         = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
             $nodeId        = $this->reader->getAttribute('rdf:nodeID');
             $idAttr        = $this->reader->getAttribute('rdf:ID');
             $isNodeElement = $about !== null || $nodeId !== null || ($idAttr !== null && $this->subject === null);
-            $isTypedNode   = $localName !== 'RDF' && $isNodeElement && ($namespace !== self::RDF_NAMESPACE || $localName !== 'Description');
+            // RDF container elements (Bag, Seq, Alt, List) are typed nodes only when there's no subject (top-level)
+            $isRdfContainer = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true) && $this->subject === null;
+            // Typed node: non-RDF namespace element OR RDF container element (only when no subject), but not RDF or Description
+            $isTypedNode = $localName !== 'RDF' && ($namespace !== self::RDF_NAMESPACE || ($isRdfContainer && $this->subject === null) || $localName !== 'Description') && ($isNodeElement || ($namespace !== self::RDF_NAMESPACE && $this->subject === null) || $isRdfContainer);
 
             if ($isTypedNode) {
                 $typedNodeDepth = $this->reader->depth;
@@ -572,6 +758,46 @@ class RdfXmlParser implements IteratorAggregate
                     new Resource($object),
                     null,
                 ]);
+
+                // Process attributes on typed node element as property-value pairs
+                // This handles attributes like rdf:_3, rdf:value on container elements
+                $typedNodeLang = $this->reader->xmlLang ?: null;
+                if ($this->reader->hasAttributes) {
+                    $this->reader->moveToFirstAttribute();
+                    do {
+                        $attrLocalName = $this->reader->localName;
+                        $attrNamespace = $this->reader->namespaceURI;
+
+                        // Skip structural RDF namespace attributes, xml:base, and xmlns declarations
+                        // Note: rdf:type is NOT skipped - it's processed as a property attribute
+                        // Also, numbered properties (rdf:_1, rdf:_2, etc.) and rdf:value are NOT skipped
+                        $skipRdfAttr = $attrNamespace === self::RDF_NAMESPACE && in_array(
+                            $attrLocalName,
+                            ['about', 'ID', 'nodeID', 'resource', 'parseType', 'datatype'],
+                            true,
+                        );
+                        if (
+                            $skipRdfAttr
+                            || $attrNamespace === XMLUtils::XML_NAMESPACE
+                            || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
+                            || $attrNamespace === ''
+                        ) {
+                            continue;
+                        }
+
+                        $predicate = new Resource($attrNamespace . $attrLocalName);
+                        $value     = $this->reader->value;
+
+                        $this->emit([
+                            $subject,
+                            $predicate,
+                            new Literal($value, $typedNodeLang),
+                            null,
+                        ]);
+                    } while ($this->reader->moveToNextAttribute());
+
+                    $this->reader->moveToElement();
+                }
 
                 // If self-closing, pop stacks immediately
                 if ($this->reader->isEmptyElement) {
@@ -784,6 +1010,9 @@ class RdfXmlParser implements IteratorAggregate
                     null,
                 ]);
 
+                // Process non-RDF attributes as properties of the object
+                $this->processPropertyElementAttributes($object, $elementLang);
+
                 // If rdf:ID is present, create reification triples
                 if ($reificationURI !== null) {
                     assert($this->subject !== null, 'subject must be set for reification');
@@ -814,16 +1043,89 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
+            // Check for non-RDF attributes on property element
+            $hasNonRdfAttributes = false;
+            if ($this->reader->hasAttributes) {
+                $this->reader->moveToFirstAttribute();
+                do {
+                    $attrNamespace = $this->reader->namespaceURI;
+                    $attrLocalName = $this->reader->localName;
+                    // Check if it's a non-RDF, non-XML attribute
+                    if (
+                        $attrNamespace !== self::RDF_NAMESPACE
+                        && $attrNamespace !== XMLUtils::XML_NAMESPACE
+                        && $attrNamespace !== XMLUtils::XMLNS_NAMESPACE
+                        && $attrNamespace !== ''
+                        && ! in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
+                    ) {
+                        $hasNonRdfAttributes = true;
+                        break;
+                    }
+                } while ($this->reader->moveToNextAttribute());
+
+                $this->reader->moveToElement();
+            }
+
+            // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
+            if ($hasNonRdfAttributes) {
+                $object = $this->nextBNode();
+
+                assert($this->subject !== null, 'subject must be set');
+
+                $this->emit([
+                    $this->subject,
+                    $predicate,
+                    $object,
+                    null,
+                ]);
+
+                // Process non-RDF attributes as properties of the object
+                $this->processPropertyElementAttributes($object, $elementLang);
+
+                // If rdf:ID is present, create reification triples
+                if ($reificationURI !== null) {
+                    assert($this->subject !== null, 'subject must be set for reification');
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                }
+
+                continue;
+            }
+
+            // Check if element is empty (self-closing)
+            if ($this->reader->isEmptyElement) {
+                // Empty property element creates empty string literal
+                $object = new Literal('', $elementLang);
+
+                assert($this->subject !== null, 'subject must be set');
+
+                $this->emit([
+                    $this->subject,
+                    $predicate,
+                    $object,
+                    null,
+                ]);
+
+                // If rdf:ID is present, create reification triples
+                if ($reificationURI !== null) {
+                    assert($this->subject !== null, 'subject must be set for reification');
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                }
+
+                continue;
+            }
+
             // Read text content
             $this->reader->read();
             if (
                 $this->reader->nodeType !== XMLReader::TEXT &&
                 $this->reader->nodeType !== XMLReader::CDATA
             ) {
-                // If rdf:ID is present but no content, still create reification
-                if ($reificationURI !== null && $this->subject !== null) {
-                    // Create a blank node for the object if there's no content
-                    $object = $this->nextBNode();
+                // Check if we're at the end of the element (empty content)
+                if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
+                    // Empty property element creates empty string literal
+                    $object = new Literal('', $elementLang);
+
+                    assert($this->subject !== null, 'subject must be set');
 
                     $this->emit([
                         $this->subject,
@@ -832,14 +1134,23 @@ class RdfXmlParser implements IteratorAggregate
                         null,
                     ]);
 
-                    assert($this->subject !== null, 'subject must be set for reification');
-                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
-                } elseif ($this->subject !== null) {
-                    // Nested content - store property info to emit when nested element closes
+                    // If rdf:ID is present, create reification triples
+                    if ($reificationURI !== null) {
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                    }
+
+                    continue;
+                }
+
+                // Nested content - store property info to emit when nested element closes
+                // This handles both cases: with and without rdf:ID
+                if ($this->subject !== null) {
                     $this->pendingProperty = [
                         'subject' => $this->subject,
                         'predicate' => $predicate,
                         'depth' => $this->reader->depth,
+                        'reificationURI' => $reificationURI,
                     ];
                 }
 
