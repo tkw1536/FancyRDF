@@ -18,6 +18,7 @@ use XMLReader;
 use function array_key_last;
 use function array_pop;
 use function assert;
+use function count;
 
 /**
  * @phpstan-import-type TripleArray from Quad
@@ -281,6 +282,145 @@ class RdfXmlParser implements IteratorAggregate
                     $reificationURI = $this->resolveURI('#' . $idAttr);
                 }
 
+                // Handle rdf:parseType="Collection" - create list structure
+                if ($parseType === 'Collection') {
+                    $listHead = $this->nextBNode();
+                    $this->emit([
+                        $this->subject,
+                        $predicate,
+                        $listHead,
+                        null,
+                    ]);
+
+                    // If rdf:ID is present, create reification triples
+                    if ($reificationURI !== null) {
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $listHead);
+                    }
+
+                    // Process collection items
+                    $currentList = $listHead;
+                    $itemDepth   = $this->reader->depth;
+                    $items       = [];
+                    while ($this->reader->read()) {
+                        // Stop when we reach the closing tag of the property element
+                        if ($this->reader->nodeType === XMLReader::END_ELEMENT && $this->reader->depth === $itemDepth) {
+                            break;
+                        }
+
+                        // Process each child element as a list item
+                        if ($this->reader->nodeType !== XMLReader::ELEMENT) {
+                            continue;
+                        }
+
+                        $itemSubject = null;
+                        $itemAbout   = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+                        $itemNodeId  = $this->reader->getAttribute('rdf:nodeID');
+                        $itemId      = $this->reader->getAttribute('rdf:ID');
+
+                        if ($itemId !== null) {
+                            $itemSubject = new Resource($this->resolveURI('#' . $itemId));
+                        } elseif ($itemAbout !== null) {
+                            $itemSubject = new Resource($this->resolveURI($itemAbout));
+                        } elseif ($itemNodeId !== null) {
+                            $itemSubject = new Resource('_:' . $itemNodeId);
+                        } else {
+                            $itemSubject = $this->nextBNode();
+                        }
+
+                        $items[] = $itemSubject;
+
+                        // Skip past this element
+                        if ($this->reader->isEmptyElement) {
+                            continue;
+                        }
+
+                        // Skip to end of element
+                        $itemElementDepth = $this->reader->depth;
+                        while ($this->reader->read()) {
+                            if ($this->reader->nodeType === XMLReader::END_ELEMENT && $this->reader->depth === $itemElementDepth) {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Build list structure
+                    foreach ($items as $index => $itemSubject) {
+                        // Emit rdf:first triple
+                        $this->emit([
+                            $currentList,
+                            new Resource(self::RDF_NAMESPACE . 'first'),
+                            $itemSubject,
+                            null,
+                        ]);
+
+                        // If not the last item, create next list node
+                        if ($index < count($items) - 1) {
+                            $nextList = $this->nextBNode();
+                            $this->emit([
+                                $currentList,
+                                new Resource(self::RDF_NAMESPACE . 'rest'),
+                                $nextList,
+                                null,
+                            ]);
+                            $currentList = $nextList;
+                        } else {
+                            // Last item - point rest to nil
+                            $this->emit([
+                                $currentList,
+                                new Resource(self::RDF_NAMESPACE . 'rest'),
+                                new Resource(self::RDF_NAMESPACE . 'nil'),
+                                null,
+                            ]);
+                        }
+                    }
+
+                    // Handle empty collection
+                    if (count($items) === 0) {
+                        $this->emit([
+                            $currentList,
+                            new Resource(self::RDF_NAMESPACE . 'rest'),
+                            new Resource(self::RDF_NAMESPACE . 'nil'),
+                            null,
+                        ]);
+                    }
+
+                    continue;
+                }
+
+                // Handle rdf:parseType="Resource" - create blank node and process nested content
+                if ($parseType === 'Resource') {
+                    $resourceObject = $this->nextBNode();
+                    $this->emit([
+                        $this->subject,
+                        $predicate,
+                        $resourceObject,
+                        null,
+                    ]);
+
+                    // If rdf:ID is present, create reification triples
+                    if ($reificationURI !== null) {
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $resourceObject);
+                    }
+
+                    // Push current subject and set the resource object as new subject
+                    $resourceDepth        = $this->reader->depth;
+                    $this->subjectStack[] = ['subject' => $this->subject, 'depth' => $resourceDepth];
+                    $this->subject        = $resourceObject;
+
+                    // Skip past this element's opening tag - nested content will be processed in main loop
+                    if ($this->reader->isEmptyElement) {
+                        $lastKey = array_key_last($this->subjectStack);
+                        if ($this->subjectStack[$lastKey]['depth'] === $resourceDepth) {
+                            $popped        = array_pop($this->subjectStack);
+                            $this->subject = $popped['subject'];
+                        }
+                    }
+
+                    continue;
+                }
+
                 // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
                 if ($parseType === 'Literal') {
                     $outerXml = $this->reader->readOuterXml();
@@ -452,6 +592,7 @@ class RdfXmlParser implements IteratorAggregate
             $predicate    = new Resource($iri);
             $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
             $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
+            $parseType    = $this->reader->getAttribute('rdf:parseType');
             $idAttr       = $this->reader->getAttribute('rdf:ID');
             $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
             $elementLang  = $this->reader->xmlLang ?: null;
@@ -460,6 +601,174 @@ class RdfXmlParser implements IteratorAggregate
             $reificationURI = null;
             if ($idAttr !== null) {
                 $reificationURI = $this->resolveURI('#' . $idAttr);
+            }
+
+            // Handle rdf:parseType="Collection" - create list structure
+            if ($parseType === 'Collection') {
+                assert($this->subject !== null, 'subject must be set for collection');
+                $listHead = $this->nextBNode();
+                $this->emit([
+                    $this->subject,
+                    $predicate,
+                    $listHead,
+                    null,
+                ]);
+
+                // If rdf:ID is present, create reification triples
+                if ($reificationURI !== null) {
+                    assert($this->subject !== null, 'subject must be set for reification');
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $listHead);
+                }
+
+                // Process collection items
+                $currentList = $listHead;
+                $itemDepth   = $this->reader->depth;
+                $items       = [];
+                while ($this->reader->read()) {
+                    // Stop when we reach the closing tag of the property element
+                    if ($this->reader->nodeType === XMLReader::END_ELEMENT && $this->reader->depth === $itemDepth) {
+                        break;
+                    }
+
+                    // Process each child element as a list item
+                    if ($this->reader->nodeType !== XMLReader::ELEMENT) {
+                        continue;
+                    }
+
+                    $itemSubject = null;
+                    $itemAbout   = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+                    $itemNodeId  = $this->reader->getAttribute('rdf:nodeID');
+                    $itemId      = $this->reader->getAttribute('rdf:ID');
+
+                    if ($itemId !== null) {
+                        $itemSubject = new Resource($this->resolveURI('#' . $itemId));
+                    } elseif ($itemAbout !== null) {
+                        $itemSubject = new Resource($this->resolveURI($itemAbout));
+                    } elseif ($itemNodeId !== null) {
+                        $itemSubject = new Resource('_:' . $itemNodeId);
+                    } else {
+                        $itemSubject = $this->nextBNode();
+                    }
+
+                    $items[] = $itemSubject;
+
+                    // Skip past this element
+                    if ($this->reader->isEmptyElement) {
+                        continue;
+                    }
+
+                    // Skip to end of element
+                    $itemElementDepth = $this->reader->depth;
+                    while ($this->reader->read()) {
+                        if ($this->reader->nodeType === XMLReader::END_ELEMENT && $this->reader->depth === $itemElementDepth) {
+                            break;
+                        }
+                    }
+                }
+
+                // Build list structure
+                foreach ($items as $index => $itemSubject) {
+                    // Emit rdf:first triple
+                    $this->emit([
+                        $currentList,
+                        new Resource(self::RDF_NAMESPACE . 'first'),
+                        $itemSubject,
+                        null,
+                    ]);
+
+                    // If not the last item, create next list node
+                    if ($index < count($items) - 1) {
+                        $nextList = $this->nextBNode();
+                        $this->emit([
+                            $currentList,
+                            new Resource(self::RDF_NAMESPACE . 'rest'),
+                            $nextList,
+                            null,
+                        ]);
+                        $currentList = $nextList;
+                    } else {
+                        // Last item - point rest to nil
+                        $this->emit([
+                            $currentList,
+                            new Resource(self::RDF_NAMESPACE . 'rest'),
+                            new Resource(self::RDF_NAMESPACE . 'nil'),
+                            null,
+                        ]);
+                    }
+                }
+
+                // Handle empty collection
+                if (count($items) === 0) {
+                    $this->emit([
+                        $currentList,
+                        new Resource(self::RDF_NAMESPACE . 'rest'),
+                        new Resource(self::RDF_NAMESPACE . 'nil'),
+                        null,
+                    ]);
+                }
+
+                continue;
+            }
+
+            // Handle rdf:parseType="Resource" - create blank node and process nested content
+            if ($parseType === 'Resource') {
+                assert($this->subject !== null, 'subject must be set for resource');
+                $resourceObject = $this->nextBNode();
+                $this->emit([
+                    $this->subject,
+                    $predicate,
+                    $resourceObject,
+                    null,
+                ]);
+
+                // If rdf:ID is present, create reification triples
+                if ($reificationURI !== null) {
+                    assert($this->subject !== null, 'subject must be set for reification');
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $resourceObject);
+                }
+
+                // Push current subject and set the resource object as new subject
+                $resourceDepth        = $this->reader->depth;
+                $this->subjectStack[] = ['subject' => $this->subject, 'depth' => $resourceDepth];
+                $this->subject        = $resourceObject;
+
+                // Skip past this element's opening tag - nested content will be processed in main loop
+                if ($this->reader->isEmptyElement) {
+                    $lastKey = array_key_last($this->subjectStack);
+                    if ($this->subjectStack[$lastKey]['depth'] === $resourceDepth) {
+                        $popped        = array_pop($this->subjectStack);
+                        $this->subject = $popped['subject'];
+                    }
+                }
+
+                continue;
+            }
+
+            // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
+            if ($parseType === 'Literal') {
+                $outerXml = $this->reader->readOuterXml();
+
+                $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
+                $object       = new Literal($canonicalXml, null, self::RDF_NAMESPACE . 'XMLLiteral');
+
+                assert($this->subject !== null, 'subject must be set for literal');
+                $this->emit([
+                    $this->subject,
+                    $predicate,
+                    $object,
+                    null,
+                ]);
+
+                // If rdf:ID is present, create reification triples
+                if ($reificationURI !== null) {
+                    assert($this->subject !== null, 'subject must be set for reification');
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                }
+
+                // Skip past this element so the main loop does not re-parse inner content as RDF
+                $this->reader->next();
+
+                continue;
             }
 
             if ($resourceAttr !== null) {
