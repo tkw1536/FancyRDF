@@ -112,6 +112,9 @@ class RdfXmlParser implements IteratorAggregate
     /** @var list<array{subject: Resource|null, depth: int}> a stack of subjects within the current nesting level */
     private array $subjectStack = [];
 
+    /** @var array{subject: Resource, predicate: Resource, depth: int}|null pending property waiting for nested object */
+    private array|null $pendingProperty = null;
+
     /**
      * Emits a set of quads by suspending the fiber.
      *
@@ -164,7 +167,19 @@ class RdfXmlParser implements IteratorAggregate
                     $this->subjectStack !== [] &&
                     $this->subjectStack[$lastKey]['depth'] === $this->reader->depth
                 ) {
-                    $popped        = array_pop($this->subjectStack);
+                    $popped = array_pop($this->subjectStack);
+                    // If there's a pending property, emit the triple with the closing element's subject as object
+                    if ($this->pendingProperty !== null && $this->pendingProperty['depth'] === $this->reader->depth) {
+                        assert($this->subject !== null, 'subject must be set for pending property');
+                        $this->emit([
+                            $this->pendingProperty['subject'],
+                            $this->pendingProperty['predicate'],
+                            $this->subject,
+                            null,
+                        ]);
+                        $this->pendingProperty = null;
+                    }
+
                     $this->subject = $popped['subject'];
                 }
 
@@ -184,6 +199,7 @@ class RdfXmlParser implements IteratorAggregate
                 $this->subjectStack[] = ['subject' => $this->subject, 'depth' => $descriptionDepth];
 
                 $about  = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+                $nodeId = $this->reader->getAttribute('rdf:nodeID');
                 $idAttr = $this->reader->getAttribute('rdf:ID');
 
                 if ($idAttr !== null) {
@@ -194,6 +210,9 @@ class RdfXmlParser implements IteratorAggregate
                     // rdf:about - empty string resolves to base URI
                     $resolvedURI   = $this->resolveURI($about);
                     $this->subject = new Resource($resolvedURI);
+                } elseif ($nodeId !== null) {
+                    // rdf:nodeID creates a blank node with the given ID
+                    $this->subject = new Resource('_:' . $nodeId);
                 } else {
                     $this->subject = $this->nextBNode();
                 }
@@ -250,6 +269,7 @@ class RdfXmlParser implements IteratorAggregate
             if ($this->subject !== null && $namespace !== '' && $namespace !== self::RDF_NAMESPACE) {
                 $predicate    = new Resource($namespace . $localName);
                 $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
+                $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
                 $parseType    = $this->reader->getAttribute('rdf:parseType');
                 $idAttr       = $this->reader->getAttribute('rdf:ID');
                 $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
@@ -307,6 +327,25 @@ class RdfXmlParser implements IteratorAggregate
                     continue;
                 }
 
+                if ($nodeIdAttr !== null) {
+                    $object = new Resource('_:' . $nodeIdAttr);
+
+                    $this->emit([
+                        $this->subject,
+                        $predicate,
+                        $object,
+                        null,
+                    ]);
+
+                    // If rdf:ID is present, create reification triples
+                    if ($reificationURI !== null) {
+                        assert($this->subject !== null, 'subject must be set for reification');
+                        $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                    }
+
+                    continue;
+                }
+
                 // Read text content
                 $this->reader->read();
                 if (
@@ -324,6 +363,13 @@ class RdfXmlParser implements IteratorAggregate
 
                         assert($this->subject !== null, 'subject must be set for reification');
                         $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                    } else {
+                        // Nested content - store property info to emit when nested element closes
+                        $this->pendingProperty = [
+                            'subject' => $this->subject,
+                            'predicate' => $predicate,
+                            'depth' => $this->reader->depth,
+                        ];
                     }
 
                     continue;
@@ -405,6 +451,7 @@ class RdfXmlParser implements IteratorAggregate
             assert($iri !== '', 'iri must be non-empty');
             $predicate    = new Resource($iri);
             $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
+            $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
             $idAttr       = $this->reader->getAttribute('rdf:ID');
             $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
             $elementLang  = $this->reader->xmlLang ?: null;
@@ -418,6 +465,27 @@ class RdfXmlParser implements IteratorAggregate
             if ($resourceAttr !== null) {
                 $resolvedURI = $this->resolveURI($resourceAttr);
                 $object      = new Resource($resolvedURI);
+
+                assert($this->subject !== null, 'subject must be set');
+
+                $this->emit([
+                    $this->subject,
+                    $predicate,
+                    $object,
+                    null,
+                ]);
+
+                // If rdf:ID is present, create reification triples
+                if ($reificationURI !== null) {
+                    assert($this->subject !== null, 'subject must be set for reification');
+                    $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                }
+
+                continue;
+            }
+
+            if ($nodeIdAttr !== null) {
+                $object = new Resource('_:' . $nodeIdAttr);
 
                 assert($this->subject !== null, 'subject must be set');
 
@@ -457,6 +525,13 @@ class RdfXmlParser implements IteratorAggregate
 
                     assert($this->subject !== null, 'subject must be set for reification');
                     $this->emitReification($reificationURI, $this->subject, $predicate, $object);
+                } elseif ($this->subject !== null) {
+                    // Nested content - store property info to emit when nested element closes
+                    $this->pendingProperty = [
+                        'subject' => $this->subject,
+                        'predicate' => $predicate,
+                        'depth' => $this->reader->depth,
+                    ];
                 }
 
                 continue;
