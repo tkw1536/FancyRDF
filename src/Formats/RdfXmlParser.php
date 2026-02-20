@@ -25,6 +25,8 @@ use function preg_match;
 use function str_contains;
 
 /**
+ * A streaming RDF/XML parser that emits triples as they are encountered.
+ *
  * @phpstan-import-type TripleArray from Quad
  * @implements IteratorAggregate<int|string, TripleArray>
  */
@@ -38,37 +40,47 @@ class RdfXmlParser implements IteratorAggregate
         $this->subjectStack = new SplStack();
     }
 
+    // =================================
+    // General setup and fiber handling.
+    // =================================
+
     /** @var bool if the getIterator() method has been previously called */
     private bool $getIteratorStarted = false;
-
-    /** @var Fiber<void, TripleArray, void, TripleArray>|null The fiber used for parsing */
-    private Fiber|null $fiber = null;
 
     /** @return Traversable<int|string, TripleArray> */
     #[Override]
     public function getIterator(): Traversable
     {
-        // prevent multiple calls to getIterator
         if ($this->getIteratorStarted) {
             throw new Exception('Can only use getIterator() once');
         }
 
         $this->getIteratorStarted = true;
 
-        // Create a fiber to run the parsing logic
-        $this->fiber = new Fiber(function (): void {
-            $this->doParse();
-        });
+        // To allow for more structured code, instead of "yield"ing directly
+        // we use a fiber to run the parsing logic.
+        // This allows us to have "yield"-like functionality deep within function calls.
+        //
+        // To emit a triple, the fiber is suspended with that value.
+        // This function then yields the triple, and resumes the fiber
+        // once control is passed back to this function.
+        //
+        // The primary parsing logic is implemented in the doParse() function.
+        // The emit() function is a type-safe helper that performs the
+        // suspension of the fiber.
+        //
+        // [1]: https://www.php.net/manual/en/language.fibers.php
 
-        // Start the fiber - it may suspend immediately with a value
-        $value = $this->fiber->start();
+        /** @var Fiber<void, TripleArray, void, TripleArray> $fiber */
+        $fiber = new Fiber([$this, 'doParse']);
+
+        $value = $fiber->start();
         if ($value !== null) {
             yield $value;
         }
 
-        // Continue resuming the fiber and yielding values as they are emitted
-        while (! $this->fiber->isTerminated()) {
-            $value = $this->fiber->resume();
+        while (! $fiber->isTerminated()) {
+            $value = $fiber->resume();
             if ($value === null) {
                 continue;
             }
@@ -76,6 +88,22 @@ class RdfXmlParser implements IteratorAggregate
             yield $value;
         }
     }
+
+    /**
+     * Emits a set of quads by suspending the fiber.
+     *
+     * @param TripleArray $quads The quads to emit
+     */
+    private function emit(array ...$quads): void
+    {
+        foreach ($quads as $quad) {
+            Fiber::suspend($quad);
+        }
+    }
+
+    // =================================
+    // URI handling
+    // =================================
 
     /**
      * Resolves a URI against the current xml:base.
@@ -185,18 +213,6 @@ class RdfXmlParser implements IteratorAggregate
 
     /** @var array{subject: Resource, predicate: Resource, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
     private array|null $pendingProperty = null;
-
-    /**
-     * Emits a set of quads by suspending the fiber.
-     *
-     * @param TripleArray $quads The quads to emit
-     */
-    private function emit(array ...$quads): void
-    {
-        foreach ($quads as $quad) {
-            Fiber::suspend($quad);
-        }
-    }
 
     /**
      * Emits a triple and handles reification if a reification URI is provided.
