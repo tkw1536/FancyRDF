@@ -20,6 +20,7 @@ use function array_pop;
 use function assert;
 use function count;
 use function in_array;
+use function is_string;
 use function mb_substr;
 use function preg_match;
 use function str_contains;
@@ -101,21 +102,67 @@ class RdfXmlParser implements IteratorAggregate
         return $result;
     }
 
-    private int $bnodeCounter = 0;
+    // ===========================
+    // Blank node handling
+    // ===========================
 
-    /** return a new blank node */
-    private function nextBNode(): Resource
+    private int $blankNodeCounter = 0;
+
+    /** @var array<string, non-empty-string> */
+    private array $blankNodeMap = [];
+
+    /**
+     * Makes a blank node resource.
+     *
+     * @param string|null $name
+     *   If non-null, a string that uniquely identifies this blank node
+     *   within the current document.
+     *   If null, a fresh blank node label is returned.
+     *
+     * @return Resource
+     */
+    private function makeBlankNode(string|null $name): Resource
     {
-        $this->bnodeCounter++;
+        // Pick the existing blank node label, or create a new one.
+        $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
+        $id ??= '_:b' . ($this->blankNodeCounter++);
 
-        return new Resource('_:b' . $this->bnodeCounter);
+        // Store the mapping if we were given a name.
+        if (is_string($name)) {
+            $this->blankNodeMap[$name] = $id;
+        }
+
+        return new Resource($id);
     }
+
+    // ===========================
+    // Unique identifier handling
+    // ===========================
+
+    /** @var array<string, true> */
+    private array $seenIds = [];
+
+    /**
+     * Checks that the given identifier was not previously seen.
+     * An identifier is considered seen once it has been passed to this function.
+     */
+    private function sawIdentifier(string $identifier): bool
+    {
+        if (isset($this->seenIds[$identifier])) {
+            return true;
+        }
+
+        $this->seenIds[$identifier] = true;
+
+        return false;
+    }
+
+    // ===========================
+    // List item handling
+    // ===========================
 
     /** @var array<int, int> li counter per depth level */
     private array $liCounters = [];
-
-    /** @var array<string, true> Track rdf:ID values to detect duplicates */
-    private array $seenIds = [];
 
     /** return the next li property name for the current depth */
     private function nextLiProperty(): Resource
@@ -208,10 +255,7 @@ class RdfXmlParser implements IteratorAggregate
             assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
 
             $resolvedURI = $this->resolveURI('#' . $idAttr);
-            if ($checkDuplicates) {
-                assert(! isset($this->seenIds[$resolvedURI]), 'Duplicate rdf:ID value: ' . $idAttr);
-                $this->seenIds[$resolvedURI] = true;
-            }
+            assert(! $checkDuplicates || ! $this->sawIdentifier($resolvedURI), 'Duplicate rdf:ID value: ' . $idAttr);
 
             return new Resource($resolvedURI);
         }
@@ -228,11 +272,11 @@ class RdfXmlParser implements IteratorAggregate
             assert(self::isValidXmlName($nodeId), 'rdf:nodeID value must match XML Name production: ' . $nodeId);
 
             // rdf:nodeID creates a blank node with the given ID
-            return new Resource('_:' . $nodeId);
+            return $this->makeBlankNode($nodeId);
         }
 
         // No identifying attributes - create blank node
-        return $this->nextBNode();
+        return $this->makeBlankNode(null);
     }
 
     /**
@@ -244,7 +288,7 @@ class RdfXmlParser implements IteratorAggregate
      */
     private function handleParseTypeCollection(Resource $subject, Resource $predicate, string|null $reificationURI): void
     {
-        $listHead = $this->nextBNode();
+        $listHead = $this->makeBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $listHead, $reificationURI);
 
         // Process collection items
@@ -296,7 +340,7 @@ class RdfXmlParser implements IteratorAggregate
 
             // If not the last item, create next list node
             if ($index < count($items) - 1) {
-                $nextList = $this->nextBNode();
+                $nextList = $this->makeBlankNode(null);
                 $this->emit([
                     $currentList,
                     new Resource(self::RDF_NAMESPACE . 'rest'),
@@ -337,7 +381,7 @@ class RdfXmlParser implements IteratorAggregate
      */
     private function handleParseTypeResource(Resource $subject, Resource $predicate, string|null $reificationURI): void
     {
-        $resourceObject = $this->nextBNode();
+        $resourceObject = $this->makeBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $resourceObject, $reificationURI);
 
         // Push current subject and set the resource object as new subject
@@ -671,7 +715,7 @@ class RdfXmlParser implements IteratorAggregate
                 }
 
                 if ($nodeIdAttr !== null) {
-                    $object = new Resource('_:' . $nodeIdAttr);
+                    $object = $this->makeBlankNode($nodeIdAttr);
                     $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                     continue;
@@ -702,7 +746,7 @@ class RdfXmlParser implements IteratorAggregate
 
                 // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
                 if ($hasNonRdfAttributes) {
-                    $object = $this->nextBNode();
+                    $object = $this->makeBlankNode(null);
                     $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                     // Process non-RDF attributes as properties of the object
@@ -787,9 +831,7 @@ class RdfXmlParser implements IteratorAggregate
                     assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
 
                     $resolvedURI = $this->resolveURI('#' . $idAttr);
-                    assert(! isset($this->seenIds[$resolvedURI]), 'Duplicate rdf:ID value: ' . $idAttr);
-
-                    $this->seenIds[$resolvedURI] = true;
+                    assert(! $this->sawIdentifier($resolvedURI), 'Duplicate rdf:ID value: ' . $idAttr);
                 }
 
                 $subject = $this->resolveSubject($about, $nodeId, $idAttr, false);
@@ -916,7 +958,7 @@ class RdfXmlParser implements IteratorAggregate
 
             if ($nodeIdAttr !== null) {
                 assert($this->subject !== null, 'subject must be set');
-                $object = new Resource('_:' . $nodeIdAttr);
+                $object = $this->makeBlankNode($nodeIdAttr);
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                 continue;
@@ -948,7 +990,7 @@ class RdfXmlParser implements IteratorAggregate
             // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
             if ($hasNonRdfAttributes) {
                 assert($this->subject !== null, 'subject must be set');
-                $object = $this->nextBNode();
+                $object = $this->makeBlankNode(null);
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                 // Process non-RDF attributes as properties of the object
