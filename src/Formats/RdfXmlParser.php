@@ -8,7 +8,7 @@ use Exception;
 use FancySparql\Dataset\Quad;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
-use FancySparql\Url\Url;
+use FancySparql\Uri\UriReference;
 use FancySparql\Xml\XMLUtils;
 use Fiber;
 use IteratorAggregate;
@@ -118,7 +118,7 @@ class RdfXmlParser implements IteratorAggregate
      */
     private function resolveURI(string $uri): string
     {
-        $resolved = Url::parseAndResolve($this->reader->baseURI, $uri);
+        $resolved = UriReference::resolveURI($this->reader->baseURI, $uri);
         assert($resolved !== '', 'URI must be non-empty');
 
         return $resolved;
