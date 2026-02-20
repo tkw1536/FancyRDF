@@ -12,11 +12,10 @@ use FancySparql\Xml\XMLUtils;
 use Fiber;
 use IteratorAggregate;
 use Override;
+use SplStack;
 use Traversable;
 use XMLReader;
 
-use function array_key_last;
-use function array_pop;
 use function assert;
 use function count;
 use function in_array;
@@ -36,6 +35,7 @@ class RdfXmlParser implements IteratorAggregate
     /** @param XMLReader $reader The XMLReader instance to parse from */
     public function __construct(private XMLReader $reader)
     {
+        $this->subjectStack = new SplStack();
     }
 
     /** @var bool if the getIterator() method has been previously called */
@@ -180,8 +180,8 @@ class RdfXmlParser implements IteratorAggregate
     /** @var Resource|null the currently active subject */
     private Resource|null $subject = null;
 
-    /** @var list<array{subject: Resource|null, depth: int}> a stack of subjects within the current nesting level */
-    private array $subjectStack = [];
+    /** @var SplStack<array{subject: Resource|null, depth: int}> a stack of subjects within the current nesting level */
+    private SplStack $subjectStack;
 
     /** @var array{subject: Resource, predicate: Resource, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
     private array|null $pendingProperty = null;
@@ -385,21 +385,20 @@ class RdfXmlParser implements IteratorAggregate
         $this->emitTripleWithReification($subject, $predicate, $resourceObject, $reificationURI);
 
         // Push current subject and set the resource object as new subject
-        $resourceDepth        = $this->reader->depth;
-        $this->subjectStack[] = ['subject' => $subject, 'depth' => $resourceDepth];
-        $this->subject        = $resourceObject;
+        $resourceDepth = $this->reader->depth;
+        $this->subjectStack->push(['subject' => $subject, 'depth' => $resourceDepth]);
+        $this->subject = $resourceObject;
 
         // Skip past this element's opening tag - nested content will be processed in main loop
         if (! $this->reader->isEmptyElement) {
             return;
         }
 
-        $lastKey = array_key_last($this->subjectStack);
-        if ($this->subjectStack[$lastKey]['depth'] !== $resourceDepth) {
+        if ($this->subjectStack->isEmpty() || $this->subjectStack->top()['depth'] !== $resourceDepth) {
             return;
         }
 
-        $popped        = array_pop($this->subjectStack);
+        $popped        = $this->subjectStack->pop();
         $this->subject = $popped['subject'];
     }
 
@@ -498,13 +497,11 @@ class RdfXmlParser implements IteratorAggregate
             // If an element closes, and we are back at the right depth, then we need to pop the stack.
             // And go back to the previous subject and base.
             if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
-                $lastKey = array_key_last($this->subjectStack);
                 if (
-                    $lastKey !== null &&
-                    $this->subjectStack !== [] &&
-                    $this->subjectStack[$lastKey]['depth'] === $this->reader->depth
+                    ! $this->subjectStack->isEmpty() &&
+                    $this->subjectStack->top()['depth'] === $this->reader->depth
                 ) {
-                    $popped             = array_pop($this->subjectStack);
+                    $popped             = $this->subjectStack->pop();
                     $thePendingProperty = $this->pendingProperty;
                     // If there's a pending property, emit the triple with the closing element's subject as object
                     if ($thePendingProperty !== null && $thePendingProperty['depth'] === $this->reader->depth) {
@@ -552,8 +549,8 @@ class RdfXmlParser implements IteratorAggregate
 
             // rdf:Description block starting
             if ($namespace === self::RDF_NAMESPACE && $localName === 'Description') {
-                $descriptionDepth     = $this->reader->depth;
-                $this->subjectStack[] = ['subject' => $this->subject, 'depth' => $descriptionDepth];
+                $descriptionDepth = $this->reader->depth;
+                $this->subjectStack->push(['subject' => $this->subject, 'depth' => $descriptionDepth]);
 
                 // Reset li counter when a new Description starts
                 // Reset at the depth where rdf:li elements will appear (one level deeper)
@@ -632,10 +629,8 @@ class RdfXmlParser implements IteratorAggregate
 
                 // If self-closing, pop stacks immediately
                 if ($this->reader->isEmptyElement) {
-                    $lastKey = array_key_last($this->subjectStack);
-                    if ($lastKey !== null && $this->subjectStack[$lastKey]['depth'] === $descriptionDepth) {
-                        $popped = array_pop($this->subjectStack);
-                        assert($popped !== null);
+                    if (! $this->subjectStack->isEmpty() && $this->subjectStack->top()['depth'] === $descriptionDepth) {
+                        $popped        = $this->subjectStack->pop();
                         $this->subject = $popped['subject'];
                     }
                 }
@@ -836,8 +831,8 @@ class RdfXmlParser implements IteratorAggregate
 
                 $subject = $this->resolveSubject($about, $nodeId, $idAttr, false);
 
-                $this->subjectStack[] = ['subject' => $this->subject, 'depth' => $typedNodeDepth];
-                $this->subject        = $subject;
+                $this->subjectStack->push(['subject' => $this->subject, 'depth' => $typedNodeDepth]);
+                $this->subject = $subject;
 
                 $object = $namespace . $localName;
                 assert($object !== '', 'object may not be empty');
@@ -891,11 +886,9 @@ class RdfXmlParser implements IteratorAggregate
 
                 // If self-closing, pop stacks immediately
                 if ($this->reader->isEmptyElement) {
-                    // we know the subject stack is no-empty because we pushed to it above!
-                    $lastKey = array_key_last($this->subjectStack);
-                    if ($lastKey !== null && $this->subjectStack[$lastKey]['depth'] === $typedNodeDepth) {
-                        $popped = array_pop($this->subjectStack);
-                        assert($popped !== null);
+                    // we know the subject stack is non-empty because we pushed to it above!
+                    if (! $this->subjectStack->isEmpty() && $this->subjectStack->top()['depth'] === $typedNodeDepth) {
+                        $popped        = $this->subjectStack->pop();
                         $this->subject = $popped['subject'];
                     }
                 }
