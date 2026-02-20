@@ -30,7 +30,7 @@ final class Url
     /**
      * Parses a URI string into components (no parse_url).
      */
-    public static function fromString(string $uri): self
+    public static function parse(string $uri): self
     {
         $fragment = null;
         $hashPos  = strpos($uri, '#');
@@ -72,13 +72,16 @@ final class Url
         return new self($scheme, $authority, $path, $query, $fragment);
     }
 
+    public function resolveRef(string $ref): self
+    {
+        return $this->resolve(self::parse($ref));
+    }
+
     /**
      * Resolves a URI reference against this URI (base) per RFC 3986 §5.2.
      */
-    public function resolveRef(string $refString): self
+    public function resolve(Url $ref): self
     {
-        $ref = self::fromString($refString);
-
         if ($ref->scheme !== null) {
             return $ref->normalizePath();
         }
@@ -86,8 +89,10 @@ final class Url
         $scheme    = $this->scheme;
         $authority = $this->authority;
 
-        if ($ref->authority !== null && str_starts_with($refString, '//')) {
-            return (new self($scheme, $ref->authority, $ref->path, $ref->query, $ref->fragment))->normalizePath();
+        if ($ref->authority !== null) {
+            return (
+                new self($scheme, $ref->authority, $ref->path, $ref->query, $ref->fragment)
+            )->normalizePath();
         }
 
         if ($ref->path === '' && $ref->query === null && $ref->fragment === null) {
@@ -228,6 +233,9 @@ final class Url
         return new self($this->scheme, $this->authority, $path, $this->query, $this->fragment);
     }
 
+    /**
+     * Turns this URL into a string that can be used to parse it again.
+     */
     public function toString(): string
     {
         $s = '';
@@ -259,14 +267,12 @@ final class Url
      *
      * @return string The resolved URI. Whenever possible, this is an absolute URI.
      */
-    public static function resolve(string $base, string $uri): string
+    public static function parseAndResolve(string $base, string $uri): string
     {
         if ($base === '') {
             return $uri;
         }
 
-        $baseUrl = self::fromString($base);
-
-        return $baseUrl->resolveRef($uri)->toString();
+        return self::parse($base)->resolve(self::parse($uri))->toString();
     }
 }

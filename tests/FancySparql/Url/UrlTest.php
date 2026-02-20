@@ -187,9 +187,9 @@ final class UrlTest extends TestCase
      * fromString() parses into scheme, authority, path, query, fragment per RFC 3986 §3.
      */
     #[DataProvider('rfcUrlParseExamplesProvider')]
-    public function testFromStringParsesComponents(string $uri, Url $expected): void
+    public function testParseParsesComponents(string $uri, Url $expected): void
     {
-        $parsed = Url::fromString($uri);
+        $parsed = Url::parse($uri);
         self::assertSame($expected->scheme, $parsed->scheme, 'scheme');
         self::assertSame($expected->authority, $parsed->authority, 'authority');
         self::assertSame($expected->path, $parsed->path, 'path');
@@ -200,14 +200,13 @@ final class UrlTest extends TestCase
     #[DataProvider('rfcUrlParseExamplesProvider')]
     public function testToString(string $uri, Url $expected): void
     {
-        $parsed = Url::fromString($uri);
         self::assertSame($uri, $expected->toString());
     }
 
     #[DataProvider('rfcUrlParseExamplesProvider')]
-    public function testToStringRoundTrip(string $uri, Url $expected): void
+    public function testParseRoundTrip(string $uri, Url $expected): void
     {
-        $parsed = Url::fromString($uri);
+        $parsed = Url::parse($uri);
         self::assertSame($uri, $parsed->toString());
     }
 
@@ -215,7 +214,7 @@ final class UrlTest extends TestCase
     #[DataProvider('rfc3986URLsProvider')]
     public function testResolveURLs(string $base, string $relative, string $expected): void
     {
-        $result = Url::resolve($base, $relative);
+        $result = Url::parseAndResolve($base, $relative);
         self::assertSame($expected, $result);
     }
 }
