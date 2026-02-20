@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace FancySparql\Url;
 
 use function preg_match;
-use function str_ends_with;
 use function str_starts_with;
 use function strpos;
 use function strrpos;
@@ -111,43 +110,57 @@ final class Url
             return new self($scheme, $authority, $path, $ref->query, $ref->fragment);
         }
 
-        $mergedPath = self::mergePath($this->scheme, $this->authority, $this->path, $ref->path);
+        $mergedPath = $this->mergePath($ref);
         $path       = self::removeDotSegments($mergedPath, $ref->path);
 
         return new self($scheme, $authority, $path, $ref->query, $ref->fragment);
     }
 
     /**
+     * Implements the Merge Routine from RFC 3986 §5.2.3.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-5.2.3
      * Merges base path with reference path per RFC 3986 §5.2.3.
      */
-    private static function mergePath(string|null $scheme, string|null $authority, string $basePath, string $refPath): string
+    private function mergePath(Url $ref): string
     {
-        if ($authority !== null && ($basePath === '' || $basePath === '/')) {
-            return '/' . $refPath;
+        // If the base URI has a defined authority component and an empty
+        // path, then return a string consisting of "/" concatenated with the
+        // reference's path
+        if ($this->authority !== null && ($this->path === '' || $this->path === '/')) {
+            return '/' . $ref->path;
         }
 
-        $lastSlash = strrpos($basePath, '/');
+        // return a string consisting of the reference's path component
+        // appended to all but the last segment of the base URI's path (i.e.,
+        // excluding any characters after the right-most "/" in the base URI
+        // path, or excluding the entire base URI path if it does not contain
+        // any "/" characters).
+        $lastSlash = strrpos($this->path, '/');
         if ($lastSlash === false) {
-            return $refPath;
+            return $ref->path;
         }
 
-        return substr($basePath, 0, $lastSlash + 1) . $refPath;
+        return substr($this->path, 0, $lastSlash + 1) . $ref->path;
     }
 
     /**
-     * Removes . and .. segments per RFC 3986 §5.2.4.
-     * Preserves trailing slash when refPath indicates a directory (e.g. ends with / or is . or ..).
+     * Implements the Remove Dot Segment routine from RFC 3986 §5.2.4.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-5.2.4
      */
     private static function removeDotSegments(string $path, string $refPath = ''): string
     {
-        $trailingSlash = $path === '' || $path === '/' || str_ends_with($path, '/')
-            || $refPath === '.' || $refPath === './' || $refPath === '..' || $refPath === '../'
-            || str_ends_with($refPath, '/');
-
+        // 1.  The input buffer is initialized with the now-appended path
+        // components and the output buffer is initialized to the empty
+        // string.
         $input  = $path;
         $output = '';
 
+        // 2.  While the input buffer is not empty, loop as follows:
         while ($input !== '') {
+            // A.  If the input buffer begins with a prefix of "../" or "./",
+            // then remove that prefix from the input buffer
             if (str_starts_with($input, '../')) {
                 $input = substr($input, 3);
                 continue;
@@ -158,6 +171,9 @@ final class Url
                 continue;
             }
 
+            // B.  if the input buffer begins with a prefix of "/./" or "/.",
+            // where "." is a complete path segment, then replace that
+            // prefix with "/" in the input buffer
             if (str_starts_with($input, '/./')) {
                 $input = '/' . substr($input, 3);
                 continue;
@@ -168,6 +184,11 @@ final class Url
                 continue;
             }
 
+            // C.  if the input buffer begins with a prefix of "/../" or "/..",
+            // where ".." is a complete path segment, then replace that
+            // prefix with "/" in the input buffer and remove the last
+            // segment and its preceding "/" (if any) from the output
+            // buffer
             if (str_starts_with($input, '/../')) {
                 $input = '/' . substr($input, 4);
                 $last  = strrpos($output, '/');
@@ -188,11 +209,17 @@ final class Url
                 continue;
             }
 
+            // D.  if the input buffer consists only of "." or "..", then remove
+            // that from the input buffer
             if ($input === '.' || $input === '..') {
                 $input = '';
                 continue;
             }
 
+            // E.  move the first path segment in the input buffer to the end of
+            // the output buffer, including the initial "/" character (if
+            // any) and any subsequent characters up to, but not including,
+            // the next "/" character or the end of the input buffer
             if (str_starts_with($input, '/')) {
                 $nextSlash = strpos($input, '/', 1);
                 if ($nextSlash !== false) {
@@ -219,10 +246,8 @@ final class Url
             $output .= $segment;
         }
 
-        if ($trailingSlash && $output !== '' && ! str_ends_with($output, '/')) {
-            $output .= '/';
-        }
-
+        // 3.  Finally, the output buffer is returned as the result of
+        // remove_dot_segments.
         return $output;
     }
 
@@ -234,29 +259,33 @@ final class Url
     }
 
     /**
-     * Turns this URL into a string that can be used to parse it again.
+     * Turns this URL into a URL reference string.
+     *
+     * This implements the component Recomposition routine from RFC 3986 §5.3.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-5.3
      */
     public function toString(): string
     {
-        $s = '';
+        $result = '';
         if ($this->scheme !== null) {
-            $s .= $this->scheme . ':';
+            $result .= $this->scheme . ':';
         }
 
         if ($this->authority !== null) {
-            $s .= '//' . $this->authority;
+            $result .= '//' . $this->authority;
         }
 
-        $s .= $this->path;
+        $result .= $this->path;
         if ($this->query !== null) {
-            $s .= '?' . $this->query;
+            $result .= '?' . $this->query;
         }
 
         if ($this->fragment !== null) {
-            $s .= '#' . $this->fragment;
+            $result .= '#' . $this->fragment;
         }
 
-        return $s;
+        return $result;
     }
 
     /**
