@@ -204,63 +204,70 @@ final class Resource extends Term
     }
 
     /**
-     * Joins a base URI with a relative URI according to RFC 3986.
+     * Joins two uris, resolving the one against a base if possible according to RFC 3986.
      *
-     * @param string $base     The base URI
-     * @param string $relative The relative URI (may be empty, relative, or absolute)
+     * @param string $base The base URI to resolve against.
+     * @param string $uri  The relative URI to resolve (which may be empty, relative, or absolute)
      *
-     * @return string The resolved absolute URI
+     * @return string
+     *   The resolved URI.
+     *   Whenever possible, this is an absolute URI.
      */
-    public static function joinURLs(string $base, string $relative): string
+    public static function joinURLs(string $base, string $uri): string
     {
+        // If we don't have a base, we can't do any resolving.
+        if ($base === '') {
+            return $uri;
+        }
+
         // Handle empty relative URI - return base without fragment
-        if ($relative === '') {
+        if ($uri === '') {
             $fragmentPos = strpos($base, '#');
 
             return $fragmentPos !== false ? substr($base, 0, $fragmentPos) : $base;
         }
 
         // Handle network path (starts with //)
-        if (str_starts_with($relative, '//')) {
+        if (str_starts_with($uri, '//')) {
             $schemeEnd = strpos($base, '://');
             if ($schemeEnd !== false) {
                 $scheme = substr($base, 0, $schemeEnd + 3);
 
-                return $scheme . substr($relative, 2);
+                return $scheme . substr($uri, 2);
             }
 
-            return $relative;
+            return $uri;
         }
 
         // Handle absolute URI (has scheme)
-        if (preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $relative)) {
-            return $relative;
+        if (preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $uri)) {
+            return $uri;
         }
 
         // Handle fragment-only (starts with #)
-        if (str_starts_with($relative, '#')) {
+        if (str_starts_with($uri, '#')) {
             $baseWithoutFragment = strpos($base, '#') !== false ? substr($base, 0, strpos($base, '#')) : $base;
 
-            return $baseWithoutFragment . $relative;
+            return $baseWithoutFragment . $uri;
         }
 
         // Remove fragment from base for resolution
         $baseWithoutFragment = strpos($base, '#') !== false ? substr($base, 0, strpos($base, '#')) : $base;
 
         // Handle absolute path (starts with /)
-        if (str_starts_with($relative, '/')) {
+        if (str_starts_with($uri, '/')) {
             // Absolute path relative to base's authority
             $schemeEnd = strpos($baseWithoutFragment, '://');
             if ($schemeEnd !== false) {
                 $authorityEnd = strpos($baseWithoutFragment, '/', $schemeEnd + 3);
                 if ($authorityEnd !== false) {
-                    return substr($baseWithoutFragment, 0, $authorityEnd) . $relative;
+                    return substr($baseWithoutFragment, 0, $authorityEnd) . $uri;
                 }
 
-                return $baseWithoutFragment . $relative;
+                return $baseWithoutFragment . $uri;
             }
 
-            return $relative;
+            return $uri;
         }
 
         // Relative path - resolve against base
@@ -275,7 +282,7 @@ final class Resource extends Term
                 $baseDir = substr($baseWithoutFragment, 0, $lastSlash + 1);
             }
 
-            $combined = $baseDir . $relative;
+            $combined = $baseDir . $uri;
             $parts    = explode('/', $combined);
         } else {
             // Has scheme - need to preserve scheme://authority
@@ -298,7 +305,7 @@ final class Resource extends Term
                 $baseDir = substr($basePath, 0, $lastSlash + 1);
             }
 
-            $combined = $baseDir . $relative;
+            $combined = $baseDir . $uri;
             $parts    = explode('/', $combined);
             // Remove empty first element (from leading /)
             if ($parts[0] === '') {

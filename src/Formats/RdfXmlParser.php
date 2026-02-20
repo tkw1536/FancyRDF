@@ -106,28 +106,21 @@ class RdfXmlParser implements IteratorAggregate
     // =================================
 
     /**
-     * Resolves a URI against the current xml:base.
+     * Resolves a URI against the xml:base attribute of the reader.
      *
-     * The code assumes that the result of joining the URL is a valid non-empty string.
+     * @param string $uri
+     *  The URI to resolve.
      *
-     * @param string $uri The URI to resolve (may be empty, relative, or absolute)
-     *
-     * @return non-empty-string The resolved absolute URI
+     * @return non-empty-string
+     *   The resolved absolute URI.
+     *   The function asserts that the URI is resolveable, i.e. that the result is non-empty.
      */
     private function resolveURI(string $uri): string
     {
-        $base = $this->reader->baseURI;
+        $resolved = Resource::joinURLs($this->reader->baseURI, $uri);
+        assert($resolved !== '', 'URI must be non-empty');
 
-        if ($base === '') {
-            assert($uri !== '', 'URI must be non-empty');
-
-            return $uri;
-        }
-
-        $result = Resource::joinURLs($base, $uri);
-        assert($result !== '', 'URI must be non-empty');
-
-        return $result;
+        return $resolved;
     }
 
     // ===========================
