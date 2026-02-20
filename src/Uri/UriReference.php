@@ -43,6 +43,7 @@ final class UriReference
         public readonly string|null $query,
         public readonly string|null $fragment,
     ) {
+        // TODO: Add a method that we only have valid characters in each of the components.
     }
 
     // ===========================

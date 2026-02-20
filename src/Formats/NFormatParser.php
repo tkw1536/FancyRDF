@@ -7,6 +7,7 @@ namespace FancySparql\Formats;
 use FancySparql\Dataset\Quad;
 use FancySparql\Term\Literal;
 use FancySparql\Term\Resource;
+use FancySparql\Uri\UriReference;
 use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\StreamInterface;
 use Traversable;
@@ -218,7 +219,7 @@ final class NFormatParser
                 self::$pos++;
 
                 $buf .= substr(self::$line, $start, $end - $start);
-                assert($buf !== '', 'empty IRI reference at position ' . self::$pos);
+                assert(!UriReference::parse($buf)->isRelativeReference(), 'IRI reference must not be relative');
 
                 return $buf;
             }

@@ -114,12 +114,16 @@ class RdfXmlParser implements IteratorAggregate
      *
      * @return non-empty-string
      *   The resolved absolute URI.
-     *   The function asserts that the URI is resolveable, i.e. that the result is non-empty.
+     *   The function asserts that the URI is resolvable, i.e. that the result is non-empty.
      */
     private function resolveURI(string $uri): string
     {
         $resolved = UriReference::resolveURI($this->reader->baseURI, $uri);
-        assert($resolved !== '', 'URI must be non-empty');
+        assert(
+            $resolved !== '' &&
+            !UriReference::parse($resolved)->isRelativeReference(),
+            'resolved URI must not be empty and must not be relative',
+        );
 
         return $resolved;
     }
