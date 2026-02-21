@@ -219,7 +219,7 @@ final class NFormatParser
                 self::$pos++;
 
                 $buf .= substr(self::$line, $start, $end - $start);
-                assert(! UriReference::parse($buf)->isRelativeReference(), 'IRI reference must not be relative');
+                assert($buf !== '' && ! UriReference::parse($buf)->isRelativeReference(), 'IRI reference must not be relative');
 
                 return $buf;
             }
