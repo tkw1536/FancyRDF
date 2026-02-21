@@ -11,10 +11,10 @@
     ],
     "require": {
         "php": ">=8.3",
+        "ext-curl": "*",
         "ext-dom": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-curl": "*",
         "ext-pcre": "*",
         "guzzlehttp/guzzle": "^7.0"
     },

@@ -1,0 +1,41 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.3', '8.4', '8.5', '8.6']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: composer
+          extensions: curl,dom,json,mbstring,pcre
+      - name: Install dependencies
+        run: composer install --prefer-dist
+
+      - name: parallel-lint
+        run: make parallel-lint
+
+      - name: phpcs
+        run: make phpcs
+
+      - name: phpstan
+        run: make phpstan
+
+      - name: PHPUnit (with assertions)
+        run: make phpunit-assertions
+
+      - name: PHPUnit (without assertions)
+        run: make phpunit-noassertions

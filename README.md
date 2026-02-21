@@ -42,6 +42,15 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all positive tests parse and round-trip correctly.
         - [ ] all but a single negative test produce an error in development mode, and produce no errors in production mode.
 
+## Dependencies
+
+- [PHP 8.3+](https://www.php.net/releases/8.3/en.php) with extensions:
+    - [ext-curl](https://www.php.net/manual/en/book.curl.php)
+    - [ext-dom](https://www.php.net/manual/en/book.dom.php)
+    - [ext-json](https://www.php.net/manual/en/book.json.php)
+    - [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
+    - [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
+- [Guzzle](https://github.com/guzzle/guzzle) 7+
 
 ## Coding Standard & Typing
 
@@ -49,7 +58,6 @@ The code should be formatted using the [Doctrine Coding Standard](https://www.do
 This is enforced using [phpcs](https://github.com/squizlabs/PHP_CodeSniffer).
 
 The code should also pass [phpstan](https://phpstan.org) on strictest settings.
-
 
 The Makefile target `make lint` runs both phpcs and phpstan.
 The Makefile target `make fmt` runs the autoformatter.
