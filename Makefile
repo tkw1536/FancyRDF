@@ -1,6 +1,6 @@
 .PHONY: all test lint fmt cspell parallel-lint phpcs phpstan phpunit-assertions phpunit-noassertions phpcbf
 
-all: lint test
+all: cspell lint test
 
 lint: parallel-lint phpcs phpstan
 

@@ -64,12 +64,12 @@ The code should also pass [phpstan](https://phpstan.org) on strictest settings.
 The Makefile target `make lint` runs both phpcs and phpstan.
 The Makefile target `make fmt` runs the autoformatter.
 
-## Spell checking
+## Spellchecking
 
 Spell checking is done with [cspell](https://cspell.org/).
 Configuration is in [cspell.json](cspell.json) (custom words and ignore patterns).
 
-The Makefile target `make spell` runs the spell checker.
+The Makefile target `make cspell` runs the spell checker.
 This requires `cspell` to be installed and available on your `PATH`.
 
 ## Testing
