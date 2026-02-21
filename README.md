@@ -1,5 +1,7 @@
 # FancyRDF
 
+[![Test](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml)
+
 A streaming PHP 8.3+ PHP Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
 When run with [PHP Assertions](https://www.php.net/manual/en/function.assert.php) enabled, any non-compliant document may produce an assertion.
 When run in production mode, all test cases do not throw, but may provide erroneous output.
@@ -11,14 +13,14 @@ This library is eventually intended to replace [EasyRDF](https://www.easyrdf.org
 
 This library provides data structures for the following:
 
-- ✅ [RDF 1.1 Term](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [src/Term/Term.php]
+- ✅ [RDF 1.1 Term](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [Term](src/Term/Term.php) class
     - support serialization to / parsing from `JSON` as part of [SPARQL 1.1 Results JSON](https://www.w3.org/TR/2013/REC-sparql11-results-json-20130321/)
     - support serialization to / parsing from `XML` as part of [SPARQL 1.1 Results XML](https://www.w3.org/TR/2013/REC-rdf-sparql-XMLres-20130321/)
-- ✅ [RDF 1.1 Datasets](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [src/Dataset/Dataset.php]
+- ✅ [RDF 1.1 Datasets](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [Dataset](src/Dataset/Dataset.php) class
     - consist only of a set of triples
     - can be checked for equivalence, taking into account blank nodes
     - minimal support for per-literal equalityRFC 3976
-- ✅ [RFC 3986 URI References](https://www.rfc-editor.org/rfc/rfc3986) in [src/Uri/UriReference.php]
+- ✅ [RFC 3986 URI References](https://www.rfc-editor.org/rfc/rfc3986) in [UriReference](src/Uri/UriReference.php) class
     - can parse from / serialize to a string
     - can resolve a reference against a base URI
 
