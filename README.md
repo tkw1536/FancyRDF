@@ -25,7 +25,7 @@ This library provides data structures for the following:
 - ✅ [RDF 1.1 Datasets](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [Dataset](src/Dataset/Dataset.php) class
     - consist only of a set of triples
     - can be checked for equivalence, taking into account blank nodes
-- ✅ [RFC 3986 URI References](https://www.rfc-editor.org/rfc/rfc3986) in [UriReference](src/Uri/UriReference.php) class
+- ✅ [RFC 3986 URI References](https://www.rfc-editor.org/rfc/rfc3986) and [RFC 3987 IRI References](https://www.rfc-editor.org/rfc/rfc3987) in [UriReference](src/Uri/UriReference.php) class
     - can parse from / serialize to a string
     - can resolve a reference against a base URI
 

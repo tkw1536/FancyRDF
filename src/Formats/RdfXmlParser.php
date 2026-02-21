@@ -118,7 +118,7 @@ class RdfXmlParser implements IteratorAggregate
      */
     private function resolveURI(string $uri): string
     {
-        $resolved = UriReference::resolveURI($this->reader->baseURI, $uri);
+        $resolved = UriReference::resolveRelative($this->reader->baseURI, $uri);
         assert(
             $resolved !== '' &&
             ! UriReference::parse($resolved)->isRelativeReference(),

@@ -684,7 +684,7 @@ final class UriReferenceTest extends TestCase
     #[TestDox('Resolve URLs: base=$base, relative=$relative, expected=$expected')]
     public function testResolveURLs(string $base, string $relative, string $expected): void
     {
-        $result = UriReference::resolveURI($base, $relative);
+        $result = UriReference::resolveRelative($base, $relative);
         self::assertSame($expected, $result);
     }
 }

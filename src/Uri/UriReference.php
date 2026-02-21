@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Uri;
 
+use LogicException;
 use RuntimeException;
 
 use function assert;
@@ -19,17 +20,25 @@ use function strtoupper;
 use function substr;
 
 /**
- * Represents RFC 3986 URI References.
+ * Represents an RFC 3986 URI  or RFC 3987 IRI References.
  *
  * @see https://www.rfc-editor.org/rfc/rfc3986
+ * @see https://www.rfc-editor.org/rfc/rfc3987
  */
 final class UriReference
 {
     /**
-     * Constructs a new URI Reference from the syntactical components described in
-     * section 3 of RFC 3986.
+     * Constructs a new URI or IRI Reference from it's syntactical components as described in
+     * section 3 of RFC 3986 or section 2 of RFC 3987.
+     *
+     * Both standards use a similar syntax, and their only difference is in their set of allowed characters.
+     * To check if an otherwise syntactically correct instance of this class only contains allowed correct characters use
+     * the isRFC3986UriReference() or isRFC3987IriReference() methods.
+     *
+     * All other methods equally to both URI and IRI references.
      *
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-3
+     * @see https://www.rfc-editor.org/rfc/rfc3987#section-2
      *
      * @param non-empty-string|null $scheme
      * @param non-empty-string|null $authority
@@ -47,17 +56,34 @@ final class UriReference
     }
 
     // ===========================
-    // Different usages of a URI Reference
+    // URI vs IRI
     // ===========================
 
     /**
-     * Checks if this is a relative reference per RFC 3986 §4.2.
-     *
-     * relative-ref = relative-part [ "?" query ] [ "#" fragment ]
-     *
-     * A relative reference does not have a scheme component.
+     * Checks if this is a valid RFC 3986 URI reference.
+     */
+    public function isRFC3986UriReference(): bool
+    {
+        throw new LogicException('Not implemented');
+    }
+
+    /**
+     * Checks if this is a valid RFC 3987 IRI reference.
+     */
+    public function isRFC3987IriReference(): bool
+    {
+        throw new LogicException('Not implemented');
+    }
+
+    // ===========================
+    // Different usages of a URI / IRI Reference
+    // ===========================
+
+    /**
+     * Checks if this is a relative reference per RFC 3986 §4.2 or RFC 3987 §2.2.
      *
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-4.2
+     * @see https://www.rfc-editor.org/rfc/rfc3987#section-2.2
      *
      * @phpstan-assert-if-true null $this->scheme
      * @phpstan-assert-if-false !null $this->scheme
@@ -68,13 +94,10 @@ final class UriReference
     }
 
     /**
-     * Checks if this is an absolute URI per RFC 3986 §4.3.
-     *
-     * absolute-URI = scheme ":" hier-part [ "?" query ]
-     *
-     * An absolute URI has a scheme but no fragment component.
+     * Checks if this is an absolute URI or IRI per RFC 3986 §4.3 or RFC 3987 §2.2.
      *
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-4.3
+     * @see https://www.rfc-editor.org/rfc/rfc3987#section-2.2
      *
      * @phpstan-assert-if-true =non-empty-string $this->scheme
      * @phpstan-assert-if-true =null $this->fragment
@@ -131,12 +154,12 @@ final class UriReference
      *
      * This method is a convenience wrapper around the parse() and resolve() methods.
      *
-     * @see \FancyRDF\Url\UriReference::parse()
-     * @see \FancyRDF\Url\UriReference::resolve()
+     * @see \FancyRDF\Uri\UriReference::parse()
+     * @see \FancyRDF\Uri\UriReference::resolve()
      *
      * @return string The resolved URI. Whenever possible, this is an absolute URI.
      */
-    public static function resolveURI(string $base, string $uri, bool $strict = true, bool $normalize = true): string
+    public static function resolveRelative(string $base, string $uri, bool $strict = true, bool $normalize = true): string
     {
         // TODO: Introduce a cache here!
         return self::parse($base)->resolve(self::parse($uri))->toString();
