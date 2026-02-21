@@ -1,8 +1,47 @@
 # FancyRDF
 
 A streaming PHP 8.3+ PHP Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
+When run with [PHP Assertions](https://www.php.net/manual/en/function.assert.php) enabled, any non-compliant document may produce an assertion.
+When run in production mode, all test cases do not throw, but may provide erroneous output.
+
+The library is currently a work-in-progress.
 This library is eventually intended to replace [EasyRDF](https://www.easyrdf.org) in [WissKI](https://wiss-ki.eu). 
-It is currently a work-in-progress.
+
+## Features
+
+This library provides data structures for the following:
+
+- ✅ [RDF 1.1 Term](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [src/Term/Term.php]
+    - support serialization to / parsing from `JSON` as part of [SPARQL 1.1 Results JSON](https://www.w3.org/TR/2013/REC-sparql11-results-json-20130321/)
+    - support serialization to / parsing from `XML` as part of [SPARQL 1.1 Results XML](https://www.w3.org/TR/2013/REC-rdf-sparql-XMLres-20130321/)
+- ✅ [RDF 1.1 Datasets](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [src/Dataset/Dataset.php]
+    - consist only of a set of triples
+    - can be checked for equivalence, taking into account blank nodes
+    - minimal support for per-literal equalityRFC 3976
+- ✅ [RFC 3986 URI References](https://www.rfc-editor.org/rfc/rfc3986) in [src/Uri/UriReference.php]
+    - can parse from / serialize to a string
+    - can resolve a reference against a base URI
+
+The library provides several stream-based implementations of parsers and serializers for datasets:
+
+> [!TIP]
+> Streaming means that instead of completely reading a source document entirely into memory, it is read one-by-one as needed.
+> This approach saves memory usage and improves efficiency, in particular for large documents.
+
+- [RDF/XML](https://www.w3.org/TR/rdf-xml/): Passing 
+    - ✅ Parser: [RdfXmlParser](src/Formats/RdfXmlParser.php) 
+    - [ ] Serializer: TODO
+    - ✅ passes W3C [Test Suite](https://www.w3.org/2013/RDFXMLTests/)
+        - ✅ all positive tests parse correctly and produce equivalent N-Triples datasets
+        - ✅ all negative tests produce an assertion error in development mode.
+        - ✅ all negative tests do not produce errors in production mode.
+- [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
+    - ✅ Parser: [NFormatParser](src/Formats/NFormatParser.php)
+    - ✅ Serializer: [NFormatSerializer](src/Formats/NFormatSerializer.php)
+    - [ ] can pass W3C [Test Suite for N-Triples](https://www.w3.org/2013/N-TriplesTests/) and [Test Suite for N-Quads](https://www.w3.org/2013/N-QuadsTests/)
+        - ✅ all positive tests parse and round-trip correctly.
+        - [ ] all but a single negative test produce an error in development mode, and produce no errors in production mode.
+
 
 ## Coding Standard & Typing
 
@@ -23,5 +62,10 @@ The Makefile target `make test` runs the tests.
 
 ## License
 
+> [!WARNING]  
+> A license will be added once the library has reached feature completion.
+
 There is no license for the library and primary testing code, as the code is still in development.
-Some of the test data in the `rdf_tests` has been adapted from W3C, licensing information can be found in the README in that directory.
+
+Some of the test data in `rdf_tests` has been adapted from W3C and other sources and is therefore licensed under specific conditions.
+See licensing information in the [rdf_tests/README.md](rdf_test/README.md) file for details.
