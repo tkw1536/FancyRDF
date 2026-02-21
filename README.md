@@ -1,5 +1,9 @@
 # FancyRDF
 
+> [!WARNING]
+> This library is still a work in progress.
+> It is neither feature complete, nor ready for production use.
+
 [![Tests](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml)
 
 A streaming PHP 8.4+ Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
@@ -81,7 +85,7 @@ The Makefile target `make test` runs the tests.
 
 ## License
 
-> [!WARNING]  
+> [!WARNING]
 > A license will be added once the library has reached feature completion.
 
 There is no license for the library and primary testing code, as the code is still in development.
