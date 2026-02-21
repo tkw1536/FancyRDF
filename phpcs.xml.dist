@@ -2,8 +2,8 @@
 <ruleset name="FancyRDF">
     <description>Coding standard for FancyRDF</description>
 
-    <!-- This must work with PHP 8.3 and above -->
-    <config name="php_version" value="80300"/>
+    <!-- This must work with PHP 8.4 and above -->
+    <config name="php_version" value="80400"/>
 
     <!-- slevomat coding standard -->
     <rule ref="Doctrine">

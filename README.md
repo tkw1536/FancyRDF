@@ -2,7 +2,7 @@
 
 [![Test](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml)
 
-A streaming PHP 8.3+ PHP Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
+A streaming PHP 8.4+ PHP Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
 When run with [PHP Assertions](https://www.php.net/manual/en/function.assert.php) enabled, any non-compliant document may produce an assertion.
 When run in production mode, all test cases do not throw, but may provide erroneous output.
 
@@ -46,7 +46,7 @@ The library provides several stream-based implementations of parsers and seriali
 
 ## Dependencies
 
-- [PHP 8.3+](https://www.php.net/releases/8.3/en.php) with extensions:
+- [PHP 8.4+](https://www.php.net/releases/8.4/en.php) with extensions:
     - [ext-curl](https://www.php.net/manual/en/book.curl.php)
     - [ext-dom](https://www.php.net/manual/en/book.dom.php)
     - [ext-json](https://www.php.net/manual/en/book.json.php)
