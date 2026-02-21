@@ -6,8 +6,8 @@ namespace FancyRDF\Results;
 
 use DOMDocument;
 use DOMElement;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Xml\XMLSerializable;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
@@ -19,23 +19,23 @@ use Traversable;
 use function array_key_exists;
 
 /**
- * @phpstan-import-type ResourceElement from Resource
+ * @phpstan-import-type IRIElement from Iri
  * @phpstan-import-type LiteralElement from Literal
- * @implements IteratorAggregate<string, Literal|Resource>
+ * @implements IteratorAggregate<string, Literal|Iri>
  */
 final class Result implements JsonSerializable, XMLSerializable, IteratorAggregate
 {
     /**
      * The bindings of this result.
      *
-     * @var array<string, Literal|Resource>
+     * @var array<string, Literal|Iri>
      */
     private readonly array $bindings;
 
     /**
      * Constructs a new result from an iterable of bindings.
      *
-     * @param iterable<string, Literal|Resource> $bindings
+     * @param iterable<string, Literal|Iri> $bindings
      *
      * @return void
      */
@@ -49,7 +49,7 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
         $this->bindings = $ary;
     }
 
-    /** @return Traversable<string, Literal|Resource> */
+    /** @return Traversable<string, Literal|Iri> */
     #[Override]
     public function getIterator(): Traversable
     {
@@ -59,11 +59,11 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
     /**
      * Returns the binding for the given name.
      *
-     * @return ($allowMissing is true ? Literal|Resource|null : Literal|Resource)
+     * @return ($allowMissing is true ? Literal|Iri|null : Literal|Iri)
      *
      * @throws InvalidArgumentException
      */
-    public function get(string $name, bool $allowMissing = true): Literal|Resource|null
+    public function get(string $name, bool $allowMissing = true): Literal|Iri|null
     {
         if (! array_key_exists($name, $this->bindings)) {
             if ($allowMissing) {
@@ -96,21 +96,21 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
     /**
      * Returns the binding for the given name, asserting that it is a resource.
      *
-     * @return ($allowMissing is true ? Resource|null : Resource)
+     * @return ($allowMissing is true ? Iri|null : Iri)
      *
      * @throws InvalidArgumentException
      */
-    public function getResource(string $name, bool $allowMissing = true): Resource|null
+    public function getResource(string $name, bool $allowMissing = true): Iri|null
     {
         $value = $this->get($name, $allowMissing);
-        if ($value !== null && ! $value instanceof Resource) {
+        if ($value !== null && ! $value instanceof Iri) {
             throw new InvalidArgumentException("Binding '" . $name . "' is not a Resource");
         }
 
         return $value;
     }
 
-    /** @return array<string, ResourceElement|LiteralElement> */
+    /** @return array<string, IRIElement|LiteralElement> */
     #[Override]
     public function jsonSerialize(): array
     {

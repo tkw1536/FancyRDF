@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Uri\UriReference;
 use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\StreamInterface;
@@ -156,7 +156,7 @@ final class NFormatParser
     /**
      * Parses an object of a triple.
      */
-    private static function parseAnyTerm(): Literal|Resource
+    private static function parseAnyTerm(): Literal|Iri
     {
         // look at the current character and decide what to parse.
         $ch = self::$line[self::$pos] ?? '';
@@ -167,7 +167,7 @@ final class NFormatParser
         return self::parseAnyResource();
     }
 
-    private static function parseAnyResource(): Resource
+    private static function parseAnyResource(): Iri
     {
         // look at the current character and decide what to parse.
         $ch = self::$line[self::$pos] ?? '';
@@ -177,14 +177,14 @@ final class NFormatParser
 
         assert($ch === '_' && self::$pos + 1 < self::$len && self::$line[self::$pos + 1] === ':', 'invalid blank node start at position ' . self::$pos);
 
-        return new Resource(self::parseBlankNodeLabel());
+        return new Iri(self::parseBlankNodeLabel());
     }
 
-    private static function parseIRI(): Resource
+    private static function parseIRI(): Iri
     {
         assert(self::$pos < self::$len && self::$line[self::$pos] === '<', 'expected "<" at position ' . self::$pos);
 
-        return new Resource(self::parseIriRef());
+        return new Iri(self::parseIriRef());
     }
 
   /**

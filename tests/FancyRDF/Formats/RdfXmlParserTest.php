@@ -6,8 +6,8 @@ namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\RdfXmlParser;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -35,8 +35,8 @@ final class RdfXmlParserTest extends TestCase
 XML,
                 [
                     [
-                        new Resource('http://example.org/subject'),
-                        new Resource('http://example.org/terms#title'),
+                        new Iri('http://example.org/subject'),
+                        new Iri('http://example.org/terms#title'),
                         new Literal('Hello World'),
                         null,
                     ],
@@ -53,14 +53,14 @@ XML,
 XML,
                 [
                     [
-                        new Resource('http://example.org/book1'),
-                        new Resource($rdfNs . 'type'),
-                        new Resource('http://example.org/terms#Book'),
+                        new Iri('http://example.org/book1'),
+                        new Iri($rdfNs . 'type'),
+                        new Iri('http://example.org/terms#Book'),
                         null,
                     ],
                     [
-                        new Resource('http://example.org/book1'),
-                        new Resource('http://example.org/terms#title'),
+                        new Iri('http://example.org/book1'),
+                        new Iri('http://example.org/terms#title'),
                         new Literal('Dogs in Hats'),
                         null,
                     ],
@@ -77,9 +77,9 @@ XML,
 XML,
                 [
                     [
-                        new Resource('http://example.org/person'),
-                        new Resource('http://example.org/terms#knows'),
-                        new Resource('http://example.org/friend'),
+                        new Iri('http://example.org/person'),
+                        new Iri('http://example.org/terms#knows'),
+                        new Iri('http://example.org/friend'),
                         null,
                     ],
                 ],
@@ -98,14 +98,14 @@ XML,
 XML,
                 [
                     [
-                        new Resource('http://example.org/s1'),
-                        new Resource('http://example.org/terms#prop1'),
+                        new Iri('http://example.org/s1'),
+                        new Iri('http://example.org/terms#prop1'),
                         new Literal('value1'),
                         null,
                     ],
                     [
-                        new Resource('http://example.org/s2'),
-                        new Resource('http://example.org/terms#prop2'),
+                        new Iri('http://example.org/s2'),
+                        new Iri('http://example.org/terms#prop2'),
                         new Literal('value2'),
                         null,
                     ],
@@ -122,14 +122,14 @@ XML,
 XML,
                 [
                     [
-                        new Resource('_:n1'),
-                        new Resource($rdfNs . 'type'),
-                        new Resource('http://example.org/terms#Person'),
+                        new Iri('_:n1'),
+                        new Iri($rdfNs . 'type'),
+                        new Iri('http://example.org/terms#Person'),
                         null,
                     ],
                     [
-                        new Resource('_:n1'),
-                        new Resource('http://example.org/terms#name'),
+                        new Iri('_:n1'),
+                        new Iri('http://example.org/terms#name'),
                         new Literal('Alice'),
                         null,
                     ],

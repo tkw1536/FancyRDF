@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\FancyRDF\Term;
 
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Term\Term;
 use FancyRDF\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -15,13 +15,13 @@ use function gmp_sign;
 
 /**
  * @phpstan-import-type LiteralElement from Literal
- * @phpstan-import-type ResourceElement from Resource
+ * @phpstan-import-type IRIElement from Iri
  */
 final class TermTest extends TestCase
 {
-    /** @param LiteralElement|ResourceElement $expectedJson */
+    /** @param LiteralElement|IRIElement $expectedJson */
     #[DataProvider('termDeserializationProvider')]
-    public function testDeserializeJSONAndXML(Literal|Resource $term, array $expectedJson, string $expectedXml): void
+    public function testDeserializeJSONAndXML(Literal|Iri $term, array $expectedJson, string $expectedXml): void
     {
         $fromJson = Term::deserializeJSON($expectedJson);
         self::assertTrue($fromJson->equals($term), 'JSON deserialize');
@@ -30,7 +30,7 @@ final class TermTest extends TestCase
         self::assertTrue($fromXml->equals($term), 'XML deserialize');
     }
 
-    /** @return array<string, array{Literal|Resource, LiteralElement|ResourceElement, string}> */
+    /** @return array<string, array{Literal|Iri, LiteralElement|IRIElement, string}> */
     public static function termDeserializationProvider(): array
     {
         $cases = [];
@@ -76,27 +76,27 @@ final class TermTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{Resource, ResourceElement, string}> */
+    /** @return array<string, array{Iri, IRIElement, string}> */
     public static function resourceSerializationProvider(): array
     {
         return [
             'URI' => [
-                new Resource('https://example.com/foo'),
+                new Iri('https://example.com/foo'),
                 ['type' => 'uri', 'value' => 'https://example.com/foo'],
                 '<uri>https://example.com/foo</uri>',
             ],
             'URI alternative' => [
-                new Resource('https://example.com/id'),
+                new Iri('https://example.com/id'),
                 ['type' => 'uri', 'value' => 'https://example.com/id'],
                 '<uri>https://example.com/id</uri>',
             ],
             'blank node' => [
-                new Resource('_:b1'),
+                new Iri('_:b1'),
                 ['type' => 'bnode', 'value' => 'b1'],
                 '<bnode>b1</bnode>',
             ],
             'blank node alternative' => [
-                new Resource('_:n0'),
+                new Iri('_:n0'),
                 ['type' => 'bnode', 'value' => 'n0'],
                 '<bnode>n0</bnode>',
             ],
@@ -108,8 +108,8 @@ final class TermTest extends TestCase
     {
         return [
             // IRIs
-            new Resource('https://example.com/foo'),
-            new Resource('https://example.com/id'),
+            new Iri('https://example.com/foo'),
+            new Iri('https://example.com/id'),
 
             // String literals
             new Literal('abc'),
@@ -128,8 +128,8 @@ final class TermTest extends TestCase
             new Literal('hello', null, 'https://example.com/datatype_b'),
 
             // Blank nodes
-            new Resource('_:b1'),
-            new Resource('_:n0'),
+            new Iri('_:b1'),
+            new Iri('_:n0'),
         ];
     }
 

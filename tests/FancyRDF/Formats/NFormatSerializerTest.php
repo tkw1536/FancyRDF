@@ -5,42 +5,42 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Formats\NFormatSerializer;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class NFormatSerializerTest extends TestCase
 {
-    /** @return array<string, array{Resource|Literal, string}> */
+    /** @return array<string, array{Iri|Literal, string}> */
     public static function serializeTermProvider(): array
     {
         return [
             // URIs without special characters
             'URI simple' => [
-                new Resource('https://example.com/'),
+                new Iri('https://example.com/'),
                 '<https://example.com/>',
             ],
             'URI with path' => [
-                new Resource('https://example.com/foo/bar'),
+                new Iri('https://example.com/foo/bar'),
                 '<https://example.com/foo/bar>',
             ],
             'URI with fragment' => [
-                new Resource('https://example.com/ns#thing'),
+                new Iri('https://example.com/ns#thing'),
                 '<https://example.com/ns#thing>',
             ],
             'URI with query' => [
-                new Resource('https://example.com/search?q=hello'),
+                new Iri('https://example.com/search?q=hello'),
                 '<https://example.com/search?q=hello>',
             ],
 
             // Blank nodes
             'blank node short id' => [
-                new Resource('_:b0'),
+                new Iri('_:b0'),
                 '_:b0',
             ],
             'blank node long id' => [
-                new Resource('_:n3_a2f89b'),
+                new Iri('_:n3_a2f89b'),
                 '_:n3_a2f89b',
             ],
 
@@ -119,7 +119,7 @@ final class NFormatSerializerTest extends TestCase
     }
 
     #[DataProvider('serializeTermProvider')]
-    public function testSerializeTerm(Resource|Literal $term, string $expected): void
+    public function testSerializeTerm(Iri|Literal $term, string $expected): void
     {
         self::assertSame($expected, NFormatSerializer::serializeTerm($term));
     }

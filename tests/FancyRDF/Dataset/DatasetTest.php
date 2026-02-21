@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Dataset;
 
 use FancyRDF\Dataset\Dataset;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use PHPUnit\Framework\TestCase;
 
 final class DatasetTest extends TestCase
 {
     public function testIsIsomorphicToGrounded(): void
     {
-        $s    = new Resource('https://example.org/s');
-        $p    = new Resource('https://example.org/p');
+        $s    = new Iri('https://example.org/s');
+        $p    = new Iri('https://example.org/p');
         $o    = new Literal('o');
-        $g    = new Resource('https://example.org/g');
+        $g    = new Iri('https://example.org/g');
         $quad = [$s, $p, $o, $g];
 
         $equalA        = new Dataset([$quad]);
@@ -35,14 +35,14 @@ final class DatasetTest extends TestCase
 
     public function testIsIsomorphicToNonGrounded(): void
     {
-        $p = new Resource('https://example.org/p');
+        $p = new Iri('https://example.org/p');
         $o = new Literal('o');
-        $g = new Resource('https://example.org/g');
+        $g = new Iri('https://example.org/g');
 
-        $blankA = new Resource('_:b1');
+        $blankA = new Iri('_:b1');
         $quadA  = [$blankA, $p, $o, $g];
 
-        $blankB = new Resource('_:x');
+        $blankB = new Iri('_:x');
         $quadB  = [$blankB, $p, $o, $g];
 
         $datasetA = new Dataset([$quadA]);
@@ -55,18 +55,18 @@ final class DatasetTest extends TestCase
 
     public function testIsIsomorphicToUnifiableQuadsDifferentOrder(): void
     {
-        $g = new Resource('https://example.org/g');
+        $g = new Iri('https://example.org/g');
 
-        $p1 = new Resource('https://example.org/p1');
+        $p1 = new Iri('https://example.org/p1');
         $o1 = new Literal('o1');
-        $p2 = new Resource('https://example.org/p2');
+        $p2 = new Iri('https://example.org/p2');
         $o2 = new Literal('o2');
 
-        $blankB1 = new Resource('_:b1');
-        $blankB2 = new Resource('_:b2');
+        $blankB1 = new Iri('_:b1');
+        $blankB2 = new Iri('_:b2');
 
-        $blankX = new Resource('_:x');
-        $blankY = new Resource('_:y');
+        $blankX = new Iri('_:x');
+        $blankY = new Iri('_:y');
 
         $quad1 = [$blankB1, $p1, $o1, $g];
         $quadX = [$blankX, $p1, $o1, $g];

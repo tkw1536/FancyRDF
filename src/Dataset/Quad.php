@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FancyRDF\Dataset;
 
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 
 use function array_is_list;
 use function count;
@@ -14,8 +14,8 @@ use function is_array;
 /**
  * Functions acting on RDF triples and quads.
  *
- * @phpstan-type TripleArray array{Resource, Resource, Resource|Literal, null}
- * @phpstan-type QuadArray array{Resource, Resource, Resource|Literal, Resource}
+ * @phpstan-type TripleArray array{Iri, Iri, Iri|Literal, null}
+ * @phpstan-type QuadArray array{Iri, Iri, Iri|Literal, Iri}
  * @phpstan-type TripleOrQuadArray TripleArray|QuadArray
  */
 final class Quad
@@ -53,10 +53,10 @@ final class Quad
         return is_array($quad) &&
             array_is_list($quad) &&
             count($quad) === 4 &&
-            $quad[0] instanceof Resource &&
-            $quad[1] instanceof Resource &&
-            ($quad[2] instanceof Resource || $quad[2] instanceof Literal) &&
-            ($quad[3] === null || $quad[3] instanceof Resource);
+            $quad[0] instanceof Iri &&
+            $quad[1] instanceof Iri &&
+            ($quad[2] instanceof Iri || $quad[2] instanceof Literal) &&
+            ($quad[3] === null || $quad[3] instanceof Iri);
     }
 
     /**

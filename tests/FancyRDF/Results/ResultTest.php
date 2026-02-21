@@ -6,8 +6,8 @@ namespace FancyRDF\Tests\FancyRDF\Results;
 
 use DOMDocument;
 use FancyRDF\Results\Result;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -15,13 +15,13 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * @phpstan-import-type LiteralElement from Literal
- * @phpstan-import-type ResourceElement from Resource
+ * @phpstan-import-type IRIElement from Iri
  */
 final class ResultTest extends TestCase
 {
     /**
-     * @param array<string, Literal|Resource>               $bindings
-     * @param array<string, ResourceElement|LiteralElement> $expectedJson
+     * @param array<string, Literal|Iri>               $bindings
+     * @param array<string, IRIElement|LiteralElement> $expectedJson
      */
     #[DataProvider('resultSerializationProvider')]
     public function testSerialize(
@@ -37,7 +37,7 @@ final class ResultTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @return array<string, array{array<string, Literal|Resource>, array<string, ResourceElement|LiteralElement>, string}> */
+    /** @return array<string, array{array<string, Literal|Iri>, array<string, IRIElement|LiteralElement>, string}> */
     public static function resultSerializationProvider(): array
     {
         return [
@@ -47,7 +47,7 @@ final class ResultTest extends TestCase
                 '<result/>',
             ],
             'single URI binding' => [
-                ['s' => new Resource('https://example.com/s')],
+                ['s' => new Iri('https://example.com/s')],
                 ['s' => ['type' => 'uri', 'value' => 'https://example.com/s']],
                 '<result><binding name="s"><uri>https://example.com/s</uri></binding></result>',
             ],
@@ -63,7 +63,7 @@ final class ResultTest extends TestCase
             ],
             'two bindings' => [
                 [
-                    'x' => new Resource('https://example.com/foo'),
+                    'x' => new Iri('https://example.com/foo'),
                     'label' => new Literal('A label'),
                 ],
                 [
@@ -77,7 +77,7 @@ final class ResultTest extends TestCase
 
     public function testGet(): void
     {
-        $resource = new Resource('https://example.com/s');
+        $resource = new Iri('https://example.com/s');
         $literal  = new Literal('A label');
         $result   = new Result(['s' => $resource, 'label' => $literal]);
 
@@ -92,7 +92,7 @@ final class ResultTest extends TestCase
 
     public function testGetLiteral(): void
     {
-        $resource = new Resource('https://example.com/s');
+        $resource = new Iri('https://example.com/s');
         $literal  = new Literal('A label');
         $result   = new Result(['s' => $resource, 'label' => $literal]);
 
@@ -106,7 +106,7 @@ final class ResultTest extends TestCase
 
     public function testGetResource(): void
     {
-        $resource = new Resource('https://example.com/s');
+        $resource = new Iri('https://example.com/s');
         $literal  = new Literal('A label');
         $result   = new Result(['s' => $resource, 'label' => $literal]);
 

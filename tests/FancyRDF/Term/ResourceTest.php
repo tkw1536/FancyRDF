@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Term;
 
 use DOMDocument;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Term\Term;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
@@ -14,14 +14,14 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
 
-/** @phpstan-import-type ResourceElement from Resource */
+/** @phpstan-import-type IRIElement from Iri */
 final class ResourceTest extends TestCase
 {
     /** @param non-empty-string $uri */
     #[DataProvider('getBlankNodeIdProvider')]
     public function testGetBlankNodeId(string $uri, string|null $expectedId): void
     {
-        $resource = new Resource($uri);
+        $resource = new Iri($uri);
         self::assertSame($expectedId, $resource->getBlankNodeId());
     }
 
@@ -49,15 +49,15 @@ final class ResourceTest extends TestCase
     #[DataProvider('isBlankNodeProvider')]
     public function testIsBlankNode(string $uri, bool $wantBlankNode, bool $wantGrounded): void
     {
-        $resource = new Resource($uri);
+        $resource = new Iri($uri);
         self::assertSame($wantBlankNode, $resource->isBlankNode());
         self::assertSame($wantGrounded, $resource->isGrounded());
     }
 
-    /** @param ResourceElement $expectedJson */
+    /** @param IRIElement $expectedJson */
     #[DataProviderExternal(TermTest::class, 'resourceSerializationProvider')]
     public function testSerialize(
-        Resource $resource,
+        Iri $resource,
         array $expectedJson,
         string $expectedXml,
     ): void {
@@ -67,17 +67,17 @@ final class ResourceTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @param ResourceElement $expectedJson */
+    /** @param IRIElement $expectedJson */
     #[DataProviderExternal(TermTest::class, 'resourceSerializationProvider')]
     public function testDeserialize(
-        Resource $resource,
+        Iri $resource,
         array $expectedJson,
         string $expectedXml,
     ): void {
-        $resourceFromXml = Resource::deserializeXML(XMLUtils::parseAndGetRootNode($expectedXml));
+        $resourceFromXml = Iri::deserializeXML(XMLUtils::parseAndGetRootNode($expectedXml));
         self::assertTrue($resourceFromXml->equals($resource), 'XML deserialize');
 
-        $resourceFromJson = Resource::deserializeJSON($expectedJson);
+        $resourceFromJson = Iri::deserializeJSON($expectedJson);
         self::assertTrue($resourceFromJson->equals($resource), 'JSON deserialize');
     }
 
@@ -87,7 +87,7 @@ final class ResourceTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage($expectedMessage);
 
-        Resource::deserializeXML(XMLUtils::parseAndGetRootNode($xml));
+        Iri::deserializeXML(XMLUtils::parseAndGetRootNode($xml));
     }
 
     /** @return array<string, array{string, string}> */
@@ -107,7 +107,7 @@ final class ResourceTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage($expectedMessage);
-        Resource::deserializeJSON($invalidData);
+        Iri::deserializeJSON($invalidData);
     }
 
     /** @return array<string, array{mixed[], string}> */
@@ -138,7 +138,7 @@ final class ResourceTest extends TestCase
      * @param array<string, string> $partialOut
      */
     #[DataProvider('unifyProvider')]
-    public function testUnify(Resource $our, Term $other, array $partialIn, array $partialOut, bool $expected): void
+    public function testUnify(Iri $our, Term $other, array $partialIn, array $partialOut, bool $expected): void
     {
         $partial = $partialIn;
         $result  = $our->unify($other, $partial);
@@ -147,26 +147,26 @@ final class ResourceTest extends TestCase
         self::assertSame($partialOut, $partial, 'Mapping after call');
     }
 
-    /** @return array<string, array{Resource, Term, array<string, string>, array<string, string>, bool}> */
+    /** @return array<string, array{Iri, Term, array<string, string>, array<string, string>, bool}> */
     public static function unifyProvider(): array
     {
-        $uriA   = new Resource('https://example.org/a');
-        $uriB   = new Resource('https://example.org/b');
-        $blank1 = new Resource('_:b1');
-        $blank2 = new Resource('_:b2');
-        $blankX = new Resource('_:x');
+        $uriA   = new Iri('https://example.org/a');
+        $uriB   = new Iri('https://example.org/b');
+        $blank1 = new Iri('_:b1');
+        $blank2 = new Iri('_:b2');
+        $blankX = new Iri('_:x');
         $lit    = new Literal('foo');
 
         return [
             'URI vs Literal' => [$uriA, $lit, [], [], false],
-            'URI vs same URI' => [$uriA, new Resource('https://example.org/a'), [], [], true],
+            'URI vs same URI' => [$uriA, new Iri('https://example.org/a'), [], [], true],
             'URI vs different URI' => [$uriA, $uriB, [], [], false],
             'blank vs Literal' => [$blank1, $lit, [], [], false],
             'blank vs blank, no partial' => [$blank1, $blankX, [], ['b1' => 'x'], true],
             'blank vs blank, valid existing mapping' => [$blank1, $blankX, ['b1' => 'x'], ['b1' => 'x'], true],
             'blank vs blank, invalid existing mapping' => [$blank1, $blankX, ['b1' => 'other'], ['b1' => 'other'], false],
             'blank vs blank, them already in partial' => [$blank2, $blankX, ['b1' => 'x'], ['b1' => 'x'], false],
-            'blank vs same blank' => [$blank1, new Resource('_:b1'), [], ['b1' => 'b1'], true],
+            'blank vs same blank' => [$blank1, new Iri('_:b1'), [], ['b1' => 'b1'], true],
         ];
     }
 }

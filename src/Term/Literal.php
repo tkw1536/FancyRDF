@@ -21,9 +21,9 @@ use function strcmp;
 /**
  * Represents an RDF1.1 Literal.
  *
- * @see https://www.w3.org/TR/rdf11-concepts/
+ * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal
  *
- * @phpstan-type LiteralElement array{'type': 'literal', 'value': string, 'datatype'?: non-empty-string, 'xml:lang'?: non-empty-string}
+ * @phpstan-type LiteralArray array{'type': 'literal', 'value': string, 'datatype'?: non-empty-string, 'xml:lang'?: non-empty-string}
  */
 final class Literal extends Term
 {
@@ -94,7 +94,7 @@ final class Literal extends Term
     }
 
     #[Override]
-    public function equals(Term $other, bool $literal = true): bool
+    public function equals(Iri|Literal|BlankNode $other, bool $literal = true): bool
     {
         // first check for exact equality of language and datatype
         if (! $other instanceof Literal || $this->language !== $other->language || $this->datatype !== $other->datatype) {
@@ -111,13 +111,15 @@ final class Literal extends Term
     }
 
     #[Override]
-    public function compare(Term $other): int
+    public function compare(Iri|Literal|BlankNode $other): int
     {
-        if ($other instanceof Resource) {
-            return $other->isBlankNode() ? -1 : 1;
+        if ($other instanceof Iri) {
+            return -1;
         }
 
-        assert($other instanceof Literal);
+        if ($other instanceof BlankNode) {
+            return 1;
+        }
 
         $ourType   = $this->getTypeForCompare();
         $theirType = $other->getTypeForCompare();
@@ -142,7 +144,7 @@ final class Literal extends Term
 
     /** @param array<string, string> &$partial */
     #[Override]
-    public function unify(Term $other, array &$partial, bool $literal = true): bool
+    public function unify(Iri|Literal|BlankNode $other, array &$partial, bool $literal = true): bool
     {
         return $this->equals($other, $literal);
     }
@@ -211,7 +213,7 @@ final class Literal extends Term
         return new Literal($element->textContent, $language, $datatype);
     }
 
-    /** @return LiteralElement */
+    /** @return LiteralArray */
     #[Override]
     public function jsonSerialize(): array
     {

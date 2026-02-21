@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Term\Datatype\XSDString;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use RuntimeException;
 
 use function mb_ord;
@@ -43,7 +43,7 @@ final class NFormatSerializer
     }
 
     /** @throws RuntimeException */
-    public static function serialize(Resource|Literal $subject, Resource $predicate, Resource|Literal $object, Resource|null $graph = null): string
+    public static function serialize(Iri|Literal $subject, Iri $predicate, Iri|Literal $object, Iri|null $graph = null): string
     {
         $out = self::serializeTerm($subject);
 
@@ -63,7 +63,7 @@ final class NFormatSerializer
         return $out;
     }
 
-    public static function serializeTerm(Resource|Literal $term): string
+    public static function serializeTerm(Iri|Literal $term): string
     {
         if ($term instanceof Literal) {
             return self::serializeLiteral($term);
@@ -75,7 +75,7 @@ final class NFormatSerializer
   /**
    * Serializes a Resource as IRIREF or BLANK_NODE_LABEL per N-Triples grammar.
    */
-    private static function serializeResource(Resource $resource): string
+    private static function serializeResource(Iri $resource): string
     {
         if ($resource->isBlankNode()) {
             return $resource->iri;

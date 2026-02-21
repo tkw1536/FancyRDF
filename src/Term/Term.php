@@ -15,10 +15,24 @@ use Override;
 /**
  * Represents a RDF 1.1 Term.
  *
- * @see https://www.w3.org/TR/rdf11-concepts/
+ * A term is always one of the following three subclasses:
  *
- * @phpstan-import-type ResourceElement from Resource
- * @phpstan-import-type LiteralElement from Literal
+ * - A Literal
+ * - An IRI
+ * - A Blank Node
+ *
+ * @internal
+ *
+ * @see https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-term
+ * @see \FancyRDF\Term\Literal
+ * @see \FancyRDF\Term\Iri
+ * @see \FancyRDF\Term\BlankNode
+ *
+ * This class should not be used directly, instead only the subclasses should be used.
+ *
+ * @phpstan-import-type IRIArray from Iri
+ * @phpstan-import-type LiteralArray from Literal
+ * @phpstan-import-type BlankNodeArray from BlankNode
  */
 abstract class Term implements JsonSerializable, XMLSerializable
 {
@@ -29,7 +43,7 @@ abstract class Term implements JsonSerializable, XMLSerializable
      *
      * @see https://www.w3.org/TR/sparql11-results-json/#select-encode-terms
      *
-     * @return ResourceElement|LiteralElement
+     * @return IRIArray|LiteralArray|BlankNodeArray
      */
     #[Override]
     abstract public function jsonSerialize(): array;
@@ -40,8 +54,6 @@ abstract class Term implements JsonSerializable, XMLSerializable
      * The encoding complies with section 2.3.1 of the SPARQL 1.1 Query Results JSON Format.
      *
      * @see https://www.w3.org/TR/sparql11-results-xml/#vb-results
-     *
-     * @throws InvalidArgumentException
      */
     #[Override]
     abstract public function xmlSerialize(DOMDocument $document): DOMNode;
@@ -57,18 +69,14 @@ abstract class Term implements JsonSerializable, XMLSerializable
      *
      * @throws InvalidArgumentException
      */
-    public static function deserializeJSON(array $data): Resource|Literal
+    public static function deserializeJSON(array $data): Iri|Literal|BlankNode
     {
-        $type = $data['type'] ?? null;
-        if ($type === 'uri' || $type === 'bnode') {
-            return Resource::deserializeJSON($data);
-        }
-
-        if ($type === 'literal') {
-            return Literal::deserializeJSON($data);
-        }
-
-        throw new InvalidArgumentException('Invalid term type');
+        return match ($data['type'] ?? null) {
+            'uri' => Iri::deserializeJSON($data),
+            'bnode' => BlankNode::deserializeJSON($data),
+            'literal' => Literal::deserializeJSON($data),
+            default => throw new InvalidArgumentException('Invalid term type'),
+        };
     }
 
     /**
@@ -82,18 +90,14 @@ abstract class Term implements JsonSerializable, XMLSerializable
      *
      * @throws InvalidArgumentException
      */
-    public static function deserializeXML(DOMElement $element): Resource|Literal
+    public static function deserializeXML(DOMElement $element): Iri|Literal|BlankNode
     {
-        $type = $element->localName;
-        if ($type === 'uri' || $type === 'bnode') {
-            return Resource::deserializeXML($element);
-        }
-
-        if ($type === 'literal') {
-            return Literal::deserializeXML($element);
-        }
-
-        throw new InvalidArgumentException('Invalid element name');
+        return match ($element->localName) {
+            'uri' => Iri::deserializeXML($element),
+            'literal' => Literal::deserializeXML($element),
+            'bnode' => BlankNode::deserializeXML($element),
+            default => throw new InvalidArgumentException('Invalid element name'),
+        };
     }
 
     /**
@@ -106,12 +110,12 @@ abstract class Term implements JsonSerializable, XMLSerializable
      *   Otherwise, attempt to check for value equality.
      *   Note that value equality only supports a specific subset of data types.
      */
-    abstract public function equals(Term $other, bool $literal = true): bool;
+    abstract public function equals(Iri|Literal|BlankNode $other, bool $literal = true): bool;
 
     /**
      * Compares this term with the other term using lexiographical ordering.
      *
-     * @param Term $other
+     * @param Iri|Literal|BlankNode $other
      *   The other term to compare.
      *
      * @return int
@@ -119,7 +123,7 @@ abstract class Term implements JsonSerializable, XMLSerializable
      *   zero if $this is equal to $other
      *   a positive integer if $this is greater than $other
      */
-    abstract public function compare(Term $other): int;
+    abstract public function compare(Iri|Literal|BlankNode $other): int;
 
     /**
      * Checks if this term can unify with the other term.
@@ -130,7 +134,7 @@ abstract class Term implements JsonSerializable, XMLSerializable
      * - The terms are both resources and the mapping $partial contains an entry for the other resource.
      * - The terms are both literals and the mapping $partial contains an entry for the other literal.
      *
-     * @param Term                  $other
+     * @param Iri|Literal|BlankNode $other
      *   The other term to check for unification.
      * @param array<string, string> &$partial
      *   The partial mapping of terms to be used for unification.
@@ -143,7 +147,7 @@ abstract class Term implements JsonSerializable, XMLSerializable
      * @return bool
      *   True if the terms are unifiable, false otherwise.
      */
-    abstract public function unify(Term $other, array &$partial, bool $literal = true): bool;
+    abstract public function unify(Iri|Literal|BlankNode $other, array &$partial, bool $literal = true): bool;
 
     /**
      * Checks if this term is grounded, meaning if it is not a blank node.

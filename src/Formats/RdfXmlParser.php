@@ -6,8 +6,8 @@ namespace FancyRDF\Formats;
 
 use Exception;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
-use FancyRDF\Term\Resource;
 use FancyRDF\Uri\UriReference;
 use FancyRDF\Xml\XMLUtils;
 use Fiber;
@@ -144,10 +144,8 @@ class RdfXmlParser implements IteratorAggregate
      *   If non-null, a string that uniquely identifies this blank node
      *   within the current document.
      *   If null, a fresh blank node label is returned.
-     *
-     * @return Resource
      */
-    private function makeBlankNode(string|null $name): Resource
+    private function makeBlankNode(string|null $name): Iri
     {
         // Pick the existing blank node label, or create a new one.
         $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
@@ -158,7 +156,7 @@ class RdfXmlParser implements IteratorAggregate
             $this->blankNodeMap[$name] = $id;
         }
 
-        return new Resource($id);
+        return new Iri($id);
     }
 
     // ===========================
@@ -191,7 +189,7 @@ class RdfXmlParser implements IteratorAggregate
     private array $liCounters = [];
 
     /** return the next li property name for the current depth */
-    private function nextLiProperty(): Resource
+    private function nextLiProperty(): Iri
     {
         $depth = $this->reader->depth;
         if (! isset($this->liCounters[$depth])) {
@@ -200,27 +198,27 @@ class RdfXmlParser implements IteratorAggregate
 
         $this->liCounters[$depth]++;
 
-        return new Resource(self::RDF_NAMESPACE . '_' . $this->liCounters[$depth]);
+        return new Iri(self::RDF_NAMESPACE . '_' . $this->liCounters[$depth]);
     }
 
-    /** @var Resource|null the currently active subject */
-    private Resource|null $subject = null;
+    /** @var Iri|null the currently active subject */
+    private Iri|null $subject = null;
 
-    /** @var SplStack<array{subject: Resource|null, depth: int}> a stack of subjects within the current nesting level */
+    /** @var SplStack<array{subject: Iri|null, depth: int}> a stack of subjects within the current nesting level */
     private SplStack $subjectStack;
 
-    /** @var array{subject: Resource, predicate: Resource, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
+    /** @var array{subject: Iri, predicate: Iri, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
     private array|null $pendingProperty = null;
 
     /**
      * Emits a triple and handles reification if a reification URI is provided.
      *
-     * @param Resource|null         $subject        The subject of the triple (may be null when assertions are disabled)
-     * @param Resource              $predicate      The predicate of the triple
-     * @param Resource|Literal      $object         The object of the triple
+     * @param Iri|null              $subject        The subject of the triple (may be null when assertions are disabled)
+     * @param Iri                   $predicate      The predicate of the triple
+     * @param Iri|Literal           $object         The object of the triple
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      */
-    private function emitTripleWithReification(Resource|null $subject, Resource $predicate, Resource|Literal $object, string|null $reificationURI): void
+    private function emitTripleWithReification(Iri|null $subject, Iri $predicate, Iri|Literal $object, string|null $reificationURI): void
     {
         if ($subject === null) {
             return;
@@ -237,12 +235,12 @@ class RdfXmlParser implements IteratorAggregate
             return;
         }
 
-        $statement         = new Resource($reificationURI);
-        $typeResource      = new Resource(self::RDF_NAMESPACE . 'type');
-        $statementType     = new Resource(self::RDF_NAMESPACE . 'Statement');
-        $subjectResource   = new Resource(self::RDF_NAMESPACE . 'subject');
-        $predicateResource = new Resource(self::RDF_NAMESPACE . 'predicate');
-        $objectResource    = new Resource(self::RDF_NAMESPACE . 'object');
+        $statement         = new Iri($reificationURI);
+        $typeResource      = new Iri(self::RDF_NAMESPACE . 'type');
+        $statementType     = new Iri(self::RDF_NAMESPACE . 'Statement');
+        $subjectResource   = new Iri(self::RDF_NAMESPACE . 'subject');
+        $predicateResource = new Iri(self::RDF_NAMESPACE . 'predicate');
+        $objectResource    = new Iri(self::RDF_NAMESPACE . 'object');
 
         $this->emit(
             [$statement, $typeResource, $statementType, null],
@@ -260,9 +258,9 @@ class RdfXmlParser implements IteratorAggregate
      * @param string|null $idAttr          The rdf:ID attribute value
      * @param bool        $checkDuplicates Whether to check for duplicate rdf:ID values
      *
-     * @return Resource The resolved subject Resource
+     * @return Iri The resolved subject Resource
      */
-    private function resolveSubject(string|null $about, string|null $nodeId, string|null $idAttr, bool $checkDuplicates = false): Resource
+    private function resolveSubject(string|null $about, string|null $nodeId, string|null $idAttr, bool $checkDuplicates = false): Iri
     {
         if ($idAttr !== null) {
             // Validate rdf:ID value matches XML Name production
@@ -271,14 +269,14 @@ class RdfXmlParser implements IteratorAggregate
             $resolvedURI = $this->resolveURI('#' . $idAttr);
             assert(! $checkDuplicates || ! $this->sawIdentifier($resolvedURI), 'Duplicate rdf:ID value: ' . $idAttr);
 
-            return new Resource($resolvedURI);
+            return new Iri($resolvedURI);
         }
 
         if ($about !== null) {
             // rdf:about - empty string resolves to base URI
             $resolvedURI = $this->resolveURI($about);
 
-            return new Resource($resolvedURI);
+            return new Iri($resolvedURI);
         }
 
         if ($nodeId !== null) {
@@ -296,11 +294,11 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Handles rdf:parseType="Collection" - creates a list structure from child elements.
      *
-     * @param Resource              $subject        The subject of the collection property
-     * @param Resource              $predicate      The predicate of the collection property
+     * @param Iri                   $subject        The subject of the collection property
+     * @param Iri                   $predicate      The predicate of the collection property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      */
-    private function handleParseTypeCollection(Resource $subject, Resource $predicate, string|null $reificationURI): void
+    private function handleParseTypeCollection(Iri $subject, Iri $predicate, string|null $reificationURI): void
     {
         $listHead = $this->makeBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $listHead, $reificationURI);
@@ -347,7 +345,7 @@ class RdfXmlParser implements IteratorAggregate
             // Emit rdf:first triple
             $this->emit([
                 $currentList,
-                new Resource(self::RDF_NAMESPACE . 'first'),
+                new Iri(self::RDF_NAMESPACE . 'first'),
                 $itemSubject,
                 null,
             ]);
@@ -357,7 +355,7 @@ class RdfXmlParser implements IteratorAggregate
                 $nextList = $this->makeBlankNode(null);
                 $this->emit([
                     $currentList,
-                    new Resource(self::RDF_NAMESPACE . 'rest'),
+                    new Iri(self::RDF_NAMESPACE . 'rest'),
                     $nextList,
                     null,
                 ]);
@@ -366,8 +364,8 @@ class RdfXmlParser implements IteratorAggregate
                 // Last item - point rest to nil
                 $this->emit([
                     $currentList,
-                    new Resource(self::RDF_NAMESPACE . 'rest'),
-                    new Resource(self::RDF_NAMESPACE . 'nil'),
+                    new Iri(self::RDF_NAMESPACE . 'rest'),
+                    new Iri(self::RDF_NAMESPACE . 'nil'),
                     null,
                 ]);
             }
@@ -380,8 +378,8 @@ class RdfXmlParser implements IteratorAggregate
 
         $this->emit([
             $currentList,
-            new Resource(self::RDF_NAMESPACE . 'rest'),
-            new Resource(self::RDF_NAMESPACE . 'nil'),
+            new Iri(self::RDF_NAMESPACE . 'rest'),
+            new Iri(self::RDF_NAMESPACE . 'nil'),
             null,
         ]);
     }
@@ -389,11 +387,11 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Handles rdf:parseType="Resource" - creates a blank node and processes nested content.
      *
-     * @param Resource              $subject        The subject of the resource property
-     * @param Resource              $predicate      The predicate of the resource property
+     * @param Iri                   $subject        The subject of the resource property
+     * @param Iri                   $predicate      The predicate of the resource property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      */
-    private function handleParseTypeResource(Resource $subject, Resource $predicate, string|null $reificationURI): void
+    private function handleParseTypeResource(Iri $subject, Iri $predicate, string|null $reificationURI): void
     {
         $resourceObject = $this->makeBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $resourceObject, $reificationURI);
@@ -419,12 +417,12 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Handles rdf:parseType="Literal" - reads inner XML content and canonicalizes it.
      *
-     * @param Resource              $subject        The subject of the literal property
-     * @param Resource              $predicate      The predicate of the literal property
+     * @param Iri                   $subject        The subject of the literal property
+     * @param Iri                   $predicate      The predicate of the literal property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      * @param string|null           $resourceAttr   The rdf:resource attribute value (must be null)
      */
-    private function handleParseTypeLiteral(Resource $subject, Resource $predicate, string|null $reificationURI, string|null $resourceAttr): void
+    private function handleParseTypeLiteral(Iri $subject, Iri $predicate, string|null $reificationURI, string|null $resourceAttr): void
     {
         // Error: rdf:parseType="Literal" cannot be combined with rdf:resource
         assert($resourceAttr === null, 'rdf:parseType="Literal" cannot be combined with rdf:resource attribute');
@@ -463,10 +461,10 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Processes non-RDF attributes on a property element as properties of the object.
      *
-     * @param Resource              $object The object (Resource) to add properties to
+     * @param Iri                   $object The object (Resource) to add properties to
      * @param non-empty-string|null $lang   The language for literal values
      */
-    private function processPropertyElementAttributes(Resource $object, string|null $lang): void
+    private function processPropertyElementAttributes(Iri $object, string|null $lang): void
     {
         if (! $this->reader->hasAttributes) {
             return;
@@ -488,7 +486,7 @@ class RdfXmlParser implements IteratorAggregate
                 continue;
             }
 
-            $attrPredicate = new Resource($attrNamespace . $attrLocalName);
+            $attrPredicate = new Iri($attrNamespace . $attrLocalName);
             $attrObject    = new Literal($attrValue, $lang);
 
             $this->emit([
@@ -617,7 +615,7 @@ class RdfXmlParser implements IteratorAggregate
                             continue;
                         }
 
-                        $predicate = new Resource($attrNamespace . $attrLocalName);
+                        $predicate = new Iri($attrNamespace . $attrLocalName);
                         $value     = $this->reader->value;
 
                         assert($this->subject !== null, 'subject must be set when processing Description attributes');
@@ -625,7 +623,7 @@ class RdfXmlParser implements IteratorAggregate
                         // rdf:type attribute values are URIs, not literals
                         if ($attrNamespace === self::RDF_NAMESPACE && $attrLocalName === 'type') {
                             $resolvedURI = $this->resolveURI($value);
-                            $object      = new Resource($resolvedURI);
+                            $object      = new Iri($resolvedURI);
                         } else {
                             $object = new Literal($value, $descriptionLang);
                         }
@@ -664,7 +662,7 @@ class RdfXmlParser implements IteratorAggregate
                     $predicate = $this->nextLiProperty();
                 } else {
                     assert($localName !== '', 'local name must be non-empty');
-                    $predicate = new Resource($namespace . $localName);
+                    $predicate = new Iri($namespace . $localName);
                 }
 
                 // Check for deprecated rdf:bagID attribute on property elements
@@ -713,7 +711,7 @@ class RdfXmlParser implements IteratorAggregate
 
                 if ($resourceAttr !== null) {
                     $resolvedURI = $this->resolveURI($resourceAttr);
-                    $object      = new Resource($resolvedURI);
+                    $object      = new Iri($resolvedURI);
 
                     $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
@@ -853,8 +851,8 @@ class RdfXmlParser implements IteratorAggregate
 
                 $this->emit([
                     $subject,
-                    new Resource(self::RDF_NAMESPACE . 'type'),
-                    new Resource($object),
+                    new Iri(self::RDF_NAMESPACE . 'type'),
+                    new Iri($object),
                     null,
                 ]);
 
@@ -884,7 +882,7 @@ class RdfXmlParser implements IteratorAggregate
                             continue;
                         }
 
-                        $predicate = new Resource($attrNamespace . $attrLocalName);
+                        $predicate = new Iri($attrNamespace . $attrLocalName);
                         $value     = $this->reader->value;
 
                         $this->emit([
@@ -912,7 +910,7 @@ class RdfXmlParser implements IteratorAggregate
 
             $iri = $namespace . $localName;
             assert($iri !== '', 'iri must be non-empty');
-            $predicate    = new Resource($iri);
+            $predicate    = new Iri($iri);
             $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
             $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
             $parseType    = $this->reader->getAttribute('rdf:parseType');
@@ -953,7 +951,7 @@ class RdfXmlParser implements IteratorAggregate
             if ($resourceAttr !== null) {
                 assert($this->subject !== null, 'subject must be set');
                 $resolvedURI = $this->resolveURI($resourceAttr);
-                $object      = new Resource($resolvedURI);
+                $object      = new Iri($resolvedURI);
 
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
