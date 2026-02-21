@@ -1,4 +1,4 @@
-.PHONY: all test lint fmt parallel-lint phpcs phpstan phpunit-assertions phpunit-noassertions phpcbf
+.PHONY: all test lint fmt cspell parallel-lint phpcs phpstan phpunit-assertions phpunit-noassertions phpcbf
 
 all: lint test
 
@@ -31,3 +31,7 @@ phpunit-assertions:
 phpunit-noassertions:
 	@echo "=> vendor/bin/phpunit (without assertions)"
 	@php -dzend.assertions=0 vendor/bin/phpunit --display-deprecations --display-warnings
+
+cspell:
+	@echo "=> cspell"
+	@cspell .

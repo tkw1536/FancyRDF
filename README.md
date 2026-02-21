@@ -1,6 +1,6 @@
 # FancyRDF
 
-[![Test](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml)
+[![Tests](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml)
 
 A streaming PHP 8.4+ Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
 When run with [PHP Assertions](https://www.php.net/manual/en/function.assert.php) enabled, any non-compliant document may produce an assertion.
@@ -63,6 +63,14 @@ The code should also pass [phpstan](https://phpstan.org) on strictest settings.
 
 The Makefile target `make lint` runs both phpcs and phpstan.
 The Makefile target `make fmt` runs the autoformatter.
+
+## Spell checking
+
+Spell checking is done with [cspell](https://cspell.org/).
+Configuration is in [cspell.json](cspell.json) (custom words and ignore patterns).
+
+The Makefile target `make spell` runs the spell checker.
+This requires `cspell` to be installed and available on your `PATH`.
 
 ## Testing
 

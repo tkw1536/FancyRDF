@@ -178,7 +178,7 @@ final class XMLUtils
 
             $resolved = $namespace === '' ? $node->lookupNamespaceURI(null) : $node->lookupNamespaceURI($namespace);
             if ($resolved === null) {
-                assert($namespace === '', 'everyting except the root namespace must be resolvable');
+                assert($namespace === '', 'everything except the root namespace must be resolvable');
                 continue;
             }
 
