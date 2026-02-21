@@ -30,7 +30,7 @@ The library provides several stream-based implementations of parsers and seriali
 > Streaming means that instead of completely reading a source document entirely into memory, it is read one-by-one as needed.
 > This approach saves memory usage and improves efficiency, in particular for large documents.
 
-- [RDF/XML](https://www.w3.org/TR/rdf-xml/): Passing 
+- [RDF/XML](https://www.w3.org/TR/rdf-xml/)
     - ✅ Parser: [RdfXmlParser](src/Formats/RdfXmlParser.php) 
     - [ ] Serializer: TODO
     - ✅ passes W3C [Test Suite](https://www.w3.org/2013/RDFXMLTests/)
