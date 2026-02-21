@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Term;
+namespace FancyRDF\Term;
 
-use FancySparql\Term\Datatype\Datatype;
-use FancySparql\Term\Datatype\LangString;
-use FancySparql\Term\Datatype\XMLLiteral;
-use FancySparql\Term\Datatype\XSDString;
+use FancyRDF\Term\Datatype\Datatype;
+use FancyRDF\Term\Datatype\LangString;
+use FancyRDF\Term\Datatype\XMLLiteral;
+use FancyRDF\Term\Datatype\XSDString;
 use RuntimeException;
 
 use function sprintf;

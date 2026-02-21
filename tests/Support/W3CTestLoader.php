@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\Support;
+namespace FancyRDF\Tests\Support;
 
 use Exception;
 

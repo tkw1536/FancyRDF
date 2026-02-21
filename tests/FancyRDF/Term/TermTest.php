@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Term;
+namespace FancyRDF\Tests\FancyRDF\Term;
 
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
-use FancySparql\Term\Term;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
+use FancyRDF\Term\Term;
+use FancyRDF\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

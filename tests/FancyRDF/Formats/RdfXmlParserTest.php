@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Formats;
+namespace FancyRDF\Tests\FancyRDF\Formats;
 
-use FancySparql\Dataset\Quad;
-use FancySparql\Formats\RdfXmlParser;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
-use FancySparql\Tests\Support\IsomorphicAsDatasetsConstraint;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\RdfXmlParser;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
+use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use XMLReader;

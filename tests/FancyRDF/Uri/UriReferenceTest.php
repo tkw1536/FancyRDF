@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Uri;
+namespace FancyRDF\Tests\FancyRDF\Uri;
 
-use FancySparql\Uri\UriReference;
+use FancyRDF\Uri\UriReference;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;

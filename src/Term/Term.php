@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Term;
+namespace FancyRDF\Term;
 
 use DOMDocument;
 use DOMElement;
 use DOMNode;
-use FancySparql\Xml\XMLSerializable;
+use FancyRDF\Xml\XMLSerializable;
 use InvalidArgumentException;
 use JsonSerializable;
 use Override;

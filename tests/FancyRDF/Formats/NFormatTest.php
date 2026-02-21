@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Formats;
+namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use AssertionError;
-use FancySparql\Dataset\Quad;
-use FancySparql\Formats\NFormatParser;
-use FancySparql\Formats\NFormatSerializer;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\NFormatParser;
+use FancyRDF\Formats\NFormatSerializer;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\TestCase;

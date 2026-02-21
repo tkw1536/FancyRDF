@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Formats;
+namespace FancyRDF\Formats;
 
 use Exception;
-use FancySparql\Dataset\Quad;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
-use FancySparql\Uri\UriReference;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
+use FancyRDF\Uri\UriReference;
+use FancyRDF\Xml\XMLUtils;
 use Fiber;
 use IteratorAggregate;
 use Override;

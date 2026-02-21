@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\Support;
+namespace FancyRDF\Tests\Support;
 
-use FancySparql\Dataset\Dataset;
-use FancySparql\Dataset\Quad;
-use FancySparql\Formats\NFormatSerializer;
+use FancyRDF\Dataset\Dataset;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\NFormatSerializer;
 use Override;
 use PHPUnit\Framework\Constraint\Constraint;
 

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Formats;
+namespace FancyRDF\Formats;
 
-use FancySparql\Dataset\Quad;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
-use FancySparql\Uri\UriReference;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
+use FancyRDF\Uri\UriReference;
 use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\StreamInterface;
 use Traversable;

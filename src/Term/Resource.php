@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Term;
+namespace FancyRDF\Term;
 
 use DOMDocument;
 use DOMNode;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 

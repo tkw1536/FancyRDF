@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Uri;
+namespace FancyRDF\Uri;
 
 use RuntimeException;
 
@@ -131,8 +131,8 @@ final class UriReference
      *
      * This method is a convenience wrapper around the parse() and resolve() methods.
      *
-     * @see \FancySparql\Url\UriReference::parse()
-     * @see \FancySparql\Url\UriReference::resolve()
+     * @see \FancyRDF\Url\UriReference::parse()
+     * @see \FancyRDF\Url\UriReference::resolve()
      *
      * @return string The resolved URI. Whenever possible, this is an absolute URI.
      */
@@ -425,7 +425,7 @@ final class UriReference
     /**
      * Applies syntax-based normalization rules to the components of a URI reference as per RFC 3986 §6.2.2.
      *
-     * @see \FancySparql\Url\UriReference::normalize()
+     * @see \FancyRDF\Url\UriReference::normalize()
      *
      * @param non-empty-string|null &$scheme
      * @param non-empty-string|null &$authority

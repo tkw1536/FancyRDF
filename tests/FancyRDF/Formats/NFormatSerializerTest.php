@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Formats;
+namespace FancyRDF\Tests\FancyRDF\Formats;
 
-use FancySparql\Formats\NFormatSerializer;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
+use FancyRDF\Formats\NFormatSerializer;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

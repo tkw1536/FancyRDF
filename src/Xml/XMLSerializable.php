@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Xml;
+namespace FancyRDF\Xml;
 
 use DOMDocument;
 use DOMNode;

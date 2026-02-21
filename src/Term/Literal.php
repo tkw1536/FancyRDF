@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Term;
+namespace FancyRDF\Term;
 
 use DOMDocument;
 use DOMElement;
 use DOMNode;
-use FancySparql\Term\Datatype\Datatype;
-use FancySparql\Term\Datatype\LangString;
-use FancySparql\Term\Datatype\XSDString;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Term\Datatype\Datatype;
+use FancyRDF\Term\Datatype\LangString;
+use FancyRDF\Term\Datatype\XSDString;
+use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 

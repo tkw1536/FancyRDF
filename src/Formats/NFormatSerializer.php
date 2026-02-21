@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Formats;
+namespace FancyRDF\Formats;
 
-use FancySparql\Term\Datatype\XSDString;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
+use FancyRDF\Term\Datatype\XSDString;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
 use RuntimeException;
 
 use function mb_ord;

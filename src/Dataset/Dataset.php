@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Dataset;
+namespace FancyRDF\Dataset;
 
 use IteratorAggregate;
 use Override;

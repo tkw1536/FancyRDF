@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Formats;
+namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use AssertionError;
-use FancySparql\Dataset\Quad;
-use FancySparql\Formats\NFormatParser;
-use FancySparql\Formats\NFormatSerializer;
-use FancySparql\Tests\Support\W3CTestLoader;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\NFormatParser;
+use FancyRDF\Formats\NFormatSerializer;
+use FancyRDF\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Results;
+namespace FancyRDF\Results;
 
 use DOMDocument;
 use DOMElement;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
-use FancySparql\Xml\XMLSerializable;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
+use FancyRDF\Xml\XMLSerializable;
+use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use IteratorAggregate;
 use JsonSerializable;

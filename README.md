@@ -1,7 +1,8 @@
-# FancySparql
+# FancyRDF
 
-This library is intended to eventually replace EasyRDF in WissKI.
-It's currently a work-in-progress.
+A streaming PHP 8.3+ PHP Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
+This library is eventually intended to replace [EasyRDF](https://www.easyrdf.org) in [WissKI](https://wiss-ki.eu). 
+It is currently a work-in-progress.
 
 ## Coding Standard & Typing
 

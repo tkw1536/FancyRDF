@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Dataset;
+namespace FancyRDF\Tests\FancyRDF\Dataset;
 
-use FancySparql\Dataset\Dataset;
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
+use FancyRDF\Dataset\Dataset;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
 use PHPUnit\Framework\TestCase;
 
 final class DatasetTest extends TestCase

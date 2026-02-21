@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Formats;
+namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use AssertionError;
-use FancySparql\Dataset\Quad;
-use FancySparql\Formats\NFormatParser;
-use FancySparql\Formats\RdfXmlParser;
-use FancySparql\Tests\Support\IsomorphicAsDatasetsConstraint;
-use FancySparql\Tests\Support\W3CTestLoader;
+use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\NFormatParser;
+use FancyRDF\Formats\RdfXmlParser;
+use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
+use FancyRDF\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\Attributes\RequiresSetting;

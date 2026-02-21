@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Term;
+namespace FancyRDF\Tests\FancyRDF\Term;
 
 use DOMDocument;
-use FancySparql\Term\Datatype\LangString;
-use FancySparql\Term\Datatype\XSDString;
-use FancySparql\Term\Literal;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Term\Datatype\LangString;
+use FancyRDF\Term\Datatype\XSDString;
+use FancyRDF\Term\Literal;
+use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;

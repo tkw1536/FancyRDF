@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Tests\FancySparql\Xml;
+namespace FancyRDF\Tests\FancyRDF\Xml;
 
 use DOMDocument;
-use FancySparql\Xml\XMLUtils;
+use FancyRDF\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;

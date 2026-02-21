@@ -27,12 +27,12 @@
     },
     "autoload": {
         "psr-4": {
-            "FancySparql\\": "src/"
+            "FancyRDF\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "FancySparql\\Tests\\": "tests/"
+            "FancyRDF\\Tests\\": "tests/"
         }
     },
     "minimum-stability": "stable",

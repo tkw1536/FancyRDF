@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Term\Datatype;
+namespace FancyRDF\Term\Datatype;
 
 /**
  * Datatype represents a value of a specific RDF1.1 datatype.

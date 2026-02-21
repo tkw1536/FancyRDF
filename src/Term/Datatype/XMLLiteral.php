@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Term\Datatype;
+namespace FancyRDF\Term\Datatype;
 
 use DOMDocument;
 use DOMNode;

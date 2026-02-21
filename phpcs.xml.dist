@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="FancySparql">
-    <description>Coding standard for FancySparql</description>
+<ruleset name="FancyRDF">
+    <description>Coding standard for FancyRDF</description>
 
     <!-- This must work with PHP 8.3 and above -->
     <config name="php_version" value="80300"/>

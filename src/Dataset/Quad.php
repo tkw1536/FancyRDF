@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace FancySparql\Dataset;
+namespace FancyRDF\Dataset;
 
-use FancySparql\Term\Literal;
-use FancySparql\Term\Resource;
+use FancyRDF\Term\Literal;
+use FancyRDF\Term\Resource;
 
 use function array_is_list;
 use function count;
