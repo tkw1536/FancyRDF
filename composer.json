@@ -15,8 +15,7 @@
         "ext-dom": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-pcre": "*",
-        "guzzlehttp/guzzle": "^7.0"
+        "ext-pcre": "*"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.0",

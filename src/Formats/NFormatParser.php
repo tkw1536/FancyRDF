@@ -9,12 +9,12 @@ use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
-use GuzzleHttp\Psr7\Utils;
-use Psr\Http\Message\StreamInterface;
 use Traversable;
 
 use function assert;
 use function ctype_xdigit;
+use function fclose;
+use function fgets;
 use function hexdec;
 use function mb_chr;
 use function preg_match;
@@ -75,14 +75,18 @@ final class NFormatParser
      *
      * This function closes the stream once it is no longer needed.
      *
+     * @param resource $stream
+     *   The stream to read from.
+     *   The stream will be closed once the parser is done.
+     *
      * @return Traversable<TripleOrQuadArray>
      */
-    public static function parseStream(StreamInterface $stream): Traversable
+    public static function parseStream(mixed $stream): Traversable
     {
         try {
             while (true) {
-                $line = Utils::readLine($stream);
-                if ($line === '') {
+                $line = fgets($stream);
+                if ($line === false) {
                     break;
                 }
 
@@ -94,7 +98,7 @@ final class NFormatParser
                 yield $term;
             }
         } finally {
-            $stream->close();
+            fclose($stream);
         }
     }
 

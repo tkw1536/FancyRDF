@@ -61,7 +61,6 @@ The library provides several stream-based implementations of parsers and seriali
     - [ext-json](https://www.php.net/manual/en/book.json.php)
     - [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
     - [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
-- [Guzzle](https://github.com/guzzle/guzzle) 7+
 
 ## Coding Standard & Typing
 
