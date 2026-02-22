@@ -75,7 +75,6 @@ final class Iri extends Term
     #[Override]
     public static function deserializeXML(DOMNode $element): Iri
     {
-        $elementName = $element->localName;
         if ($element->localName !== 'uri') {
             throw new InvalidArgumentException('Invalid element name');
         }

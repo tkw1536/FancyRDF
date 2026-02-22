@@ -114,11 +114,11 @@ final class Literal extends Term
     public function compare(Iri|Literal|BlankNode $other): int
     {
         if ($other instanceof Iri) {
-            return -1;
+            return 1;
         }
 
         if ($other instanceof BlankNode) {
-            return 1;
+            return -1;
         }
 
         $ourType   = $this->getTypeForCompare();

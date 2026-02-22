@@ -113,7 +113,10 @@ abstract class Term implements JsonSerializable, XMLSerializable
     abstract public function equals(Iri|Literal|BlankNode $other, bool $literal = true): bool;
 
     /**
-     * Compares this term with the other term using lexiographical ordering.
+     * Compares this term with the other term using a lexiographical ordering.
+     *
+     * This function orders IRIs before Literals before Blank Nodes.
+     * Within each type of term, the ordering is lexicographical.
      *
      * @param Iri|Literal|BlankNode $other
      *   The other term to compare.

@@ -75,7 +75,7 @@ final class BlankNode extends Term
      * @throws InvalidArgumentException
      */
     #[Override]
-    public static function deserializeJSON(array $data): Iri
+    public static function deserializeJSON(array $data): BlankNode
     {
         $type = $data['type'] ?? null;
         if ($type !== 'bnode') {
@@ -87,7 +87,7 @@ final class BlankNode extends Term
             throw new InvalidArgumentException('Blank node identifier must be a non-empty string');
         }
 
-        return new Iri($value);
+        return new BlankNode($value);
     }
 
     /** @throws InvalidArgumentException */
