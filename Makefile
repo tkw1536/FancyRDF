@@ -1,8 +1,8 @@
-.PHONY: all test lint fmt cspell parallel-lint phpcs phpstan phpunit-assertions phpunit-noassertions phpcbf
+.PHONY: all test lint fmt cspell parallel-lint phpcs phpstan phpunit-assertions phpunit-noassertions phpcbf composer-dependency-analyser
 
 all: cspell lint test
 
-lint: parallel-lint phpcs phpstan
+lint: composer-dependency-analyser parallel-lint phpcs phpstan
 
 parallel-lint:
 	@echo "=> vendor/bin/parallel-lint"
@@ -15,6 +15,10 @@ phpcs:
 phpstan:
 	@echo "=> vendor/bin/phpstan"
 	@vendor/bin/phpstan analyse --memory-limit=1G -v
+
+composer-dependency-analyser:
+	@echo "=> vendor/bin/composer-dependency-analyser"
+	@vendor/bin/composer-dependency-analyser --verbose
 
 fmt: phpcbf
 

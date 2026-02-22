@@ -39,8 +39,12 @@ jobs:
           php-version: ${{ matrix.php-version }}
           tools: composer
           extensions: curl,dom,json,mbstring,pcre
+
       - name: Install dependencies
         run: composer install --prefer-dist
+
+      - name: composer-dependency-analyser
+        run: make composer-dependency-analyser
 
       - name: parallel-lint
         run: make parallel-lint

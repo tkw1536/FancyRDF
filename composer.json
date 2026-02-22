@@ -15,14 +15,17 @@
         "ext-dom": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-pcre": "*"
+        "ext-pcre": "*",
+        "ext-xmlreader": "*"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^11.0",
         "squizlabs/php_codesniffer": "^3.0",
         "php-parallel-lint/php-parallel-lint": "^1.4",
-        "doctrine/coding-standard": "^13.0"
+        "doctrine/coding-standard": "^13.0",
+        "shipmonk/composer-dependency-analyser": "^1.8",
+        "ext-sockets": "*"
     },
     "autoload": {
         "psr-4": {

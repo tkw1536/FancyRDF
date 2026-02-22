@@ -55,12 +55,21 @@ The library provides several stream-based implementations of parsers and seriali
 
 ## Dependencies
 
+A prodution installation of this library only requires PHP and a couple of extensions:
+
 - [PHP 8.4+](https://www.php.net/releases/8.4/en.php) with extensions:
     - [ext-curl](https://www.php.net/manual/en/book.curl.php)
     - [ext-dom](https://www.php.net/manual/en/book.dom.php)
     - [ext-json](https://www.php.net/manual/en/book.json.php)
     - [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
     - [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
+    - [ext-xmlreader](https://www.php.net/manual/en/book.xmlreader.php)
+
+To run the tests and develop the module further dependencies are required.
+See [composer.json](composer.json) for details.
+
+The composer dependencies are verified with [composer-dependency-analyser](https://github.com/shipmonk-rnd/composer-dependency-analyser).
+The `make composer-dependency-analyser` target runs this automatically.
 
 ## Coding Standard & Typing
 
@@ -69,7 +78,7 @@ This is enforced using [phpcs](https://github.com/squizlabs/PHP_CodeSniffer).
 
 The code should also pass [phpstan](https://phpstan.org) on strictest settings.
 
-The Makefile target `make lint` runs both phpcs and phpstan.
+The Makefile target `make lint` runs both phpcs and phpstan (and other checks).
 The Makefile target `make fmt` runs the autoformatter.
 
 ## Spell checking

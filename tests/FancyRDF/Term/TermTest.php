@@ -13,7 +13,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
-use function gmp_sign;
 use function var_export;
 
 /**
@@ -230,12 +229,22 @@ final class TermTest extends TestCase
                 $gotCompare    = $term->compare($other);
 
                 self::assertSame(
-                    gmp_sign($shouldCompare),
-                    gmp_sign($gotCompare),
+                    self::sign($shouldCompare),
+                    self::sign($gotCompare),
                     'Term ' . $i . ' compares ' . $j,
                 );
             }
         }
+    }
+
+    private static function sign(int $value): int
+    {
+        // Use gmp_sign would introduce an extra dependency on ext-gmp.
+        return match (true) {
+            $value > 0 => 1,
+            $value < 0 => -1,
+            default => 0,
+        };
     }
 
     /**

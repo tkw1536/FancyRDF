@@ -12,7 +12,6 @@ use FancyRDF\Uri\UriReference;
 use Traversable;
 
 use function assert;
-use function ctype_xdigit;
 use function fclose;
 use function fgets;
 use function hexdec;
@@ -392,7 +391,7 @@ final class NFormatParser
 
         // read the escape sequence.
         $hex = substr(self::$line, self::$pos, $hexLen);
-        assert(ctype_xdigit($hex), 'invalid hex in \\u or \\U escape at position ' . self::$pos);
+        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in \\u or \\U escape at position ' . self::$pos);
 
         self::$pos += $hexLen;
 
