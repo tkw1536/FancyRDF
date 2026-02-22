@@ -17,6 +17,7 @@ use function curl_getinfo;
 use function curl_setopt;
 use function explode;
 use function strlen;
+use function strtolower;
 use function trigger_error;
 use function trim;
 
@@ -28,14 +29,23 @@ use const E_USER_WARNING;
 
 /**
  * A class that allows reading html response data by yielding it.
- *
- * TODO: Test this.
  */
 final class CurlStream
 {
     /** @var Fiber<void, string, null, void> */
     private readonly Fiber $curl;
 
+    /**
+     * Constructs a new CurlStream instance from a handle.
+     *
+     * @param CurlHandle $handle
+     *   A not yet executed curl handle.
+     *   The options CURLOPT_HEADERFUNCTION and CURLOPT_WRITEFUNCTION will be overwritten, all other options are left unchanged.
+     *
+     * @return void
+     *
+     * @throws Exception If the curl handle returns an error.
+     */
     public function __construct(private readonly CurlHandle $handle)
     {
         $headers       = [];
@@ -79,7 +89,10 @@ final class CurlStream
 
         $this->curl->start();
         if (! $didFirstChunk) {
-            throw new Exception(curl_error($this->handle));
+            $error = curl_error($this->handle);
+            if ($error !== '') {
+                throw new Exception($error);
+            }
         }
 
         $headersMap = [];
@@ -89,10 +102,18 @@ final class CurlStream
                 continue;
             }
 
-            $headersMap[$parts[0]] = trim($parts[1]);
+            $key   = strtolower(trim($parts[0]));
+            $value = trim($parts[1]);
+
+            if (! isset($headersMap[$key])) {
+                $headersMap[$key] = [];
+            }
+
+            $headersMap[$key][] = $value;
         }
 
-        $this->headers    = $headersMap;
+        $this->headers = $headersMap;
+
         $this->statusCode = curl_getinfo($this->handle, CURLINFO_RESPONSE_CODE);
 
         $length              = (int) curl_getinfo($this->handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
@@ -100,7 +121,7 @@ final class CurlStream
     }
 
     private readonly int $statusCode;
-    /** @var array<string, string> */
+    /** @var array<string, non-empty-list<string>> */
     private readonly array $headers;
 
     /** @var positive-int|null */
@@ -119,9 +140,10 @@ final class CurlStream
 
     /**
      * Returns the headers of the response as an array.
-     * This function can only be called once.
      *
-     * @return array<string, string>
+     * @return array<string, non-empty-list<string>>
+     *   A map from header name to all encountered header values.
+     *   The keys are guaranteed to be lowercase.
      */
     public function getHeaders(): array
     {
