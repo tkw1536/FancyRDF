@@ -8,7 +8,7 @@
     "rdf_tests/**",
     ".git/**",
     "composer.lock",
-    "package-lock.json"
+    "composer.json"
   ],
   "dictionaryDefinitions": [
     { "name": "project-words", "path": "./cspell.txt" }

@@ -38,7 +38,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           tools: composer
-          extensions: curl,dom,json,mbstring,pcre
+          extensions: none,curl,dom,json,mbstring,pcre,xmlreader,sockets,simplexml,tokenizer,xml,xmlwriter,ctype
 
       - name: Install dependencies
         run: composer install --prefer-dist

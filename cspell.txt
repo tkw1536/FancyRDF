@@ -2,6 +2,7 @@ abitrary
 absfile
 AFFFD
 analyse
+analyser
 autoload
 BFFFD
 bnode
@@ -75,4 +76,5 @@ UXXXXXXXX
 Wiesing
 WissKI
 WRITEFUNCTION
+xmlreader
 XMLW
