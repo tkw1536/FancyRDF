@@ -56,12 +56,13 @@ The library provides several stream-based implementations of parsers and seriali
 ## Dependencies
 
 A production installation of this library requires [PHP 8.4+](https://www.php.net/releases/8.4/en.php) with the following extensions:
-    - [ext-curl](https://www.php.net/manual/en/book.curl.php)
-    - [ext-dom](https://www.php.net/manual/en/book.dom.php)
-    - [ext-json](https://www.php.net/manual/en/book.json.php)
-    - [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
-    - [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
-    - [ext-xmlreader](https://www.php.net/manual/en/book.xmlreader.php)
+
+- [ext-curl](https://www.php.net/manual/en/book.curl.php)
+- [ext-dom](https://www.php.net/manual/en/book.dom.php)
+- [ext-json](https://www.php.net/manual/en/book.json.php)
+- [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
+- [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
+- [ext-xmlreader](https://www.php.net/manual/en/book.xmlreader.php)
 
 To run the tests and develop the module further dependencies and extensions may be required.
 See [composer.json](composer.json) for details.
