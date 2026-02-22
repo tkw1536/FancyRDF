@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Formats\NFormatSerializer;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -12,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 
 final class NFormatSerializerTest extends TestCase
 {
-    /** @return array<string, array{Iri|Literal, string}> */
+    /** @return array<string, array{Iri|Literal|BlankNode, string}> */
     public static function serializeTermProvider(): array
     {
         return [
@@ -36,12 +37,12 @@ final class NFormatSerializerTest extends TestCase
 
             // Blank nodes
             'blank node short id' => [
-                new Iri('_:b0'),
+                new BlankNode('b0'),
                 '_:b0',
             ],
             'blank node long id' => [
-                new Iri('_:n3_a2f89b'),
-                '_:n3_a2f89b',
+                new BlankNode('n3'),
+                '_:n3',
             ],
 
             // Literals with datatype
@@ -119,7 +120,7 @@ final class NFormatSerializerTest extends TestCase
     }
 
     #[DataProvider('serializeTermProvider')]
-    public function testSerializeTerm(Iri|Literal $term, string $expected): void
+    public function testSerializeTerm(Iri|Literal|BlankNode $term, string $expected): void
     {
         self::assertSame($expected, NFormatSerializer::serializeTerm($term));
     }

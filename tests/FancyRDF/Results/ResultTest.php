@@ -6,6 +6,7 @@ namespace FancyRDF\Tests\FancyRDF\Results;
 
 use DOMDocument;
 use FancyRDF\Results\Result;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Xml\XMLUtils;
@@ -14,14 +15,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @phpstan-import-type LiteralElement from Literal
- * @phpstan-import-type IRIElement from Iri
+ * @phpstan-import-type LiteralArray from Literal
+ * @phpstan-import-type IRIArray from Iri
+ * @phpstan-import-type BlankNodeArray from BlankNode
  */
 final class ResultTest extends TestCase
 {
     /**
-     * @param array<string, Literal|Iri>               $bindings
-     * @param array<string, IRIElement|LiteralElement> $expectedJson
+     * @param array<string, Literal|Iri|BlankNode>                $bindings
+     * @param array<string, IRIArray|LiteralArray|BlankNodeArray> $expectedJson
      */
     #[DataProvider('resultSerializationProvider')]
     public function testSerialize(
@@ -37,7 +39,7 @@ final class ResultTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @return array<string, array{array<string, Literal|Iri>, array<string, IRIElement|LiteralElement>, string}> */
+    /** @return array<string, array{array<string, Literal|Iri|BlankNode>, array<string, IRIArray|LiteralArray|BlankNodeArray>, string}> */
     public static function resultSerializationProvider(): array
     {
         return [
@@ -75,46 +77,261 @@ final class ResultTest extends TestCase
         ];
     }
 
+    /** @return array<string, array{bool}> */
+    public static function allowMissingProvider(): array
+    {
+        return [
+            'with allow_missing' => [true],
+            'without allow_missing' => [false],
+        ];
+    }
+
+    // ==================================================
+    // get
+    // ==================================================
+
+    /** tests the get method */
     public function testGet(): void
     {
-        $resource = new Iri('https://example.com/s');
-        $literal  = new Literal('A label');
-        $result   = new Result(['s' => $resource, 'label' => $literal]);
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
 
-        self::assertSame($resource, $result->get('s'));
-        self::assertSame($literal, $result->get('label'));
+        self::assertSame($iri, $result->get('iri'));
+        self::assertSame($literal, $result->get('literal'));
+        self::assertSame($blankNode, $result->get('bnode'));
+
+        self::assertSame($iri, $result->get('iri', false));
+        self::assertSame($literal, $result->get('literal', false));
+        self::assertSame($blankNode, $result->get('bnode', false));
+
         self::assertNull($result->get('missing'));
+    }
+
+    public function testGetInvalidMissing(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage("Binding 'missing' not found");
         $result->get('missing', false);
     }
 
-    public function testGetLiteral(): void
-    {
-        $resource = new Iri('https://example.com/s');
-        $literal  = new Literal('A label');
-        $result   = new Result(['s' => $resource, 'label' => $literal]);
+    // ==================================================
+    // getResource
+    // ==================================================
 
-        self::assertSame($literal, $result->getLiteral('label'));
-        self::assertNull($result->getLiteral('missing'));
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Binding 's' is not a Literal");
-        $result->getLiteral('s');
-    }
-
+    /** tests the getResource method */
     public function testGetResource(): void
     {
-        $resource = new Iri('https://example.com/s');
-        $literal  = new Literal('A label');
-        $result   = new Result(['s' => $resource, 'label' => $literal]);
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
 
-        self::assertSame($resource, $result->getResource('s'));
+        self::assertSame($iri, $result->getResource('iri'));
+        self::assertSame($blankNode, $result->getResource('bnode'));
+
+        self::assertSame($iri, $result->getResource('iri', false));
+        self::assertSame($blankNode, $result->getResource('bnode', false));
+
         self::assertNull($result->getResource('missing'));
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetResourceInvalidLiteral(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Binding 'label' is not a Resource");
-        $result->getResource('label');
+        $this->expectExceptionMessage("Binding 'literal' is not a IRI or Blank Node");
+        $result->getResource('literal', $allowMissing);
+    }
+
+    public function testGetResourceInvalidMissing(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'missing' not found");
+        $result->getResource('missing', false);
+    }
+
+    // ==================================================
+    // getIri
+    // ==================================================
+
+    /** tests the getIri method */
+    public function testGetIri(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        self::assertSame($iri, $result->getIri('iri'));
+        self::assertSame($iri, $result->getIri('iri', false));
+
+        self::assertNull($result->getIri('missing'));
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetIriInvalidLiteral(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'literal' is not a IRI");
+        $result->getIri('literal', $allowMissing);
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetIriInvalidBNode(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'bnode' is not a IRI");
+        $result->getIri('bnode', $allowMissing);
+    }
+
+    public function testGetIriInvalidMissing(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'missing' not found");
+        $result->getResource('missing', false);
+    }
+
+    // ==================================================
+    // getLiteral
+    // ==================================================
+
+    /** tests the getLiteral method */
+    public function testGetLiteral(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        self::assertSame($literal, $result->getLiteral('literal'));
+        self::assertSame($literal, $result->getLiteral('literal', false));
+
+        self::assertNull($result->getLiteral('missing'));
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetLiteralInvalidIri(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'iri' is not a Literal");
+        $result->getLiteral('iri', $allowMissing);
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetLiteralInvalidBNode(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'bnode' is not a Literal");
+        $result->getLiteral('bnode', $allowMissing);
+    }
+
+    public function testGetLiteralInvalidMissing(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'missing' not found");
+        $result->getLiteral('missing', false);
+    }
+
+    // ==================================================
+    // getBlankNode
+    // ==================================================
+
+    /** tests the getBlankNode method */
+    public function testGetBlankNode(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        self::assertSame($blankNode, $result->getBlankNode('bnode'));
+        self::assertSame($blankNode, $result->getBlankNode('bnode', false));
+
+        self::assertNull($result->getBlankNode('missing'));
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetBlankNodeInvalidIri(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'iri' is not a Blank Node");
+        $result->getBlankNode('iri', $allowMissing);
+    }
+
+    #[DataProvider('allowMissingProvider')]
+    public function testGetBlankNodeInvalidLiteral(bool $allowMissing): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'literal' is not a Blank Node");
+        $result->getBlankNode('literal', $allowMissing);
+    }
+
+    public function testGetBlankNodeInvalidMissing(): void
+    {
+        $iri       = new Iri('https://example.com/s');
+        $literal   = new Literal('A label');
+        $blankNode = new BlankNode('b1');
+        $result    = new Result(['iri' => $iri, 'literal' => $literal, 'bnode' => $blankNode]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Binding 'missing' not found");
+        $result->getBlankNode('missing', false);
     }
 }

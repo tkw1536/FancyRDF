@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Dataset;
 
 use FancyRDF\Dataset\Dataset;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use PHPUnit\Framework\TestCase;
@@ -39,10 +40,10 @@ final class DatasetTest extends TestCase
         $o = new Literal('o');
         $g = new Iri('https://example.org/g');
 
-        $blankA = new Iri('_:b1');
+        $blankA = new BlankNode('b1');
         $quadA  = [$blankA, $p, $o, $g];
 
-        $blankB = new Iri('_:x');
+        $blankB = new BlankNode('x');
         $quadB  = [$blankB, $p, $o, $g];
 
         $datasetA = new Dataset([$quadA]);
@@ -62,11 +63,11 @@ final class DatasetTest extends TestCase
         $p2 = new Iri('https://example.org/p2');
         $o2 = new Literal('o2');
 
-        $blankB1 = new Iri('_:b1');
-        $blankB2 = new Iri('_:b2');
+        $blankB1 = new BlankNode('b1');
+        $blankB2 = new BlankNode('b2');
 
-        $blankX = new Iri('_:x');
-        $blankY = new Iri('_:y');
+        $blankX = new BlankNode('x');
+        $blankY = new BlankNode('y');
 
         $quad1 = [$blankB1, $p1, $o1, $g];
         $quadX = [$blankX, $p1, $o1, $g];

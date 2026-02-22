@@ -6,6 +6,7 @@ namespace FancyRDF\Results;
 
 use DOMDocument;
 use DOMElement;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Xml\XMLSerializable;
@@ -19,23 +20,24 @@ use Traversable;
 use function array_key_exists;
 
 /**
- * @phpstan-import-type IRIElement from Iri
- * @phpstan-import-type LiteralElement from Literal
- * @implements IteratorAggregate<string, Literal|Iri>
+ * @phpstan-import-type IRIArray from Iri
+ * @phpstan-import-type LiteralArray from Literal
+ * @phpstan-import-type BlankNodeArray from BlankNode
+ * @implements IteratorAggregate<string, Literal|Iri|BlankNode>
  */
 final class Result implements JsonSerializable, XMLSerializable, IteratorAggregate
 {
     /**
      * The bindings of this result.
      *
-     * @var array<string, Literal|Iri>
+     * @var array<string, Literal|Iri|BlankNode>
      */
     private readonly array $bindings;
 
     /**
      * Constructs a new result from an iterable of bindings.
      *
-     * @param iterable<string, Literal|Iri> $bindings
+     * @param iterable<string, Literal|Iri|BlankNode> $bindings
      *
      * @return void
      */
@@ -49,7 +51,7 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
         $this->bindings = $ary;
     }
 
-    /** @return Traversable<string, Literal|Iri> */
+    /** @return Traversable<string, Literal|Iri|BlankNode> */
     #[Override]
     public function getIterator(): Traversable
     {
@@ -59,11 +61,11 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
     /**
      * Returns the binding for the given name.
      *
-     * @return ($allowMissing is true ? Literal|Iri|null : Literal|Iri)
+     * @return ($allowMissing is true ? Literal|Iri|BlankNode|null : Literal|Iri|BlankNode)
      *
      * @throws InvalidArgumentException
      */
-    public function get(string $name, bool $allowMissing = true): Literal|Iri|null
+    public function get(string $name, bool $allowMissing = true): Literal|Iri|BlankNode|null
     {
         if (! array_key_exists($name, $this->bindings)) {
             if ($allowMissing) {
@@ -74,6 +76,23 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
         }
 
         return $this->bindings[$name];
+    }
+
+    /**
+     * Returns the binding for the given name, asserting that it is a resource.
+     *
+     * @return ($allowMissing is true ? Iri|BlankNode|null : Iri|BlankNode)
+     *
+     * @throws InvalidArgumentException
+     */
+    public function getResource(string $name, bool $allowMissing = true): Iri|BlankNode|null
+    {
+        $value = $this->get($name, $allowMissing);
+        if ($value !== null && ! $value instanceof Iri && ! $value instanceof BlankNode) {
+            throw new InvalidArgumentException("Binding '" . $name . "' is not a IRI or Blank Node");
+        }
+
+        return $value;
     }
 
     /**
@@ -94,23 +113,40 @@ final class Result implements JsonSerializable, XMLSerializable, IteratorAggrega
     }
 
     /**
-     * Returns the binding for the given name, asserting that it is a resource.
+     * Returns the binding for the given name, asserting that it is an IRI.
      *
      * @return ($allowMissing is true ? Iri|null : Iri)
      *
      * @throws InvalidArgumentException
      */
-    public function getResource(string $name, bool $allowMissing = true): Iri|null
+    public function getIri(string $name, bool $allowMissing = true): Iri|null
     {
         $value = $this->get($name, $allowMissing);
         if ($value !== null && ! $value instanceof Iri) {
-            throw new InvalidArgumentException("Binding '" . $name . "' is not a Resource");
+            throw new InvalidArgumentException("Binding '" . $name . "' is not a IRI");
         }
 
         return $value;
     }
 
-    /** @return array<string, IRIElement|LiteralElement> */
+    /**
+     * Returns the binding for the given name, asserting that it is a blank node.
+     *
+     * @return ($allowMissing is true ? BlankNode|null : BlankNode)
+     *
+     * @throws InvalidArgumentException
+     */
+    public function getBlankNode(string $name, bool $allowMissing = true): BlankNode|null
+    {
+        $value = $this->get($name, $allowMissing);
+        if ($value !== null && ! $value instanceof BlankNode) {
+            throw new InvalidArgumentException("Binding '" . $name . "' is not a Blank Node");
+        }
+
+        return $value;
+    }
+
+    /** @return array<string, IRIArray|LiteralArray|BlankNodeArray> */
     #[Override]
     public function jsonSerialize(): array
     {

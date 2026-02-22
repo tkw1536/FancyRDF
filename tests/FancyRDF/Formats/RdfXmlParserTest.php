@@ -6,6 +6,7 @@ namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\RdfXmlParser;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
@@ -122,13 +123,13 @@ XML,
 XML,
                 [
                     [
-                        new Iri('_:n1'),
+                        new BlankNode('n1'),
                         new Iri($rdfNs . 'type'),
                         new Iri('http://example.org/terms#Person'),
                         null,
                     ],
                     [
-                        new Iri('_:n1'),
+                        new BlankNode('n1'),
                         new Iri('http://example.org/terms#name'),
                         new Literal('Alice'),
                         null,

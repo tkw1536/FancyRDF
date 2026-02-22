@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
@@ -122,23 +123,22 @@ final class NFormatParser
                 return null;
             }
 
-            $subject = self::parseAnyResource();
+            $subject = self::parseIriOrBlankNode();
             self::skipWhitespace();
             assert(self::$pos < self::$len, 'unexpected end of line while reading term at position ' . self::$pos);
 
             $predicate = self::parseIRI();
-            assert(! $predicate->isBlankNode(), 'predicate must be an IRI at position ' . self::$pos);
 
             self::skipWhitespace();
             assert(self::$pos < self::$len, 'unexpected end of line while reading term at position ' . self::$pos);
 
-            $object = self::parseAnyTerm();
+            $object = self::parseLiteralOrIriOrBlankNode();
 
             // optionally parse a graph
             $graph = null;
             self::skipWhitespace();
             if (self::$pos < self::$len && self::$line[self::$pos] !== '.') {
-                $graph = self::parseAnyResource();
+                $graph = self::parseIriOrBlankNode();
                 self::skipWhitespace();
             }
 
@@ -156,7 +156,7 @@ final class NFormatParser
     /**
      * Parses an object of a triple.
      */
-    private static function parseAnyTerm(): Literal|Iri
+    private static function parseLiteralOrIriOrBlankNode(): Iri|Literal|BlankNode
     {
         // look at the current character and decide what to parse.
         $ch = self::$line[self::$pos] ?? '';
@@ -164,10 +164,10 @@ final class NFormatParser
             return self::parseLiteral();
         }
 
-        return self::parseAnyResource();
+        return self::parseIriOrBlankNode();
     }
 
-    private static function parseAnyResource(): Iri
+    private static function parseIriOrBlankNode(): Iri|BlankNode
     {
         // look at the current character and decide what to parse.
         $ch = self::$line[self::$pos] ?? '';
@@ -177,7 +177,7 @@ final class NFormatParser
 
         assert($ch === '_' && self::$pos + 1 < self::$len && self::$line[self::$pos + 1] === ':', 'invalid blank node start at position ' . self::$pos);
 
-        return new Iri(self::parseBlankNodeLabel());
+        return new BlankNode(self::parseBlankNodeLabel());
     }
 
     private static function parseIRI(): Iri
@@ -245,7 +245,7 @@ final class NFormatParser
     }
 
   /**
-   * Parses a blank node label _:label.
+   * Parses a blank node label _:label and returns only the label.
    *
    * Label is built on PN_CHARS_BASE, with: _ and [0-9] anywhere; . anywhere except
    * first or last; -, U+00B7, U+0300–U+036F, U+203F–U+2040 anywhere except first.
@@ -257,9 +257,9 @@ final class NFormatParser
     {
         assert(self::$line[self::$pos] === '_' && self::$line[self::$pos + 1] === ':', 'expected _: at position ' . self::$pos);
 
-        $start      = self::$pos;
         self::$pos += 2; // skip the _: prefix
 
+        $start      = self::$pos;
         $matchCount = preg_match(
             '/\G[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su',
             self::$line,
@@ -278,7 +278,7 @@ final class NFormatParser
 
         self::$pos += $labelLen;
 
-        $label = substr(self::$line, $start, $labelLen + 2);
+        $label = substr(self::$line, $start, $labelLen);
         assert($label !== '', 'empty blank node label at position ' . self::$pos);
 
         return $label;

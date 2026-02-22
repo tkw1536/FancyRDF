@@ -8,6 +8,7 @@ use AssertionError;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\NFormatSerializer;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 final class NFormatTest extends TestCase
 {
-    /** @return array<string, array{Iri, Iri, Iri|Literal, Iri|null, string}> */
+    /** @return array<string, array{Iri|BlankNode, Iri, Iri|Literal|BlankNode, Iri|BlankNode|null, string}> */
     public static function statementProvider(): array
     {
         return [
@@ -42,14 +43,14 @@ final class NFormatTest extends TestCase
                 '<https://example.com/s> <https://example.com/p> <https://example.com/o> <https://example.com/g> .',
             ],
             'quad with graph (blank node)' => [
-                new Iri('_:s'),
+                new BlankNode('s'),
                 new Iri('https://example.com/p'),
                 new Literal('x'),
-                new Iri('_:g'),
+                new BlankNode('g'),
                 '_:s <https://example.com/p> "x" _:g .',
             ],
             'triple with blank subject' => [
-                new Iri('_:b0'),
+                new BlankNode('b0'),
                 new Iri('https://example.com/p'),
                 new Literal('lit'),
                 null,
@@ -60,10 +61,10 @@ final class NFormatTest extends TestCase
 
     #[DataProvider('statementProvider')]
     public function testSerialize(
-        Iri $subject,
+        Iri|BlankNode $subject,
         Iri $predicate,
-        Iri|Literal $object,
-        Iri|null $graph,
+        Iri|Literal|BlankNode $object,
+        Iri|BlankNode|null $graph,
         string $expected,
     ): void {
         self::assertSame($expected, NFormatSerializer::serialize($subject, $predicate, $object, $graph));
@@ -71,10 +72,10 @@ final class NFormatTest extends TestCase
 
     #[DataProvider('statementProvider')]
     public function testParseLine(
-        Iri $subject,
+        Iri|BlankNode $subject,
         Iri $predicate,
-        Iri|Literal $object,
-        Iri|null $graph,
+        Iri|Literal|BlankNode $object,
+        Iri|BlankNode|null $graph,
         string $line,
     ): void {
         $parsed = NFormatParser::parseLine($line);

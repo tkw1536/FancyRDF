@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Dataset;
 
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 
@@ -14,8 +15,8 @@ use function is_array;
 /**
  * Functions acting on RDF triples and quads.
  *
- * @phpstan-type TripleArray array{Iri, Iri, Iri|Literal, null}
- * @phpstan-type QuadArray array{Iri, Iri, Iri|Literal, Iri}
+ * @phpstan-type TripleArray array{Iri|BlankNode, Iri, Iri|Literal|BlankNode, null}
+ * @phpstan-type QuadArray array{Iri|BlankNode, Iri, Iri|Literal|BlankNode, Iri|BlankNode}
  * @phpstan-type TripleOrQuadArray TripleArray|QuadArray
  */
 final class Quad
@@ -53,10 +54,10 @@ final class Quad
         return is_array($quad) &&
             array_is_list($quad) &&
             count($quad) === 4 &&
-            $quad[0] instanceof Iri &&
+            ($quad[0] instanceof Iri || $quad[0] instanceof BlankNode) &&
             $quad[1] instanceof Iri &&
-            ($quad[2] instanceof Iri || $quad[2] instanceof Literal) &&
-            ($quad[3] === null || $quad[3] instanceof Iri);
+            ($quad[2] instanceof Iri || $quad[2] instanceof Literal || $quad[2] instanceof BlankNode) &&
+            ($quad[3] === null || $quad[3] instanceof Iri || $quad[3] instanceof BlankNode);
     }
 
     /**

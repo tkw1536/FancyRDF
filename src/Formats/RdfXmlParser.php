@@ -6,6 +6,7 @@ namespace FancyRDF\Formats;
 
 use Exception;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
@@ -145,18 +146,18 @@ class RdfXmlParser implements IteratorAggregate
      *   within the current document.
      *   If null, a fresh blank node label is returned.
      */
-    private function makeBlankNode(string|null $name): Iri
+    private function makeBlankNode(string|null $name): BlankNode
     {
         // Pick the existing blank node label, or create a new one.
         $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
-        $id ??= '_:b' . ($this->blankNodeCounter++);
+        $id ??= 'b' . ($this->blankNodeCounter++);
 
         // Store the mapping if we were given a name.
         if (is_string($name)) {
             $this->blankNodeMap[$name] = $id;
         }
 
-        return new Iri($id);
+        return new BlankNode($id);
     }
 
     // ===========================
@@ -201,24 +202,24 @@ class RdfXmlParser implements IteratorAggregate
         return new Iri(self::RDF_NAMESPACE . '_' . $this->liCounters[$depth]);
     }
 
-    /** @var Iri|null the currently active subject */
-    private Iri|null $subject = null;
+    /** @var Iri|BlankNode|null the currently active subject */
+    private Iri|BlankNode|null $subject = null;
 
-    /** @var SplStack<array{subject: Iri|null, depth: int}> a stack of subjects within the current nesting level */
+    /** @var SplStack<array{subject: Iri|BlankNode|null, depth: int}> a stack of subjects within the current nesting level */
     private SplStack $subjectStack;
 
-    /** @var array{subject: Iri, predicate: Iri, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
+    /** @var array{subject: Iri|BlankNode, predicate: Iri, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
     private array|null $pendingProperty = null;
 
     /**
      * Emits a triple and handles reification if a reification URI is provided.
      *
-     * @param Iri|null              $subject        The subject of the triple (may be null when assertions are disabled)
+     * @param Iri|BlankNode|null    $subject        The subject of the triple (may be null when assertions are disabled)
      * @param Iri                   $predicate      The predicate of the triple
-     * @param Iri|Literal           $object         The object of the triple
+     * @param Iri|Literal|BlankNode $object         The object of the triple
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      */
-    private function emitTripleWithReification(Iri|null $subject, Iri $predicate, Iri|Literal $object, string|null $reificationURI): void
+    private function emitTripleWithReification(Iri|BlankNode|null $subject, Iri $predicate, Iri|Literal|BlankNode $object, string|null $reificationURI): void
     {
         if ($subject === null) {
             return;
@@ -258,9 +259,9 @@ class RdfXmlParser implements IteratorAggregate
      * @param string|null $idAttr          The rdf:ID attribute value
      * @param bool        $checkDuplicates Whether to check for duplicate rdf:ID values
      *
-     * @return Iri The resolved subject Resource
+     * @return Iri|BlankNode The resolved subject Resource
      */
-    private function resolveSubject(string|null $about, string|null $nodeId, string|null $idAttr, bool $checkDuplicates = false): Iri
+    private function resolveSubject(string|null $about, string|null $nodeId, string|null $idAttr, bool $checkDuplicates = false): Iri|BlankNode
     {
         if ($idAttr !== null) {
             // Validate rdf:ID value matches XML Name production
@@ -294,11 +295,11 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Handles rdf:parseType="Collection" - creates a list structure from child elements.
      *
-     * @param Iri                   $subject        The subject of the collection property
+     * @param Iri|BlankNode         $subject        The subject of the collection property
      * @param Iri                   $predicate      The predicate of the collection property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      */
-    private function handleParseTypeCollection(Iri $subject, Iri $predicate, string|null $reificationURI): void
+    private function handleParseTypeCollection(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI): void
     {
         $listHead = $this->makeBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $listHead, $reificationURI);
@@ -387,11 +388,11 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Handles rdf:parseType="Resource" - creates a blank node and processes nested content.
      *
-     * @param Iri                   $subject        The subject of the resource property
+     * @param Iri|BlankNode         $subject        The subject of the resource property
      * @param Iri                   $predicate      The predicate of the resource property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      */
-    private function handleParseTypeResource(Iri $subject, Iri $predicate, string|null $reificationURI): void
+    private function handleParseTypeResource(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI): void
     {
         $resourceObject = $this->makeBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $resourceObject, $reificationURI);
@@ -417,12 +418,12 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Handles rdf:parseType="Literal" - reads inner XML content and canonicalizes it.
      *
-     * @param Iri                   $subject        The subject of the literal property
+     * @param Iri|BlankNode         $subject        The subject of the literal property
      * @param Iri                   $predicate      The predicate of the literal property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      * @param string|null           $resourceAttr   The rdf:resource attribute value (must be null)
      */
-    private function handleParseTypeLiteral(Iri $subject, Iri $predicate, string|null $reificationURI, string|null $resourceAttr): void
+    private function handleParseTypeLiteral(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI, string|null $resourceAttr): void
     {
         // Error: rdf:parseType="Literal" cannot be combined with rdf:resource
         assert($resourceAttr === null, 'rdf:parseType="Literal" cannot be combined with rdf:resource attribute');
@@ -461,10 +462,10 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Processes non-RDF attributes on a property element as properties of the object.
      *
-     * @param Iri                   $object The object (Resource) to add properties to
+     * @param Iri|BlankNode         $object The object (IRI or Blank Node) to add properties to
      * @param non-empty-string|null $lang   The language for literal values
      */
-    private function processPropertyElementAttributes(Iri $object, string|null $lang): void
+    private function processPropertyElementAttributes(Iri|BlankNode $object, string|null $lang): void
     {
         if (! $this->reader->hasAttributes) {
             return;
