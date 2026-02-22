@@ -219,7 +219,7 @@ final class NFormatParser
                 self::$pos++;
 
                 $buf .= substr(self::$line, $start, $end - $start);
-                assert($buf !== '' && ! UriReference::parse($buf)->isRelativeReference(), 'IRI reference must not be relative');
+                assert($buf !== '' && self::isValidRDFIri($buf), 'IRI reference must be a valid absolute IRI: ' . $buf);
 
                 return $buf;
             }
@@ -242,6 +242,13 @@ final class NFormatParser
         // GIGO: Return a random blank node.
         // This branch can only be triggered if assertions are disabled.
         return '_:gigo';
+    }
+
+    private static function isValidRDFIri(string $iri): bool
+    {
+        $ref = UriReference::parse($iri);
+
+        return ! $ref->isRelativeReference() && $ref->isRFC3987IriReference();
     }
 
   /**

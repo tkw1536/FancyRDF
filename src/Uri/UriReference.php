@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace FancyRDF\Uri;
 
-use LogicException;
 use RuntimeException;
 
 use function assert;
 use function chr;
 use function hexdec;
+use function is_numeric;
 use function preg_match;
 use function preg_replace_callback;
 use function str_starts_with;
@@ -61,18 +61,241 @@ final class UriReference
 
     /**
      * Checks if this is a valid RFC 3986 URI reference.
+     *
+     * Validates that all components contain only ASCII characters allowed by RFC 3986 §2
+     * (unreserved, gen-delims, sub-delims, and pct-encoded).
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-2
      */
     public function isRFC3986UriReference(): bool
     {
-        throw new LogicException('Not implemented');
+        $components = [
+            $this->scheme,
+            $this->authority,
+            $this->path,
+            $this->query,
+            $this->fragment,
+        ];
+
+        foreach ($components as $component) {
+            if ($component === null) {
+                continue;
+            }
+
+            if (! self::componentIsValidRfc3986($component)) {
+                return false;
+            }
+        }
+
+        return $this->authorityPartsValidRfc3986();
     }
 
     /**
      * Checks if this is a valid RFC 3987 IRI reference.
+     *
+     * Validates that all components contain only characters allowed by RFC 3987 §2.2
+     * (iunreserved, gen-delims, sub-delims, pct-encoded, and in query/fragment also iprivate).
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3987#section-2.2
      */
     public function isRFC3987IriReference(): bool
     {
-        throw new LogicException('Not implemented');
+        $components = [
+            $this->scheme,
+            $this->authority,
+            $this->path,
+            $this->query,
+            $this->fragment,
+        ];
+
+        foreach ($components as $component) {
+            if ($component === null) {
+                continue;
+            }
+
+            if (! self::componentIsValidRfc3987($component)) {
+                return false;
+            }
+        }
+
+        return $this->authorityPartsValidRfc3987();
+    }
+
+    /**
+     * RFC 3986 §2: URI component must be ASCII-only and only contain unreserved, gen-delims, sub-delims, pct-encoded.
+     */
+    private static function componentIsValidRfc3986(string $component): bool
+    {
+        if (preg_match('/[\x80-\xff]/', $component) === 1) {
+            return false;
+        }
+
+        return preg_match(self::RFC3986_COMPONENT_PATTERN, $component) === 1;
+    }
+
+    /**
+     * RFC 3987 §2.2: IRI component allows UCSCHAR and (in query) iprivate in addition to RFC 3986 set.
+     */
+    private static function componentIsValidRfc3987(string $component): bool
+    {
+        return preg_match(self::RFC3987_COMPONENT_PATTERN, $component) === 1;
+    }
+
+    /**
+     * Validates authority subcomponents (userinfo and host) per RFC 3986.
+     */
+    private function authorityPartsValidRfc3986(): bool
+    {
+        $parts = $this->getAuthorityParts();
+        if ($parts === null) {
+            return true;
+        }
+
+        $userinfo = $parts[0];
+        $host     = $parts[1];
+
+        if ($userinfo !== null && ! self::componentIsValidRfc3986($userinfo)) {
+            return false;
+        }
+
+        return $host !== '' && self::componentIsValidRfc3986($host);
+    }
+
+    /**
+     * Validates authority subcomponents (userinfo and host) per RFC 3987.
+     */
+    private function authorityPartsValidRfc3987(): bool
+    {
+        $parts = $this->getAuthorityParts();
+        if ($parts === null) {
+            return true;
+        }
+
+        $userinfo = $parts[0];
+        $host     = $parts[1];
+
+        if ($userinfo !== null && ! self::componentIsValidRfc3987($userinfo)) {
+            return false;
+        }
+
+        return $host !== '' && self::componentIsValidRfc3987($host);
+    }
+
+    /** RFC 3986: unreserved | gen-delims | sub-delims | pct-encoded (ASCII only checked separately) */
+    private const string RFC3986_COMPONENT_PATTERN = '/^(?:[A-Za-z0-9\-._~:\/\?#\[\]@!$&\'()*+,;=]|%[0-9A-Fa-f]{2})*$/';
+
+    /** RFC 3987: RFC 3986 set plus ucschar and iprivate ranges (character classes for Unicode ranges) */
+    private const string RFC3987_COMPONENT_PATTERN = '/^(?:[A-Za-z0-9\-._~:\/\?#\[\]@!$&\'()*+,;=]|%[0-9A-Fa-f]{2}|'
+        . '[\x{A0}-\x{D7FF}\x{F900}-\x{FDCF}\x{FDF0}-\x{FFEF}'
+        . '\x{10000}-\x{1FFFD}\x{20000}-\x{2FFFD}\x{30000}-\x{3FFFD}\x{40000}-\x{4FFFD}\x{50000}-\x{5FFFD}\x{60000}-\x{6FFFD}'
+        . '\x{70000}-\x{7FFFD}\x{80000}-\x{8FFFD}\x{90000}-\x{9FFFD}'
+        . '\x{A0000}-\x{AFFFD}\x{B0000}-\x{BFFFD}\x{C0000}-\x{CFFFD}\x{D0000}-\x{DFFFD}\x{E1000}-\x{EFFFD}'
+        . '\x{E000}-\x{F8FF}\x{F0000}-\x{FFFFD}\x{100000}-\x{10FFFD}])*$/u';
+
+    // ===========================
+    // Authority parts (RFC 3986 §3.2: authority = [ userinfo "@" ] host [ ":" port ])
+    // ===========================
+
+    /**
+     * User information from the authority component, if present.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-3.2.1
+     */
+    public function getUserInfo(): string|null
+    {
+        $parts = $this->getAuthorityParts();
+        if ($parts === null) {
+            return null;
+        }
+
+        return $parts[0];
+    }
+
+    /**
+     * Host from the authority component, if authority is present.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-3.2.2
+     */
+    public function getHost(): string|null
+    {
+        $parts = $this->getAuthorityParts();
+        if ($parts === null) {
+            return null;
+        }
+
+        return $parts[1];
+    }
+
+    /**
+     * Port from the authority component (without leading colon), if present.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986#section-3.2.3
+     */
+    public function getPort(): string|null
+    {
+        $parts = $this->getAuthorityParts();
+        if ($parts === null) {
+            return null;
+        }
+
+        return $parts[2];
+    }
+
+    /**
+     * Port info from the authority component as an integer, if present.
+     *
+     * @return int|null
+     *    Technically, RFC 3986 and 3987 do not limit the maximum port size, so it is not guaranteed that this fits into the int datatype.
+     *    Use getPort() instead if you need the full port.
+     */
+    public function getPortInt(): int|null
+    {
+        $port = $this->getPort();
+        if ($port === null || ! is_numeric($port)) {
+            return null;
+        }
+
+        return (int) $port;
+    }
+
+    /**
+     * Returns parsed authority as [userinfo, host, port] or null when authority is absent.
+     *
+     * @return array{0: string|null, 1: string, 2: string|null}|null
+     *  [userinfo, host, port]
+     */
+    public function getAuthorityParts(): array|null
+    {
+        if ($this->authority === null) {
+            return null;
+        }
+
+        $at       = strpos($this->authority, '@');
+        $hostPort = $at !== false ? substr($this->authority, $at + 1) : $this->authority;
+
+        $userinfo = $at !== false ? substr($this->authority, 0, $at) : null;
+
+        if ($hostPort === '') {
+            return [$userinfo, '', null];
+        }
+
+        if ($hostPort[0] === '[') {
+            $close = strpos($hostPort, ']');
+            if ($close === false) {
+                $host = $hostPort;
+                $port = null;
+            } else {
+                $host = substr($hostPort, 0, $close + 1);
+                $rest = substr($hostPort, $close + 1);
+                $port = str_starts_with($rest, ':') ? substr($rest, 1) : null;
+            }
+        } else {
+            $colon = strpos($hostPort, ':');
+            $host  = $colon !== false ? substr($hostPort, 0, $colon) : $hostPort;
+            $port  = $colon !== false ? substr($hostPort, $colon + 1) : null;
+        }
+
+        return [$userinfo, $host, $port];
     }
 
     // ===========================

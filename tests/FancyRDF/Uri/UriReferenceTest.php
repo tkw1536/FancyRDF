@@ -14,8 +14,8 @@ final class UriReferenceTest extends TestCase
     /**
      * Examples from RFC 3986.
      *
-     * @return array<string, array{string, UriReference, bool, bool, bool}>
-     *     Array of [uriString, uri, isRelativeReference, isAbsoluteURI, isSuffixReference]
+     * @return array<string, array{string, UriReference, bool, bool, bool, bool, bool}>
+     *     Array of [uriString, uri, isRelativeReference, isAbsoluteURI, isSuffixReference, isRFC3986UriReference, isRFC3987IriReference]
      */
     public static function rfc3986SpecParseProvider(): array
     {
@@ -26,48 +26,64 @@ final class UriReferenceTest extends TestCase
                 false, // isRelativeReference
                 true,  // isAbsoluteURI
                 false, // isSuffixReference
+                true,  // isRFC3986UriReference
+                true,  // isRFC3987IriReference
             ],
             'http://www.ietf.org/rfc/rfc2396.txt' => [
                 new UriReference('http', 'www.ietf.org', '/rfc/rfc2396.txt', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'ldap://[2001:db8::7]/c=GB?objectClass?one' => [
                 new UriReference('ldap', '[2001:db8::7]', '/c=GB', 'objectClass?one', null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'mailto:John.Doe@example.com' => [
                 new UriReference('mailto', null, 'John.Doe@example.com', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'news:comp.infosystems.www.servers.unix' => [
                 new UriReference('news', null, 'comp.infosystems.www.servers.unix', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'tel:+1-816-555-1212' => [
                 new UriReference('tel', null, '+1-816-555-1212', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'telnet://192.0.2.16:80/' => [
                 new UriReference('telnet', '192.0.2.16:80', '/', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'urn:oasis:names:specification:docbook:dtd:xml:4.1.2' => [
                 new UriReference('urn', null, 'oasis:names:specification:docbook:dtd:xml:4.1.2', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
 
             // RFC 3986 §5.4 base and components
@@ -76,36 +92,67 @@ final class UriReferenceTest extends TestCase
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'http://a/b/c/d;p?q#s' => [
                 new UriReference('http', 'a', '/b/c/d;p', 'q', 's'),
                 false,
                 false,
                 false,
+                true,
+                true,
             ],
             'http://a/b/c/g/' => [
                 new UriReference('http', 'a', '/b/c/g/', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'http://g' => [
                 new UriReference('http', 'g', '', null, null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'http://a/b/c/g?y/./x' => [
                 new UriReference('http', 'a', '/b/c/g', 'y/./x', null),
                 false,
                 true,
                 false,
+                true,
+                true,
             ],
             'http://a/b/c/g#s/../x' => [
                 new UriReference('http', 'a', '/b/c/g', null, 's/../x'),
                 false,
                 false,
                 false,
+                true,
+                true,
+            ],
+
+            // RFC 3986: Path Examples from §3.3
+            'mailto:fred@example.com' => [
+                new UriReference('mailto', null, 'fred@example.com', null, null),
+                false,
+                true,
+                false,
+                true,
+                true,
+            ],
+
+            'foo://info.example.com?fred' => [
+                new UriReference('foo', 'info.example.com', '', 'fred', null),
+                false,
+                true,
+                false,
+                true,
+                true,
             ],
 
             // Relative references: path-only, query-only, fragment-only
@@ -114,11 +161,15 @@ final class UriReferenceTest extends TestCase
                 true,
                 false,
                 true, // suffix: no scheme/query/fragment, path non-empty
+                true,
+                true,
             ],
             'g/' => [
                 new UriReference(null, null, 'g/', null, null),
                 true,
                 false,
+                true,
+                true,
                 true,
             ],
             './g' => [
@@ -126,11 +177,15 @@ final class UriReferenceTest extends TestCase
                 true,
                 false,
                 true,
+                true,
+                true,
             ],
             '/g' => [
                 new UriReference(null, null, '/g', null, null),
                 true,
                 false,
+                true,
+                true,
                 true,
             ],
             '?y' => [
@@ -138,30 +193,40 @@ final class UriReferenceTest extends TestCase
                 true,
                 false,
                 false, // has query
+                true,
+                true,
             ],
             '#s' => [
                 new UriReference(null, null, '', null, 's'),
                 true,
                 false,
                 false, // has fragment
+                true,
+                true,
             ],
             'g?y' => [
                 new UriReference(null, null, 'g', 'y', null),
                 true,
                 false,
                 false, // has query
+                true,
+                true,
             ],
             'g#s' => [
                 new UriReference(null, null, 'g', null, 's'),
                 true,
                 false,
                 false, // has fragment
+                true,
+                true,
             ],
             'g?y#s' => [
                 new UriReference(null, null, 'g', 'y', 's'),
                 true,
                 false,
                 false, // has query and fragment
+                true,
+                true,
             ],
 
             // Network path reference
@@ -170,12 +235,16 @@ final class UriReferenceTest extends TestCase
                 true,
                 false,
                 true, // suffix: authority and path, no query/fragment
+                true,
+                true,
             ],
             '//g' => [
                 new UriReference(null, 'g', '', null, null),
                 true,
                 false,
                 true, // suffix: authority only
+                true,
+                true,
             ],
 
             // Empty
@@ -184,18 +253,42 @@ final class UriReferenceTest extends TestCase
                 true,
                 false,
                 false, // path empty and no authority
+                true,
+                true,
+            ],
+
+            // RFC 3986 vs RFC 3987: Unicode in path
+            'http://example.com/café' => [
+                new UriReference('http', 'example.com', '/café', null, null),
+                false,
+                true,
+                false,
+                false, // not valid RFC 3986 (non-ASCII)
+                true,  // valid RFC 3987 IRI
+            ],
+
+            // Invalid: space not allowed in URI or IRI
+            'http://example.com/foo bar' => [
+                new UriReference('http', 'example.com', '/foo bar', null, null),
+                false,
+                true,
+                false,
+                false,
+                false,
             ],
         ];
 
         $cases = [];
         foreach ($examples as $uri => $data) {
-            [$expected, $isRelativeReference, $isAbsoluteURI, $isSuffixReference] = $data;
-            $cases[$uri]                                                          = [
+            [$expected, $isRelativeReference, $isAbsoluteURI, $isSuffixReference, $isRFC3986, $isRFC3987] = $data;
+            $cases[$uri]                                                                                  = [
                 $uri,
                 $expected,
                 $isRelativeReference,
                 $isAbsoluteURI,
                 $isSuffixReference,
+                $isRFC3986,
+                $isRFC3987,
             ];
         }
 
@@ -207,7 +300,7 @@ final class UriReferenceTest extends TestCase
      */
     #[DataProvider('rfc3986SpecParseProvider')]
     #[TestDox('Is relative reference for $uriString')]
-    public function testIsRelativeReference(string $uriString, UriReference $uri, bool $expectedIsRelative, bool $expectedIsAbsolute, bool $expectedIsSuffix): void
+    public function testIsRelativeReference(string $uriString, UriReference $uri, bool $expectedIsRelative, bool $_expectedIsAbsolute, bool $_expectedIsSuffix, bool $_expectedIsRfc3986, bool $_expectedIsRfc3987): void
     {
         self::assertSame($expectedIsRelative, $uri->isRelativeReference());
     }
@@ -217,7 +310,7 @@ final class UriReferenceTest extends TestCase
      */
     #[DataProvider('rfc3986SpecParseProvider')]
     #[TestDox('Is absolute URI for $uriString')]
-    public function testIsAbsoluteURI(string $uriString, UriReference $uri, bool $expectedIsRelative, bool $expectedIsAbsolute, bool $expectedIsSuffix): void
+    public function testIsAbsoluteURI(string $uriString, UriReference $uri, bool $_expectedIsRelative, bool $expectedIsAbsolute, bool $_expectedIsSuffix, bool $_expectedIsRfc3986, bool $_expectedIsRfc3987): void
     {
         self::assertSame($expectedIsAbsolute, $uri->isAbsoluteURI());
     }
@@ -227,9 +320,85 @@ final class UriReferenceTest extends TestCase
      */
     #[DataProvider('rfc3986SpecParseProvider')]
     #[TestDox('Is suffix reference for $uriString')]
-    public function testIsSuffixReference(string $uriString, UriReference $uri, bool $expectedIsRelative, bool $expectedIsAbsolute, bool $expectedIsSuffix): void
+    public function testIsSuffixReference(string $uriString, UriReference $uri, bool $_expectedIsRelative, bool $_expectedIsAbsolute, bool $expectedIsSuffix, bool $_expectedIsRfc3986, bool $_expectedIsRfc3987): void
     {
         self::assertSame($expectedIsSuffix, $uri->isSuffixReference());
+    }
+
+    /**
+     * Tests isRFC3986UriReference() per RFC 3986 §2.
+     */
+    #[DataProvider('rfc3986SpecParseProvider')]
+    #[TestDox('Is RFC 3986 URI reference for $uriString')]
+    public function testIsRFC3986UriReference(string $uriString, UriReference $uri, bool $_expectedIsRelative, bool $_expectedIsAbsolute, bool $_expectedIsSuffix, bool $expectedIsRfc3986, bool $_expectedIsRfc3987): void
+    {
+        self::assertSame($expectedIsRfc3986, $uri->isRFC3986UriReference());
+    }
+
+    /**
+     * Tests isRFC3987IriReference() per RFC 3987 §2.2.
+     */
+    #[DataProvider('rfc3986SpecParseProvider')]
+    #[TestDox('Is RFC 3987 IRI reference for $uriString')]
+    public function testIsRFC3987IriReference(string $uriString, UriReference $uri, bool $_expectedIsRelative, bool $_expectedIsAbsolute, bool $_expectedIsSuffix, bool $_expectedIsRfc3986, bool $expectedIsRfc3987): void
+    {
+        self::assertSame($expectedIsRfc3987, $uri->isRFC3987IriReference());
+    }
+
+    /**
+     * Authority part accessors (getAuthorityUserInfo, getHost, getPort).
+     *
+     * @return array<string, array{UriReference, string|null, string|null, string|null}>
+     */
+    public static function authorityPartsProvider(): array
+    {
+        return [
+            'no authority' => [
+                new UriReference('http', null, '/path', null, null),
+                null,
+                null,
+                null,
+            ],
+            'host only' => [
+                new UriReference('http', 'example.com', '/', null, null),
+                null,
+                'example.com',
+                null,
+            ],
+            'userinfo and host' => [
+                new UriReference('http', 'user:pass@example.com', '/', null, null),
+                'user:pass',
+                'example.com',
+                null,
+            ],
+            'host and port' => [
+                new UriReference('telnet', '192.0.2.16:80', '/', null, null),
+                null,
+                '192.0.2.16',
+                '80',
+            ],
+            'IP literal' => [
+                new UriReference('ldap', '[2001:db8::7]', '/c=GB', null, null),
+                null,
+                '[2001:db8::7]',
+                null,
+            ],
+            'userinfo, host and port' => [
+                new UriReference('http', 'user@example.com:8080', '/', null, null),
+                'user',
+                'example.com',
+                '8080',
+            ],
+        ];
+    }
+
+    #[DataProvider('authorityPartsProvider')]
+    #[TestDox('Authority parts: userinfo, host and port')]
+    public function testAuthorityPartsAccessors(UriReference $uri, string|null $expectedUserinfo, string|null $expectedHost, string|null $expectedPort): void
+    {
+        self::assertSame($expectedUserinfo, $uri->getUserInfo());
+        self::assertSame($expectedHost, $uri->getHost());
+        self::assertSame($expectedPort, $uri->getPort());
     }
 
     /**
@@ -477,6 +646,8 @@ final class UriReferenceTest extends TestCase
                 'http://example.org/dir/',
                 'relfile',
                 'http://example.org/dir/relfile',
+                true,
+                true,
             ],
         ];
     }
@@ -517,6 +688,8 @@ final class UriReferenceTest extends TestCase
             'fragment percent-encoding hex uppercased' => [
                 'http://example.com/#%7b',
                 'http://example.com/#%7B',
+                true,
+                true,
             ],
         ];
     }
@@ -561,6 +734,8 @@ final class UriReferenceTest extends TestCase
             'decode in fragment' => [
                 'http://example.com#%73ection',
                 'http://example.com#section',
+                true,
+                true,
             ],
         ];
     }
@@ -609,6 +784,8 @@ final class UriReferenceTest extends TestCase
             'relative path with dot segments' => [
                 'g/./h',
                 'g/h',
+                true,
+                true,
             ],
         ];
     }

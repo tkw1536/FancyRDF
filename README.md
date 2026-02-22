@@ -48,9 +48,10 @@ The library provides several stream-based implementations of parsers and seriali
 - [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
     - ✅ Parser: [NFormatParser](src/Formats/NFormatParser.php)
     - ✅ Serializer: [NFormatSerializer](src/Formats/NFormatSerializer.php)
-    - [ ] can pass W3C [Test Suite for N-Triples](https://www.w3.org/2013/N-TriplesTests/) and [Test Suite for N-Quads](https://www.w3.org/2013/N-QuadsTests/)
+    - ✅ can pass W3C [Test Suite for N-Triples](https://www.w3.org/2013/N-TriplesTests/) and [Test Suite for N-Quads](https://www.w3.org/2013/N-QuadsTests/)
         - ✅ all positive tests parse and round-trip correctly.
-        - [ ] all but a single negative test produce an error in development mode, and produce no errors in production mode.
+        - ✅ all negative tests produce an assertion error in development mode.
+        - ✅ all negative tests do not produce errors in production mode. 
 
 ## Dependencies
 

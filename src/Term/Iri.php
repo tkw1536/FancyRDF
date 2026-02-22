@@ -6,6 +6,7 @@ namespace FancyRDF\Term;
 
 use DOMDocument;
 use DOMNode;
+use FancyRDF\Uri\UriReference;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
@@ -30,11 +31,22 @@ final class Iri extends Term
      *
      * @param non-empty-string $iri
      *   A valid absolute IRI as per RFC3987.
-     *   The IRI is only validated if assertions are enabled, otherwise the code assumes it is a valid absolute IRI.
+     *   The IRI is not validated, and parts of the code simply assume it is a valid absolute IRI.
      *   If passed an invalid string, the behavior of the entire class is undefined.
      */
     public function __construct(readonly string $iri)
     {
+    }
+
+    /**
+     * Splits this IRI into it's component parts as described in RFC 3986 and RFC 3987.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc3986
+     * @see https://www.rfc-editor.org/rfc/rfc3987
+     */
+    public function toReference(): UriReference
+    {
+        return UriReference::parse($this->iri);
     }
 
     #[Override]

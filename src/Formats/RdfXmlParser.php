@@ -121,12 +121,18 @@ class RdfXmlParser implements IteratorAggregate
     {
         $resolved = UriReference::resolveRelative($this->reader->baseURI, $uri);
         assert(
-            $resolved !== '' &&
-            ! UriReference::parse($resolved)->isRelativeReference(),
-            'resolved URI must not be empty and must not be relative',
+            $resolved !== '' && self::isValidRDFIri($resolved),
+            'resolved URI must be a valid absolute IRI: ' . $resolved,
         );
 
         return $resolved;
+    }
+
+    private static function isValidRDFIri(string $iri): bool
+    {
+        $ref = UriReference::parse($iri);
+
+        return ! $ref->isRelativeReference() && $ref->isRFC3987IriReference();
     }
 
     // ===========================
