@@ -9,6 +9,7 @@ canonicalizes
 Castable
 CFFFD
 codesniffer
+CURLOPT
 dataname
 Datatypes
 dealerdirect
@@ -26,6 +27,7 @@ FFEF
 FFFD
 FFFFD
 guzzlehttp
+HEADERFUNCTION
 hier
 infosystems
 injective
@@ -72,4 +74,5 @@ userinfo
 UXXXXXXXX
 Wiesing
 WissKI
+WRITEFUNCTION
 XMLW
