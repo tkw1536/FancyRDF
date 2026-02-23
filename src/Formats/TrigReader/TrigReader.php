@@ -149,9 +149,7 @@ final class TrigReader
             return null;
         }
 
-        $char = mb_substr($rest, 0, 1);
-
-        return $char !== '' ? $char : null;
+        return mb_substr($rest, 0, 1);
     }
 
     /**
@@ -495,6 +493,10 @@ final class TrigReader
             }
         }
 
+        if (! $isLong && strlen($source) === 2) {
+            return $source;
+        }
+
         if ($isLong) {
             $end = $delim . $delim . $delim;
             while (true) {
@@ -505,7 +507,7 @@ final class TrigReader
 
                 $this->appendChar($source);
                 $pos = strlen($source);
-                if ($pos >= 6 && substr($source, -3) === $end) {
+                if ($pos >= 6 && substr($source, -3) === $end && ($pos === 6 || $source[$pos - 4] !== '\\')) {
                     break;
                 }
             }
@@ -772,6 +774,7 @@ final class TrigReader
      */
     private function isAnonAhead(): bool
     {
+        // TODO: Bug for edge-of-page
         $rest = substr($this->buffer, $this->position + 1);
         $len  = strlen($rest);
         $p    = 0;
