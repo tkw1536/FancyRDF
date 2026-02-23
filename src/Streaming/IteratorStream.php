@@ -33,6 +33,8 @@ final class IteratorStream
      *
      * @param callable(): Generator<int, string, mixed, void> $func
      *   A generator function that "yield"s string content of the stream.
+     *   The function is called right before the stream is first read.
+     *
      * @param int|null                                        $size
      *   The total number of bytes expected to be read from the generator, if known.
      *   If the size does not match what the generator yields, the behavior of the stream is undefined.
@@ -190,10 +192,6 @@ final class IteratorStream
 
                 return false;
             }
-        }
-
-        if ($this->buffer === '') {
-            return '';
         }
 
         $chunk        = substr($this->buffer, 0, $count);
