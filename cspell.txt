@@ -35,6 +35,7 @@ injective
 iprivate
 IRIREF
 iunreserved
+LANGTAG
 lexiographical
 mbstring
 newpath
