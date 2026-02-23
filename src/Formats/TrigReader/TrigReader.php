@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats\TrigReader;
 
+use FancyRDF\Streaming\BufferedStream;
+
 use function assert;
-use function fread;
-use function max;
-use function mb_substr;
 use function ord;
 use function preg_match;
-use function strcasecmp;
 use function strlen;
-use function strpos;
 use function substr;
 
 /**
@@ -31,15 +28,7 @@ use function substr;
  */
 final class TrigReader
 {
-    private const int READ_CHUNK_SIZE = 8192;
-
-    /** Longest keyword length + 1 for word-boundary lookahead (e.g. "false" = 5). */
-    private const int KEYWORD_LOOKAHEAD = 6;
-
-    /** Longest possible UTF-8 code point length. */
-    private const int MAX_CODE_POINT_LENGTH = 4;
-
-
+    private readonly BufferedStream $stream;
 
     private TrigTokenType $currentTokenType = TrigTokenType::EndOfInput;
 
@@ -47,15 +36,16 @@ final class TrigReader
 
     /** @param resource $source Stream to read from (e.g. from fopen). */
     public function __construct(
-        private readonly mixed $source,
-        private readonly int $readChunkSize = self::READ_CHUNK_SIZE,
+        mixed $source,
+        int $readChunkSize = BufferedStream::DEFAULT_READ_CHUNK_SIZE,
     ) {
+        $this->stream = new BufferedStream($source, $readChunkSize);
     }
 
     public function next(): bool
     {
         $this->skipWhitespaceAndComments();
-        $ch = $this->peekChar();
+        $ch = $this->stream->peekChar();
         if ($ch === null) {
             $this->currentTokenType  = TrigTokenType::EndOfInput;
             $this->currentTokenValue = '';
@@ -63,18 +53,12 @@ final class TrigReader
             return false;
         }
 
-        $type = $this->recognizeToken($ch);
-
-        if ($type === null) {
-            $this->currentTokenType  = TrigTokenType::EndOfInput;
-            $this->currentTokenValue = '';
-
-            return false;
-        }
-
+        [$type, $value]          = $this->processToken($ch);
         $this->currentTokenType  = $type;
-        $this->currentTokenValue = $this->consumeRecognizedToken($type);
-        $this->slideBuffer();
+        $this->currentTokenValue = $value;
+
+        // everything that we have eaten.
+        $this->stream->flush();
 
         return true;
     }
@@ -90,105 +74,6 @@ final class TrigReader
     }
 
     // ================================
-    // Buffer management
-    // ================================
-
-    /**
-     * The current buffer of characters read from the underlying source.
-     */
-    private string $buffer = '';
-
-    /**
-     * The current position in the buffer.
-     */
-    private int $position = 0;
-
-    /**
-     * Refill reads data from the underlying stream into the buffer.
-     *
-     * After a call to refill at least one of the following is true:
-     *
-     * - there are at least $numBytes read from the stream into the buffer past the current position.
-     * - the input stream has ended, and all available bytes are available in the buffer.
-     */
-    private function refill(int $numBytes = 1): void
-    {
-        $available = strlen($this->buffer) - $this->position;
-        while ($available < $numBytes) {
-            $chunk = fread($this->source, max(1, $this->readChunkSize));
-            if ($chunk === false || $chunk === '') {
-                return;
-            }
-
-            $this->buffer .= $chunk;
-            $available     = strlen($this->buffer) - $this->position;
-        }
-    }
-
-    /**
-     * Slides the buffer over, removing any characters before the current position from the buffer.
-     */
-    private function slideBuffer(): void
-    {
-        $this->buffer   = substr($this->buffer, $this->position);
-        $this->position = 0;
-    }
-
-    /**
-     * Returns the next character in the input, loading buffer if needed.
-     *
-     * @return non-empty-string|null
-     *     null if the end of input has been reached.
-     */
-    private function peekChar(): string|null
-    {
-        // Load the substring from the current position.
-        $this->refill(self::MAX_CODE_POINT_LENGTH);
-        $rest = substr($this->buffer, $this->position);
-        if ($rest === '') {
-            return null;
-        }
-
-        return mb_substr($rest, 0, 1);
-    }
-
-    /**
-     * Advances the position by the given character.
-     */
-    private function eatChar(string $char): void
-    {
-        $this->position += strlen($char);
-    }
-
-    /**
-     * Peeks at the next character, appends it to dest, and returns it.
-     */
-    private function appendChar(string &$dest): string|null
-    {
-        $ch = $this->peekChar();
-        if ($ch === null) {
-            return null;
-        }
-
-        $dest .= $ch;
-        $this->eatChar($ch);
-
-        return $ch;
-    }
-
-    /**
-     * Reads a string of the same length as s from the buffer.
-     */
-    private function eatString(string $s): string
-    {
-        $this->refill(strlen($s));
-        $result          = substr($this->buffer, $this->position, strlen($s));
-        $this->position += strlen($s);
-
-        return $result;
-    }
-
-    // ================================
     // Token recognition
     // ================================
 
@@ -199,12 +84,12 @@ final class TrigReader
      */
     private function skipWhitespaceAndComments(): void
     {
-        $ch = $this->peekChar();
+        $ch = $this->stream->peekChar();
         while (true) {
             // skip pure whitespace
             while ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-                $this->eatChar($ch);
-                $ch = $this->peekChar();
+                $this->stream->eatChar($ch);
+                $ch = $this->stream->peekChar();
             }
 
             // if there is a comment, skip until end of line.
@@ -214,235 +99,590 @@ final class TrigReader
             }
 
             while ($ch !== "\n" && $ch !== "\r" && $ch !== null) {
-                $this->eatChar($ch);
-                $ch = $this->peekChar();
+                $this->stream->eatChar($ch);
+                $ch = $this->stream->peekChar();
             }
         }
     }
 
     /**
-     * Determine token type from the first character (longest match).
+     * Processes the stream to extract the next token.
+     *
+     * @return array{TrigTokenType, string}
+     *   The token type and it's raw value.
      */
-    private function recognizeToken(string $ch): TrigTokenType|null
+    private function processToken(string $ch): array
     {
-        $this->refill(self::KEYWORD_LOOKAHEAD);
-        $rest = substr($this->buffer, $this->position);
+        // First look at unambiguous single character tokens.
+        // Each of these can only start a single type of token.
+        // It is thus unambiguous to return them immediately.
+        foreach (
+            [
+                ';' => TrigTokenType::Semicolon,
+                ',' => TrigTokenType::Comma,
+                '[' => TrigTokenType::LSquare,
+                ']' => TrigTokenType::RSquare,
+                '(' => TrigTokenType::LParen,
+                ')' => TrigTokenType::RParen,
+                '{' => TrigTokenType::LCurly,
+                '}' => TrigTokenType::RCurly,
 
-        if ($ch === '@') {
-            if (self::startsWith($rest, '@prefix')) {
-                return TrigTokenType::AtPrefix;
+            ] as $char => $tokenType
+        ) {
+            if ($ch !== $char) {
+                continue;
             }
 
-            if (self::startsWith($rest, '@base')) {
-                return TrigTokenType::AtBase;
-            }
+            $this->stream->eatString($char);
 
-            if (preg_match('/^@[a-zA-Z]+(-[a-zA-Z0-9]+)*/u', $rest) === 1) {
-                return TrigTokenType::LangTag;
-            }
-        }
-
-        if (self::matchCaseInsensitiveKeyword($rest, 'GRAPH')) {
-            return TrigTokenType::Graph;
-        }
-
-        if (self::matchCaseInsensitiveKeyword($rest, 'PREFIX')) {
-            return TrigTokenType::Prefix;
-        }
-
-        if (self::matchCaseInsensitiveKeyword($rest, 'BASE')) {
-            return TrigTokenType::Base;
-        }
-
-        if ($ch === 'a') {
-            if (self::isWordBoundaryAfter($rest, 'a')) {
-                return TrigTokenType::A;
-            }
-        }
-
-        if (self::startsWith($rest, 'true') && self::isWordBoundaryAfter($rest, 'true')) {
-            return TrigTokenType::True;
-        }
-
-        if (self::startsWith($rest, 'false') && self::isWordBoundaryAfter($rest, 'false')) {
-            return TrigTokenType::False;
+            return [$tokenType, $char];
         }
 
         if ($ch === '<') {
-            return TrigTokenType::IriRef;
+            $value = $this->consumeIriRef();
+
+            return [TrigTokenType::IriRef, $value];
         }
 
-        if (self::startsWith($rest, "'''")) {
-            return TrigTokenType::String;
+        if ($ch === '_') {
+            $value = $this->consumeBlankNodeLabel();
+
+            return [TrigTokenType::BlankNodeLabel, $value];
         }
 
-        if (self::startsWith($rest, '"""')) {
-            return TrigTokenType::String;
+        if ($ch === '^') {
+            $hatHat = $this->stream->eatString('^^');
+            assert($hatHat === '^^', 'expected two hats');
+
+            return [TrigTokenType::HatHat, $hatHat];
         }
 
         if ($ch === '"' || $ch === "'") {
-            return TrigTokenType::String;
+            $value = $this->consumeString();
+
+            return [TrigTokenType::String, $value];
         }
 
-        if ($ch === '_' && strlen($rest) >= 2 && $rest[1] === ':') {
-            return TrigTokenType::BlankNodeLabel;
+        // match @prefix, @base or a language tag
+        $at = $this->matchAt();
+        if ($at !== null) {
+            return [$at[0], $at[1]];
         }
 
-        if ($ch === '[') {
-            return $this->isAnonAhead() ? TrigTokenType::Anon : TrigTokenType::LSquare;
+        // try and match the PNAME_LN or PNAME_NS productions.
+        $tok = $this->matchPName();
+        if ($tok !== null) {
+            [$token, $len] = $tok;
+            $value         = $this->stream->eatString($len);
+
+            return [$token, $value];
+        }
+
+        // Check for fixed-character tokens.
+        foreach (
+            [
+                'a' => TrigTokenType::A,
+                'true' => TrigTokenType::True,
+                'false' => TrigTokenType::False,
+            ] as $word => $token
+        ) {
+            if (! $this->stream->startsWith($word)) {
+                continue;
+            }
+
+            $value = $this->stream->eatString($word);
+
+            return [$token, $value];
+        }
+
+        // check for case-insensitive keywords.
+        // these are case-insensitive.
+        foreach (
+            [
+                'GRAPH' => TrigTokenType::Graph,
+                'PREFIX' => TrigTokenType::Prefix,
+                'BASE' => TrigTokenType::Base,
+            ] as $word => $token
+        ) {
+            if (! $this->stream->startsWith($word, true)) {
+                continue;
+            }
+
+            $value = $this->stream->eatString($word);
+
+            return [$token, $value];
+        }
+
+        $numeric = $this->matchNumericLiteral();
+        if ($numeric !== null) {
+            [$token, $len] = $numeric;
+            $res           = $this->stream->eatString($len);
+
+            return [$token, $res];
+        }
+
+        $this->stream->eatChar($ch);
+        assert($ch === '.', 'expected dot, got ' . $ch);
+
+        return [TrigTokenType::Dot, $ch];
+    }
+
+    /**
+     * Matches @prefix, @base, or a language tag (@[a-zA-Z]+(-[a-zA-Z0-9]+)*).
+     * Only uses peekChar($offset); does not consume.
+     *
+     * @return array{TrigTokenType, string}|null
+     */
+    private function matchAt(): array|null
+    {
+        $offset = 0;
+        $ch     = $this->stream->peekChar($offset);
+        if ($ch !== '@') {
+            return null;
+        }
+
+        $offset += strlen($ch);
+        $ch      = $this->stream->peekChar($offset);
+        if ($ch === null || ! self::isLangTagLetter($ch)) {
+            return null;
+        }
+
+        $offset += strlen($ch);
+
+        while (true) {
+            $ch = $this->stream->peekChar($offset);
+            if ($ch === null) {
+                break;
+            }
+
+            if (self::isLangTagLetter($ch) || self::isDigit($ch)) {
+                $offset += strlen($ch);
+                continue;
+            }
+
+            if ($ch === '-') {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peekChar($offset);
+                if ($ch === null || (! self::isLangTagLetter($ch) && ! self::isDigit($ch))) {
+                    break;
+                }
+
+                $offset += strlen($ch);
+                continue;
+            }
+
+            break;
+        }
+
+        $name = '';
+        $off  = 1;
+        while ($off < $offset) {
+            $c = $this->stream->peekChar($off);
+            if ($c === null) {
+                break;
+            }
+
+            $name .= $c;
+            $off  += strlen($c);
+        }
+
+        $value = $this->stream->eatString('@' . $name);
+        if ($this->currentTokenType === TrigTokenType::String) {
+            return [TrigTokenType::LangTag, $value];
+        }
+
+        if ($name === 'prefix') {
+            return [TrigTokenType::AtPrefix, $value];
+        }
+
+        if ($name === 'base') {
+            return [TrigTokenType::AtBase, $value];
+        }
+
+        // This case shouldn't happen, we just have a weird at.
+        // But whatever!
+        return [TrigTokenType::LangTag, $value];
+    }
+
+    private static function isLangTagLetter(string $ch): bool
+    {
+        if ($ch === '' || strlen($ch) !== 1) {
+            return false;
+        }
+
+        $o = ord($ch[0]);
+
+        return ($o >= 0x41 && $o <= 0x5A) || ($o >= 0x61 && $o <= 0x7A);
+    }
+
+    /**
+     * Matches any numeric literal at the start of the stream.
+     * Only uses peekChar($offset); does not consume.
+     *
+     * @return array{TrigTokenType, int}|null
+     *   The token type and the byte length of the matched numeric literal.
+     *   Null if no match.
+     *
+     * [20] INTEGER ::= [+-]? [0-9]+
+     * [21] DECIMAL ::= [+-]? ([0-9]* '.' [0-9]+)
+     * [22] DOUBLE ::= [+-]? ([0-9]+ '.' [0-9]* EXPONENT | '.' [0-9]+ EXPONENT | [0-9]+ EXPONENT)
+     * [154s] EXPONENT ::= [eE] [+-]? [0-9]+
+     */
+    private function matchNumericLiteral(): array|null
+    {
+        $offset = 0;
+        $ch     = $this->stream->peekChar($offset);
+        if ($ch === null) {
+            return null;
+        }
+
+        if ($ch === '+' || $ch === '-') {
+            $offset += strlen($ch);
+            $ch      = $this->stream->peekChar($offset);
+        }
+
+        if ($ch === null) {
+            return null;
         }
 
         if ($ch === '.') {
-            return TrigTokenType::Dot;
+            $offset += strlen($ch);
+            $ch      = $this->stream->peekChar($offset);
+            if ($ch === null || ! self::isDigit($ch)) {
+                return null;
+            }
+
+            while ($ch !== null && self::isDigit($ch)) {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peekChar($offset);
+            }
+
+            if ($ch === 'e' || $ch === 'E') {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peekChar($offset);
+                if ($ch === '+' || $ch === '-') {
+                    $offset += strlen($ch);
+                    $ch      = $this->stream->peekChar($offset);
+                }
+
+                if ($ch === null || ! self::isDigit($ch)) {
+                    return null;
+                }
+
+                while ($ch !== null && self::isDigit($ch)) {
+                    $offset += strlen($ch);
+                    $ch      = $this->stream->peekChar($offset);
+                }
+
+                return [TrigTokenType::Double, $offset];
+            }
+
+            return [TrigTokenType::Decimal, $offset];
         }
 
-        if ($ch === ';') {
-            return TrigTokenType::Semicolon;
+        if (! self::isDigit($ch)) {
+            return null;
         }
 
-        if ($ch === ',') {
-            return TrigTokenType::Comma;
+        while ($ch !== null && self::isDigit($ch)) {
+            $offset += strlen($ch);
+            $ch      = $this->stream->peekChar($offset);
         }
 
-        if ($ch === ']') {
-            return TrigTokenType::RSquare;
+        if ($ch === null) {
+            return [TrigTokenType::Integer, $offset];
         }
 
-        if ($ch === '(') {
-            return TrigTokenType::LParen;
+        if ($ch === 'e' || $ch === 'E') {
+            $offset += strlen($ch);
+            $ch      = $this->stream->peekChar($offset);
+            if ($ch === '+' || $ch === '-') {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peekChar($offset);
+            }
+
+            if ($ch === null || ! self::isDigit($ch)) {
+                return null;
+            }
+
+            while ($ch !== null && self::isDigit($ch)) {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peekChar($offset);
+            }
+
+            return [TrigTokenType::Double, $offset];
         }
 
-        if ($ch === ')') {
-            return TrigTokenType::RParen;
+        if ($ch === '.') {
+            $offset          += strlen($ch);
+            $ch               = $this->stream->peekChar($offset);
+            $hasDigitAfterDot = false;
+            while ($ch !== null && self::isDigit($ch)) {
+                $hasDigitAfterDot = true;
+                $offset          += strlen($ch);
+                $ch               = $this->stream->peekChar($offset);
+            }
+
+            if ($ch === 'e' || $ch === 'E') {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peekChar($offset);
+                if ($ch === '+' || $ch === '-') {
+                    $offset += strlen($ch);
+                    $ch      = $this->stream->peekChar($offset);
+                }
+
+                if ($ch === null || ! self::isDigit($ch)) {
+                    return null;
+                }
+
+                while ($ch !== null && self::isDigit($ch)) {
+                    $offset += strlen($ch);
+                    $ch      = $this->stream->peekChar($offset);
+                }
+
+                return [TrigTokenType::Double, $offset];
+            }
+
+            return $hasDigitAfterDot ? [TrigTokenType::Decimal, $offset] : null;
         }
 
-        if ($ch === '{') {
-            return TrigTokenType::LCurly;
-        }
-
-        if ($ch === '}') {
-            return TrigTokenType::RCurly;
-        }
-
-        if (strlen($rest) >= 2 && $rest[0] === '^' && $rest[1] === '^') {
-            return TrigTokenType::HatHat;
-        }
-
-        if (self::matchDouble($rest)) {
-            return TrigTokenType::Double;
-        }
-
-        if (self::matchDecimal($rest)) {
-            return TrigTokenType::Decimal;
-        }
-
-        if (self::matchInteger($rest)) {
-            return TrigTokenType::Integer;
-        }
-
-        if (self::matchPnameLn($rest)) {
-            return TrigTokenType::PnameLn;
-        }
-
-        if (self::matchPnameNs($rest)) {
-            return TrigTokenType::PnameNs;
-        }
-
-        return null;
+        return [TrigTokenType::Integer, $offset];
     }
 
-    private function consumeRecognizedToken(TrigTokenType $type): string
+    private static function isDigit(string $ch): bool
     {
-        $source = '';
+        return $ch !== '' && strlen($ch) === 1 && ord($ch[0]) >= 0x30 && ord($ch[0]) <= 0x39;
+    }
 
-        switch ($type) {
-            case TrigTokenType::AtPrefix:
-                return $this->eatString('@prefix');
-
-            case TrigTokenType::AtBase:
-                return $this->eatString('@base');
-
-            case TrigTokenType::A:
-                return $this->eatString('a');
-
-            case TrigTokenType::True:
-                return $this->eatString('true');
-
-            case TrigTokenType::False:
-                return $this->eatString('false');
-
-            case TrigTokenType::Graph:
-                return $this->eatString('GRAPH');
-
-            case TrigTokenType::Prefix:
-                return $this->eatString('PREFIX');
-
-            case TrigTokenType::Base:
-                return $this->eatString('BASE');
-
-            case TrigTokenType::Dot:
-            case TrigTokenType::Semicolon:
-            case TrigTokenType::Comma:
-            case TrigTokenType::LSquare:
-            case TrigTokenType::RSquare:
-            case TrigTokenType::LParen:
-            case TrigTokenType::RParen:
-            case TrigTokenType::LCurly:
-            case TrigTokenType::RCurly:
-                $this->appendChar($source);
-
-                return $source;
-
-            case TrigTokenType::HatHat:
-                return $this->eatString('^^');
-
-            case TrigTokenType::IriRef:
-                return $this->consumeIriRef();
-
-            case TrigTokenType::String:
-                return $this->consumeString();
-
-            case TrigTokenType::BlankNodeLabel:
-                return $this->consumeBlankNodeLabel();
-
-            case TrigTokenType::Anon:
-                return $this->consumeAnon();
-
-            case TrigTokenType::Integer:
-            case TrigTokenType::Decimal:
-            case TrigTokenType::Double:
-                return $this->consumeNumber();
-
-            case TrigTokenType::LangTag:
-                return $this->consumeLangTag();
-
-            case TrigTokenType::PnameNs:
-                return $this->consumePnameNs();
-
-            case TrigTokenType::PnameLn:
-                return $this->consumePnameLn();
-
-            default:
-                return '';
+    /**
+     * Attempts to match a PNAME_LN or PNAME_NS at the current position.
+     * Only uses peekChar($offset); does not consume.
+     *
+     * @return array{TrigTokenType, int}|null [token type, byte length of matched PName] or null if no match
+     *
+     * [139s] PNAME_NS ::= PN_PREFIX? ':'
+     * [140s] PNAME_LN ::= PNAME_NS PN_LOCAL
+     * [167s] PN_PREFIX ::= PN_CHARS_BASE ((PN_CHARS | '.')* PN_CHARS)?
+     * [168s] PN_LOCAL  ::= (PN_CHARS_U | ':' | [0-9] | PLX) ((PN_CHARS | '.' | ':' | PLX)* (PN_CHARS | ':' | PLX))?
+     */
+    private function matchPName(): array|null
+    {
+        $offset = 0;
+        $ch     = $this->stream->peekChar($offset);
+        if ($ch === null) {
+            return null;
         }
+
+        if ($ch === ':') {
+            $offset += strlen($ch);
+            $type    = $this->isPnLocalStart($offset) ? TrigTokenType::PnameLn : TrigTokenType::PnameNs;
+            $len     = $type === TrigTokenType::PnameLn
+                ? $offset + $this->pnLocalByteLength($offset)
+                : $offset;
+
+            return [$type, $len];
+        }
+
+        if (! self::isPnCharsBase($ch)) {
+            return null;
+        }
+
+        $offset       += strlen($ch);
+        $lastWasPnChar = true;
+
+        while (true) {
+            $ch = $this->stream->peekChar($offset);
+            if ($ch === null) {
+                return null;
+            }
+
+            if ($ch === ':') {
+                if (! $lastWasPnChar) {
+                    return null;
+                }
+
+                $offset += strlen($ch);
+                $type    = $this->isPnLocalStart($offset) ? TrigTokenType::PnameLn : TrigTokenType::PnameNs;
+                $len     = $type === TrigTokenType::PnameLn
+                    ? $offset + $this->pnLocalByteLength($offset)
+                    : $offset;
+
+                return [$type, $len];
+            }
+
+            if ($ch === '.') {
+                $lastWasPnChar = false;
+                $offset       += strlen($ch);
+                continue;
+            }
+
+            if (self::isPnChars($ch)) {
+                $lastWasPnChar = true;
+                $offset       += strlen($ch);
+                continue;
+            }
+
+            return null;
+        }
+    }
+
+    /**
+     * Byte length of PN_LOCAL starting at $offset (does not consume).
+     * PN_LOCAL cannot end with '.'; trailing '.' is not counted.
+     */
+    private function pnLocalByteLength(int $offset): int
+    {
+        $first = $this->pnLocalUnitLength($offset, true);
+        if ($first === 0) {
+            return 0;
+        }
+
+        $len         = $first;
+        $pos         = $offset + $first;
+        $lastWasDot  = false;
+        $lastUnitLen = 0;
+
+        while (($unit = $this->pnLocalUnitLength($pos, false)) !== 0) {
+            $ch          = $this->stream->peekChar($pos);
+            $lastWasDot  = ($ch === '.');
+            $lastUnitLen = $unit;
+            $len        += $unit;
+            $pos        += $unit;
+        }
+
+        if ($lastWasDot) {
+            $len -= $lastUnitLen;
+        }
+
+        return $len;
+    }
+
+    /**
+     * Byte length of one PN_LOCAL unit at $offset: one char (PN_CHARS, '.', ':') or one PLX.
+     * $first = true for the first unit (PN_CHARS_U | ':' | [0-9] | PLX), false for rest.
+     */
+    private function pnLocalUnitLength(int $offset, bool $first): int
+    {
+        $ch = $this->stream->peekChar($offset);
+        if ($ch === null) {
+            return 0;
+        }
+
+        if ($first) {
+            if (self::isPnCharsU($ch) || $ch === ':' || self::isDigit($ch)) {
+                return strlen($ch);
+            }
+        } else {
+            if (self::isPnChars($ch) || $ch === '.' || $ch === ':') {
+                return strlen($ch);
+            }
+        }
+
+        $plx = $this->tryPlxLength($offset);
+        if ($plx !== 0) {
+            return $plx;
+        }
+
+        return 0;
+    }
+
+    /** Whether there is a PN_LOCAL at $offset (first char of local part). */
+    private function isPnLocalStart(int $offset): bool
+    {
+        $ch = $this->stream->peekChar($offset);
+        if ($ch === null) {
+            return false;
+        }
+
+        if (self::isPnCharsU($ch) || $ch === ':' || self::isDigit($ch)) {
+            return true;
+        }
+
+        return $this->tryPlxLength($offset) !== 0;
+    }
+
+    /** Returns byte length of PLX at $offset, or 0 if not PLX. */
+    private function tryPlxLength(int $offset): int
+    {
+        $ch = $this->stream->peekChar($offset);
+        if ($ch === null) {
+            return 0;
+        }
+
+        if ($ch === '%') {
+            $len = strlen($ch);
+            $h1  = $this->stream->peekChar($offset + $len);
+            if ($h1 === null || ! self::isHex($h1)) {
+                return 0;
+            }
+
+            $len += strlen($h1);
+            $h2   = $this->stream->peekChar($offset + $len);
+            if ($h2 === null || ! self::isHex($h2)) {
+                return 0;
+            }
+
+            return $len + strlen($h2);
+        }
+
+        if ($ch === '\\') {
+            $len = strlen($ch);
+            $esc = $this->stream->peekChar($offset + $len);
+            if ($esc !== null && self::isPnLocalEscChar($esc)) {
+                return $len + strlen($esc);
+            }
+        }
+
+        return 0;
+    }
+
+    private static function isPnCharsBase(string $ch): bool
+    {
+        return $ch !== '' && preg_match('/^[\p{L}]$/u', $ch) === 1;
+    }
+
+    private static function isPnCharsU(string $ch): bool
+    {
+        return $ch === '_' || self::isPnCharsBase($ch);
+    }
+
+    private static function isPnChars(string $ch): bool
+    {
+        return $ch !== '' && preg_match('/^[\p{L}_0-9\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]$/u', $ch) === 1;
+    }
+
+    private static function isHex(string $ch): bool
+    {
+        if ($ch === '' || strlen($ch) !== 1) {
+            return false;
+        }
+
+        $o = ord($ch[0]);
+
+        return ($o >= 0x30 && $o <= 0x39) || ($o >= 0x41 && $o <= 0x46) || ($o >= 0x61 && $o <= 0x66);
+    }
+
+    private static function isPnLocalEscChar(string $ch): bool
+    {
+        return $ch !== '' && preg_match("/^[_~.\\-!\\\$&'()*+,;=\\/?#@%]$/u", $ch) === 1;
     }
 
     private function consumeIriRef(): string
     {
         $source = '';
-        $ch     = $this->appendChar($source);
+        $ch     = $this->stream->appendChar($source);
         assert($ch === '<', 'IRIREF must start with <');
         while (true) {
-            $ch = $this->appendChar($source);
+            $ch = $this->stream->appendChar($source);
             if ($ch === null || $ch === '>') {
                 break;
             }
 
-            if ($ch !== '\\' || $this->position > strlen($this->buffer)) {
+            if ($ch !== '\\' || $this->stream->position > strlen($this->stream->buffer)) {
                 continue;
             }
 
-            $next = $this->appendChar($source);
+            $next = $this->stream->appendChar($source);
             if ($next !== 'u' && $next !== 'U') {
                 continue;
             }
@@ -462,12 +702,12 @@ final class TrigReader
         assert($source !== '' && (substr($source, -1) === 'u' || substr($source, -1) === 'U'), 'source must end with u or U');
         $hexLen = substr($source, -1) === 'u' ? 4 : 8;
         for ($i = 0; $i < $hexLen; $i++) {
-            $c = $this->peekChar();
+            $c = $this->stream->peekChar();
             if ($c === null) {
                 break;
             }
 
-            $this->appendChar($source);
+            $this->stream->appendChar($source);
         }
 
         assert(strlen($source) >= 2 + $hexLen, 'incomplete \\u or \\U escape');
@@ -476,18 +716,18 @@ final class TrigReader
     private function consumeString(): string
     {
         $source = '';
-        $ch     = $this->peekChar();
+        $ch     = $this->stream->peekChar();
         assert($ch !== null, 'expected string delimiter');
         $isLong = false;
         $delim  = $ch;
         if ($delim === '"' || $delim === "'") {
-            $this->appendChar($source);
-            $next = $this->peekChar();
+            $this->stream->appendChar($source);
+            $next = $this->stream->peekChar();
             if ($next === $delim) {
-                $this->appendChar($source);
-                $next2 = $this->peekChar();
+                $this->stream->appendChar($source);
+                $next2 = $this->stream->peekChar();
                 if ($next2 === $delim) {
-                    $this->appendChar($source);
+                    $this->stream->appendChar($source);
                     $isLong = true;
                 }
             }
@@ -500,12 +740,12 @@ final class TrigReader
         if ($isLong) {
             $end = $delim . $delim . $delim;
             while (true) {
-                $ch = $this->peekChar();
+                $ch = $this->stream->peekChar();
                 if ($ch === null) {
                     break;
                 }
 
-                $this->appendChar($source);
+                $this->stream->appendChar($source);
                 $pos = strlen($source);
                 if ($pos >= 6 && substr($source, -3) === $end && ($pos === 6 || $source[$pos - 4] !== '\\')) {
                     break;
@@ -516,21 +756,21 @@ final class TrigReader
         }
 
         while (true) {
-            $ch = $this->peekChar();
+            $ch = $this->stream->peekChar();
             if ($ch === null) {
                 break;
             }
 
             if ($ch === $delim) {
-                $this->appendChar($source);
+                $this->stream->appendChar($source);
                 break;
             }
 
             if ($ch === '\\') {
-                $this->appendChar($source);
-                $next = $this->peekChar();
+                $this->stream->appendChar($source);
+                $next = $this->stream->peekChar();
                 if ($next !== null) {
-                    $this->appendChar($source);
+                    $this->stream->appendChar($source);
                     if ($next === 'u' || $next === 'U') {
                         $this->consumeUchar($source);
                     }
@@ -539,7 +779,7 @@ final class TrigReader
                 continue;
             }
 
-            $this->appendChar($source);
+            $this->stream->appendChar($source);
         }
 
         return $source;
@@ -548,10 +788,10 @@ final class TrigReader
     private function consumeBlankNodeLabel(): string
     {
         $source = '';
-        $this->appendChar($source);
-        $this->appendChar($source);
+        $this->stream->appendChar($source);
+        $this->stream->appendChar($source);
         assert(substr($source, -2) === '_:', 'blank node label must start with _:');
-        $rest = substr($this->buffer, $this->position);
+        $rest = substr($this->stream->buffer, $this->stream->position);
         $m    = null;
         if (preg_match('/\G[\p{L}_0-9](?:[\p{L}_0-9.\\-]|\x{00B7}|[\x{0300}-\x{036F}]|[\x{203F}-\x{2040}])*/Su', $rest, $m) === 1) {
             $label = $m[0];
@@ -561,299 +801,10 @@ final class TrigReader
             }
 
             for ($i = 0; $i < $len; $i++) {
-                $this->appendChar($source);
+                $this->stream->appendChar($source);
             }
         }
 
         return $source;
-    }
-
-    private function consumeAnon(): string
-    {
-        $source = '';
-        $this->appendChar($source);
-        assert($source === '[', 'ANON must start with [');
-        while (true) {
-            $ch = $this->peekChar();
-            if ($ch === null || $ch === ']') {
-                break;
-            }
-
-            if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-                $this->appendChar($source);
-                continue;
-            }
-
-            if ($ch === '#') {
-                while (true) {
-                    $this->appendChar($source);
-                    $ch = $this->peekChar();
-                    if ($ch === null || $ch === "\n" || $ch === "\r") {
-                        break;
-                    }
-                }
-
-                continue;
-            }
-
-            break;
-        }
-
-        $ch = $this->peekChar();
-        assert($ch === ']', 'ANON must be [ WS* ]');
-        $this->appendChar($source);
-
-        return $source;
-    }
-
-    private function consumeNumber(): string
-    {
-        $source = '';
-        $ch     = $this->peekChar();
-        if ($ch === '+' || $ch === '-') {
-            $this->appendChar($source);
-        }
-
-        while (true) {
-            $ch = $this->peekChar();
-            if ($ch === null || ! self::isDigit($ch)) {
-                break;
-            }
-
-            $this->appendChar($source);
-        }
-
-        if ($this->peekChar() === '.') {
-            $this->appendChar($source);
-            while (true) {
-                $ch = $this->peekChar();
-                if ($ch === null || ! self::isDigit($ch)) {
-                    break;
-                }
-
-                $this->appendChar($source);
-            }
-        }
-
-        $ch = $this->peekChar();
-        if ($ch === 'e' || $ch === 'E') {
-            $this->appendChar($source);
-            $ch = $this->peekChar();
-            if ($ch === '+' || $ch === '-') {
-                $this->appendChar($source);
-            }
-
-            while (true) {
-                $ch = $this->peekChar();
-                if ($ch === null || ! self::isDigit($ch)) {
-                    break;
-                }
-
-                $this->appendChar($source);
-            }
-        }
-
-        return $source;
-    }
-
-    private function consumeLangTag(): string
-    {
-        $source = '';
-        $rest   = substr($this->buffer, $this->position);
-        $m      = null;
-        if (preg_match('/\G@[a-zA-Z]+(-[a-zA-Z0-9]+)*/u', $rest, $m) === 1) {
-            $len = strlen($m[0]);
-            for ($i = 0; $i < $len; $i++) {
-                $this->appendChar($source);
-            }
-        } else {
-            $this->appendChar($source);
-        }
-
-        return $source;
-    }
-
-    private function consumePnameNs(): string
-    {
-        $source = '';
-        $rest   = substr($this->buffer, $this->position);
-        $m      = null;
-        if (preg_match('/\G[a-zA-Z\x{00C0}-\x{00D6}\x{00D8}-\x{00F6}\x{00F8}-\x{02FF}](?:[\p{L}_0-9.\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]|\\.)*/u', $rest, $m) === 1) {
-            foreach (self::mbChars($m[0]) as $_c) {
-                $this->appendChar($source);
-            }
-        }
-
-        $ch = $this->peekChar();
-        if ($ch === ':') {
-            $this->appendChar($source);
-        }
-
-        return $source;
-    }
-
-    private function consumePnameLn(): string
-    {
-        $source = $this->consumePnameNs();
-        $rest   = substr($this->buffer, $this->position);
-        $m      = null;
-        if (preg_match('/\G(?:[\p{L}_]|[0-9]|%[0-9A-Fa-f]{2}|\\[._~!\$&\'()*+,;=\/?#@%-])(?:[\p{L}_0-9.\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]|[:%]|\\[._~!\$&\'()*+,;=\/?#@%-])*/u', $rest, $m) === 1) {
-            $local = $m[0];
-            $len   = strlen($local);
-            $i     = 0;
-            while ($i < $len) {
-                $b = ord($local[$i]);
-                $n = $b < 0x80 ? 1 : ($b < 0xE0 ? 2 : ($b < 0xF0 ? 3 : 4));
-                for ($j = 0; $j < $n && $i < $len; $j++, $i++) {
-                    $this->appendChar($source);
-                }
-            }
-        }
-
-        return $source;
-    }
-
-    /** @return list<string> */
-    private static function mbChars(string $s): array
-    {
-        $chars = [];
-        $len   = strlen($s);
-        $i     = 0;
-        while ($i < $len) {
-            $b       = ord($s[$i]);
-            $n       = $b < 0x80 ? 1 : ($b < 0xE0 ? 2 : ($b < 0xF0 ? 3 : 4));
-            $chars[] = substr($s, $i, $n);
-            $i      += $n;
-        }
-
-        return $chars;
-    }
-
-    private static function startsWith(string $buffer, string $prefix): bool
-    {
-        $len = strlen($prefix);
-        if (strlen($buffer) < $len) {
-            return false;
-        }
-
-        return substr($buffer, 0, $len) === $prefix;
-    }
-
-    private static function isWordBoundaryAfter(string $buffer, string $word): bool
-    {
-        $len = strlen($word);
-        if (strlen($buffer) < $len) {
-            return false;
-        }
-
-        if (substr($buffer, 0, $len) !== $word) {
-            return false;
-        }
-
-        if (strlen($buffer) === $len) {
-            return true;
-        }
-
-        $next = $buffer[$len];
-
-        return $next === ' ' || $next === "\t" || $next === "\n" || $next === "\r" || $next === '.' || $next === ';' || $next === ',' || $next === '[' || $next === ']' || $next === '(' || $next === ')' || $next === '{' || $next === '}' || $next === '<' || $next === '>' || $next === '"' || $next === "'" || $next === '#' || $next === '^' || $next === '@';
-    }
-
-    private static function matchCaseInsensitiveKeyword(string $buffer, string $keyword): bool
-    {
-        $len = strlen($keyword);
-        if (strlen($buffer) < $len) {
-            return false;
-        }
-
-        return strcasecmp(substr($buffer, 0, $len), $keyword) === 0 && (strlen($buffer) === $len || ! self::isPnameChar(substr($buffer, $len, 1)));
-    }
-
-    /**
-     * Whether after '[' the next non-WS, non-comment character is ']' (i.e. this is ANON).
-     */
-    private function isAnonAhead(): bool
-    {
-        // TODO: Bug for edge-of-page
-        $rest = substr($this->buffer, $this->position + 1);
-        $len  = strlen($rest);
-        $p    = 0;
-        while ($p < $len) {
-            $c = $rest[$p];
-            if ($c === ' ' || $c === "\t" || $c === "\n" || $c === "\r") {
-                $p++;
-                continue;
-            }
-
-            if ($c === '#') {
-                while ($p < $len && $rest[$p] !== "\n" && $rest[$p] !== "\r") {
-                    $p++;
-                }
-
-                continue;
-            }
-
-            break;
-        }
-
-        return $p < $len && $rest[$p] === ']';
-    }
-
-    private static function isPnameChar(string $ch): bool
-    {
-        if ($ch === '') {
-            return false;
-        }
-
-        $o = ord($ch[0]);
-
-        return ($o >= 0x41 && $o <= 0x5A) || ($o >= 0x61 && $o <= 0x7A) || ($o >= 0x30 && $o <= 0x39) || $o === 0x5F || $o === 0x2D || $o === 0x2E;
-    }
-
-    private static function matchInteger(string $buffer): bool
-    {
-        return preg_match('/^[+-]?[0-9]+(?![\p{L}_0-9.])/u', $buffer) === 1;
-    }
-
-    private static function matchDecimal(string $buffer): bool
-    {
-        return preg_match('/^[+-]?(?:[0-9]*\\.[0-9]+)(?![0-9Ee])/u', $buffer) === 1;
-    }
-
-    private static function matchDouble(string $buffer): bool
-    {
-        return preg_match('/^[+-]?(?:[0-9]+\\.[0-9]*(?:[eE][+-]?[0-9]+)|\\.[0-9]+(?:[eE][+-]?[0-9]+)|[0-9]+[eE][+-]?[0-9]+)/u', $buffer) === 1;
-    }
-
-    private static function matchPnameNs(string $buffer): bool
-    {
-        return preg_match('/^[a-zA-Z\x{00C0}-\x{00D6}\x{00D8}-\x{00F6}\x{00F8}-\x{02FF}](?:[\p{L}_0-9.\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]|\\.)*:/u', $buffer) === 1 || (strlen($buffer) >= 1 && $buffer[0] === ':');
-    }
-
-    private static function matchPnameLn(string $buffer): bool
-    {
-        if (preg_match('/^[a-zA-Z\x{00C0}-\x{00D6}\x{00D8}-\x{00F6}\x{00F8}-\x{02FF}](?:[\p{L}_0-9.\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]|\\.)*:/u', $buffer) !== 1 && ! (strlen($buffer) >= 1 && $buffer[0] === ':')) {
-            return false;
-        }
-
-        $colonPos = strpos($buffer, ':');
-        if ($colonPos === false) {
-            return false;
-        }
-
-        $local = substr($buffer, $colonPos + 1);
-
-        return $local !== '' && preg_match('/^(?:[\p{L}_]|[0-9]|%[0-9A-Fa-f]{2}|\\[._~!\$&\'()*+,;=\/?#@%-])(?:[\p{L}_0-9.\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]|[:%]|\\[._~!\$&\'()*+,;=\/?#@%-])*/u', $local) === 1;
-    }
-
-    private static function isDigit(string $ch): bool
-    {
-        if ($ch === '' || strlen($ch) > 1) {
-            return false;
-        }
-
-        $o = ord($ch[0]);
-
-        return $o >= 0x30 && $o <= 0x39;
     }
 }

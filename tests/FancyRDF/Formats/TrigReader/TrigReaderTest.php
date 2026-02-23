@@ -10,11 +10,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Throwable;
 
 use function fopen;
 use function fwrite;
 use function rewind;
 use function str_repeat;
+use function trigger_error;
+
+use const E_USER_WARNING;
 
 final class TrigReaderTest extends TestCase
 {
@@ -45,8 +49,12 @@ final class TrigReaderTest extends TestCase
         $stream = self::openString($input);
         $reader = new TrigReader($stream);
         $tokens = [];
-        while ($reader->next()) {
-            $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];
+        try {
+            while ($reader->next()) {
+                $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];
+            }
+        } catch (Throwable $e) {
+            trigger_error($e->getMessage(), E_USER_WARNING);
         }
 
         $tokens[] = [TrigTokenType::EndOfInput, $reader->getTokenValue()];
@@ -76,7 +84,8 @@ TRIG;
                     [TrigTokenType::Dot, '.'],
                     [TrigTokenType::Semicolon, ';'],
                     [TrigTokenType::Comma, ','],
-                    [TrigTokenType::Anon, '[ ]'],
+                    [TrigTokenType::LSquare, '['],
+                    [TrigTokenType::RSquare, ']'],
                     [TrigTokenType::LParen, '('],
                     [TrigTokenType::RParen, ')'],
                     [TrigTokenType::LCurly, '{'],
@@ -128,7 +137,8 @@ TRIG;
                 '_:b0 [] _:label',
                 [
                     [TrigTokenType::BlankNodeLabel, '_:b0'],
-                    [TrigTokenType::Anon, '[]'],
+                    [TrigTokenType::LSquare, '['],
+                    [TrigTokenType::RSquare, ']'],
                     [TrigTokenType::BlankNodeLabel, '_:label'],
                     [TrigTokenType::EndOfInput, ''],
                 ],

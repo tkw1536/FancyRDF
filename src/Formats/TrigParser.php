@@ -185,7 +185,7 @@ final class TrigParser extends FiberIterator
 
     private function parseTriplesOrGraphBlock(TrigTokenType $firstType): void
     {
-        if ($this->isTrig && ($firstType === TrigTokenType::IriRef || $firstType === TrigTokenType::PnameLn || $firstType === TrigTokenType::PnameNs || $firstType === TrigTokenType::BlankNodeLabel || $firstType === TrigTokenType::Anon)) {
+        if ($this->isTrig && ($firstType === TrigTokenType::IriRef || $firstType === TrigTokenType::PnameLn || $firstType === TrigTokenType::PnameNs || $firstType === TrigTokenType::BlankNodeLabel)) {
             $label = $this->parseLabelOrSubjectFromCurrent();
             if ($label !== null) {
                 // Skip to LCurly (graph block) or verb (subject of triple)
@@ -355,7 +355,6 @@ final class TrigParser extends FiberIterator
             TrigTokenType::IriRef => $this->parseIriRefTerm(),
             TrigTokenType::PnameLn, TrigTokenType::PnameNs => $this->parsePnameTerm(),
             TrigTokenType::BlankNodeLabel => $this->parseBlankNodeLabel(),
-            TrigTokenType::Anon => $this->parseAnon(),
             TrigTokenType::LSquare => $this->parseBlankNodePropertyListSubject(),
             TrigTokenType::LParen => $this->parseCollectionSubject(),
             default => throw new Exception('expected subject, got ' . $type->value),
@@ -381,7 +380,6 @@ final class TrigParser extends FiberIterator
             TrigTokenType::IriRef => $this->parseIriRefTerm(),
             TrigTokenType::PnameLn, TrigTokenType::PnameNs => $this->parsePnameTerm(),
             TrigTokenType::BlankNodeLabel => $this->parseBlankNodeLabel(),
-            TrigTokenType::Anon => $this->parseAnon(),
             default => null,
         };
     }
@@ -404,7 +402,6 @@ final class TrigParser extends FiberIterator
             TrigTokenType::IriRef => $this->parseIriRefTerm(),
             TrigTokenType::PnameLn, TrigTokenType::PnameNs => $this->parsePnameTerm(),
             TrigTokenType::BlankNodeLabel => $this->parseBlankNodeLabel(),
-            TrigTokenType::Anon => $this->parseAnon(),
             TrigTokenType::LSquare => $this->parseBlankNodePropertyListObject(),
             TrigTokenType::LParen => $this->parseCollectionObject(),
             TrigTokenType::String => $this->parseLiteral(),
@@ -580,7 +577,6 @@ final class TrigParser extends FiberIterator
                 TrigTokenType::IriRef => $this->parseIriRefTerm(),
                 TrigTokenType::PnameLn, TrigTokenType::PnameNs => $this->parsePnameTerm(),
                 TrigTokenType::BlankNodeLabel => $this->parseBlankNodeLabel(),
-                TrigTokenType::Anon => $this->parseAnon(),
                 TrigTokenType::LSquare => $this->parseBlankNodePropertyListObject(),
                 TrigTokenType::LParen => $this->parseCollectionObject(),
                 TrigTokenType::String => $this->parseLiteral(),

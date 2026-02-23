@@ -21,8 +21,8 @@ enum TrigTokenType: string
 
     // Keywords (case-insensitive): GRAPH, PREFIX, BASE
     case Graph  = 'GRAPH';
-    case Prefix = 'PREFIX';
-    case Base   = 'BASE';
+    case Prefix = 'PREFIX'; // or '@base'
+    case Base   = 'BASE'; // or '@prefix'
 
     // Punctuation
     case Dot       = '.';
@@ -41,7 +41,6 @@ enum TrigTokenType: string
     case PnameNs        = 'PNAME_NS';
     case PnameLn        = 'PNAME_LN';
     case BlankNodeLabel = 'BLANK_NODE_LABEL';
-    case Anon           = 'ANON';
 
     // String (all four string productions)
     case String = 'STRING';
