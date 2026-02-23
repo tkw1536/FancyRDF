@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\FancyRDF\Formats;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
+use FancyRDF\Streaming\ResourceStreamReader;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
@@ -208,7 +209,7 @@ final class TrigParserTest extends TestCase
     public function testParse(string $input, array $expected, bool $isTrig): void
     {
         $stream = self::openString($input);
-        $reader = new TrigReader($stream);
+        $reader = new TrigReader(new ResourceStreamReader($stream));
         $parser = new TrigParser($reader, $isTrig);
 
         $parsed = iterator_to_array($parser);

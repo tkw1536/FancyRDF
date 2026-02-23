@@ -6,6 +6,7 @@ namespace FancyRDF\Tests\FancyRDF\Formats\TrigReader;
 
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigTokenType;
+use FancyRDF\Streaming\ResourceStreamReader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
@@ -47,7 +48,7 @@ final class TrigReaderTest extends TestCase
     public function testTokenize(string $input, array $expected): void
     {
         $stream = self::openString($input);
-        $reader = new TrigReader($stream);
+        $reader = new TrigReader(new ResourceStreamReader($stream));
         $tokens = [];
         try {
             while ($reader->next()) {
@@ -223,7 +224,7 @@ TRIG;
     {
         $chunk  = str_repeat(' ', 500) . '.' . str_repeat(' ', 500);
         $stream = self::openString($chunk);
-        $reader = new TrigReader($stream, 256);
+        $reader = new TrigReader(new ResourceStreamReader($stream, 256));
         $tokens = [];
         while ($reader->next()) {
             $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];

@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\FancyRDF\Formats\TrigReader;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
+use FancyRDF\Streaming\ResourceStreamReader;
 use FancyRDF\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
@@ -93,7 +94,7 @@ final class TrigReaderW3CTest extends TestCase
 
         try {
             // create a reader
-            $reader = new TrigReader($stream);
+            $reader = new TrigReader(new ResourceStreamReader($stream));
 
             /** phpcs:disable Generic.CodeAnalysis.EmptyStatement.DetectedWhile */
             while ($reader->next()) {
@@ -118,7 +119,7 @@ final class TrigReaderW3CTest extends TestCase
         }
 
         try {
-            $reader = new TrigReader($stream);
+            $reader = new TrigReader(new ResourceStreamReader($stream));
 
             /** phpcs:disable Generic.CodeAnalysis.EmptyStatement.DetectedWhile */
             while ($reader->next()) {

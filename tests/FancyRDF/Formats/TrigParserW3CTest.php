@@ -8,6 +8,7 @@ use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
+use FancyRDF\Streaming\ResourceStreamReader;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancyRDF\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -73,7 +74,7 @@ final class TrigParserW3CTest extends TestCase
             self::fail('Failed to open file: ' . $path);
         }
 
-        $reader = new TrigReader($stream);
+        $reader = new TrigReader(new ResourceStreamReader($stream));
         $parser = new TrigParser($reader, true);
         $got    = iterator_to_array($parser);
 
