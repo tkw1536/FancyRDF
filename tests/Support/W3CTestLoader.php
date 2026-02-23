@@ -25,6 +25,24 @@ final class W3CTestLoader
     {
     }
 
+    private static function getDocumentBase(string $path): string|null
+    {
+        $baseMaps = [
+            'rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR => 'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-xml/',
+            'rdf_tests' . DIRECTORY_SEPARATOR . 'trig' . DIRECTORY_SEPARATOR => 'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-trig/',
+        ];
+
+        foreach ($baseMaps as $prefix => $base) {
+            $pos = strpos($path, $prefix);
+            if ($pos === false) {
+                continue;
+            }
+            $relativePath = substr($path, $pos + strlen($prefix));
+            return $base . $relativePath;
+        }
+        return null;
+    }
+
     /**
      * Loads a set of test files from a subdirectory of 'rdf_tests'.
      *
@@ -73,16 +91,7 @@ final class W3CTestLoader
                 throw new Exception('Failed to read file: ' . $path);
             }
 
-            // Get the document base url.
-            $rdfTestsPos = strpos($path, 'rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR);
-            if ($rdfTestsPos !== false) {
-                $relativePath = substr($path, $rdfTestsPos + strlen('rdf_tests' . DIRECTORY_SEPARATOR . 'rdfxml' . DIRECTORY_SEPARATOR));
-                $documentBase = 'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-xml/' . $relativePath;
-            } else {
-                $documentBase = null;
-            }
-
-            $cases[$name] = [$path, $content, $documentBase];
+            $cases[$name] = [$path, $content, self::getDocumentBase($path)];
         }
 
         return $cases;
