@@ -47,7 +47,7 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all positive tests tokenize 
     - [ ] Parser: TODO
     - [ ] Serializer: TODO
-    - ✅ passes W3C [Test Suite](https://www.w3.org/2013/RDFXMLTests/)
+    - ✅ passes W3C [Test Suite](https://www.w3.org/2013/TrigTests/)
        - ✅ all positive tests tokenize
        - ✅ all negative tests do not produce errors in production mode.
 - [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
