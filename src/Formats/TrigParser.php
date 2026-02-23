@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats;
 
+use Exception;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigTokenType;
@@ -165,7 +166,6 @@ final class TrigParser extends FiberIterator
         $this->curGraph = null;
         $this->parseTriplesBlock();
         assert($this->reader->getTokenType() === TrigTokenType::RCurly, 'expected }');
-        $this->reader->next();
     }
 
     private function parseGraphKeywordBlock(): void
@@ -181,7 +181,6 @@ final class TrigParser extends FiberIterator
         assert($this->reader->getTokenType() === TrigTokenType::LCurly, 'expected {');
         $this->parseTriplesBlock();
         assert($this->reader->getTokenType() === TrigTokenType::RCurly, 'expected }');
-        $this->reader->next();
     }
 
     private function parseTriplesOrGraphBlock(TrigTokenType $firstType): void
@@ -189,12 +188,23 @@ final class TrigParser extends FiberIterator
         if ($this->isTrig && ($firstType === TrigTokenType::IriRef || $firstType === TrigTokenType::PnameLn || $firstType === TrigTokenType::PnameNs || $firstType === TrigTokenType::BlankNodeLabel || $firstType === TrigTokenType::Anon)) {
             $label = $this->parseLabelOrSubjectFromCurrent();
             if ($label !== null) {
-                $nextType = $this->reader->next() ? $this->reader->getTokenType() : TrigTokenType::EndOfInput;
+                // Skip to LCurly (graph block) or verb (subject of triple)
+                $nextType = TrigTokenType::EndOfInput;
+                while ($this->reader->next()) {
+                    $nextType = $this->reader->getTokenType();
+                    if ($nextType === TrigTokenType::LCurly) {
+                        break;
+                    }
+
+                    if ($nextType === TrigTokenType::IriRef || $nextType === TrigTokenType::PnameLn || $nextType === TrigTokenType::PnameNs || $nextType === TrigTokenType::A) {
+                        break;
+                    }
+                }
+
                 if ($nextType === TrigTokenType::LCurly) {
                     $this->curGraph = $label;
                     $this->parseTriplesBlock();
                     assert($this->reader->getTokenType() === TrigTokenType::RCurly, 'expected }');
-                    $this->reader->next();
 
                     return;
                 }
@@ -228,11 +238,7 @@ final class TrigParser extends FiberIterator
         }
 
         $this->parseTriples($type);
-        while (true) {
-            if (! $this->reader->next()) {
-                break;
-            }
-
+        while ($this->reader->next()) {
             $type = $this->reader->getTokenType();
             if ($type === TrigTokenType::RCurly) {
                 break;
@@ -279,15 +285,11 @@ final class TrigParser extends FiberIterator
                 break;
             }
 
-            if ($next === TrigTokenType::Semicolon) {
-                $verbType = TrigTokenType::Semicolon;
-                $hasNext  = $this->reader->next();
-                assert($hasNext, 'expected verb or object after ;');
-                $verbType = $this->reader->getTokenType();
-                continue;
-            }
-
-            assert(false, 'expected ; or .' . ($endToken !== null ? ' or ]' : ''));
+            assert($next === TrigTokenType::Semicolon, 'expected ; or .' . ($endToken !== null ? ' or ]' : ''));
+            $verbType = TrigTokenType::Semicolon;
+            $hasNext  = $this->reader->next();
+            assert($hasNext, 'expected verb or object after ;');
+            $verbType = $this->reader->getTokenType();
         }
     }
 
@@ -326,9 +328,7 @@ final class TrigParser extends FiberIterator
             TrigTokenType::Anon => $this->parseAnon(),
             TrigTokenType::LSquare => $this->parseBlankNodePropertyListSubject(),
             TrigTokenType::LParen => $this->parseCollectionSubject(),
-            default => (static function () use ($type): never {
-                assert(false, 'expected subject, got ' . $type->value);
-            })(),
+            default => throw new Exception('expected subject, got ' . $type->value),
         };
     }
 
@@ -380,9 +380,7 @@ final class TrigParser extends FiberIterator
             TrigTokenType::String => $this->parseLiteral(),
             TrigTokenType::Integer, TrigTokenType::Decimal, TrigTokenType::Double => $this->parseNumericLiteral(),
             TrigTokenType::True, TrigTokenType::False => $this->parseBooleanLiteral(),
-            default => (static function () use ($type): never {
-                assert(false, 'expected object, got ' . $type->value);
-            })(),
+            default => throw new Exception('expected object, got ' . $type->value),
         };
         assert($this->curSubject !== null && $this->curPredicate !== null, 'subject and predicate must be set');
         $graph = $this->isTrig ? $this->curGraph : null;
@@ -410,6 +408,8 @@ final class TrigParser extends FiberIterator
         $type  = $this->reader->getTokenType();
         $value = $this->reader->getTokenValue();
         if ($type === TrigTokenType::BlankNodeLabel) {
+            assert($value !== '', 'BLANK_NODE_LABEL is empty');
+
             return $this->getOrCreateBlankNode($value);
         }
 
@@ -418,18 +418,20 @@ final class TrigParser extends FiberIterator
         return new Iri($resolved);
     }
 
+    /** @return non-empty-string */
     private function resolveIriRef(string $tokenValue): string
     {
         assert(strlen($tokenValue) >= 2 && $tokenValue[0] === '<' && $tokenValue[strlen($tokenValue) - 1] === '>', 'IRIREF must be <...>');
         $inner     = substr($tokenValue, 1, -1);
         $unescaped = $this->unescapeIri($inner);
-        if ($this->base !== '') {
-            return UriReference::resolveRelative($this->base, $unescaped);
-        }
 
-        return $unescaped;
+        $iri = $this->base !== '' ? UriReference::resolveRelative($this->base, $unescaped) : $unescaped;
+        assert($iri !== '', 'resolved IRI is empty');
+
+        return $iri;
     }
 
+    /** @return non-empty-string */
     private function expandPnameOrIriRef(TrigTokenType $type, string $tokenValue): string
     {
         if ($type === TrigTokenType::IriRef) {
@@ -449,6 +451,8 @@ final class TrigParser extends FiberIterator
             $full = UriReference::resolveRelative($this->base, $full);
         }
 
+        assert($full !== '', 'expanded IRI is empty');
+
         return $full;
     }
 
@@ -461,6 +465,8 @@ final class TrigParser extends FiberIterator
             $label = substr($label, 0, -1);
         }
 
+        assert($label !== '', 'BLANK_NODE_LABEL is empty');
+
         return $this->getOrCreateBlankNode($label);
     }
 
@@ -469,6 +475,7 @@ final class TrigParser extends FiberIterator
         return new BlankNode('_anon_' . (++$this->anonCounter));
     }
 
+    /** @param non-empty-string $label */
     private function getOrCreateBlankNode(string $label): BlankNode
     {
         if (! isset($this->bnodeLabels[$label])) {
@@ -478,9 +485,9 @@ final class TrigParser extends FiberIterator
         return $this->bnodeLabels[$label];
     }
 
-    private function parseBlankNodePropertyListSubject(): Iri|BlankNode
+    private function parseBlankNodePropertyListSubject(): BlankNode
     {
-        $bnode            = new BlankNode('_anon_' . (++$this->anonCounter));
+        $bnode            = $this->parseAnon();
         $savedSubject     = $this->curSubject;
         $savedPredicate   = $this->curPredicate;
         $this->curSubject = $bnode;
@@ -497,9 +504,9 @@ final class TrigParser extends FiberIterator
         return $bnode;
     }
 
-    private function parseBlankNodePropertyListObject(): Iri|Literal|BlankNode
+    private function parseBlankNodePropertyListObject(): BlankNode
     {
-        $bnode            = new BlankNode('_anon_' . (++$this->anonCounter));
+        $bnode            = $this->parseAnon();
         $savedSubject     = $this->curSubject;
         $savedPredicate   = $this->curPredicate;
         $this->curSubject = $bnode;
@@ -521,7 +528,7 @@ final class TrigParser extends FiberIterator
         return $this->parseCollection(true);
     }
 
-    private function parseCollectionObject(): Iri|Literal|BlankNode
+    private function parseCollectionObject(): Iri|BlankNode
     {
         return $this->parseCollection(false);
     }
@@ -549,9 +556,7 @@ final class TrigParser extends FiberIterator
                 TrigTokenType::String => $this->parseLiteral(),
                 TrigTokenType::Integer, TrigTokenType::Decimal, TrigTokenType::Double => $this->parseNumericLiteral(),
                 TrigTokenType::True, TrigTokenType::False => $this->parseBooleanLiteral(),
-                default => (static function (): never {
-                    assert(false, 'expected object in collection');
-                })(),
+                default => throw new Exception('expected object in collection'),
             };
             $objects[] = $obj;
             if (! $this->reader->next()) {
@@ -570,17 +575,13 @@ final class TrigParser extends FiberIterator
         $graph       = $this->isTrig ? $this->curGraph : null;
         $currentList = null;
         foreach ($objects as $index => $item) {
-            $listNode = new BlankNode('_anon_' . (++$this->anonCounter));
+            $listNode = $this->parseAnon();
             if ($currentList !== null) {
                 $this->emit([$currentList, $rdfRest, $listNode, $graph]);
             }
 
             $this->emit([$listNode, $rdfFirst, $item, $graph]);
             $currentList = $listNode;
-        }
-
-        if ($currentList === null) {
-            return $rdfNil;
         }
 
         $this->emit([$currentList, $rdfRest, $rdfNil, $graph]);
@@ -597,9 +598,9 @@ final class TrigParser extends FiberIterator
         if ($this->reader->next()) {
             if ($this->reader->getTokenType() === TrigTokenType::LangTag) {
                 $lang = $this->reader->getTokenValue();
-                if (str_starts_with($lang, '@')) {
-                    $lang = substr($lang, 1);
-                }
+                assert(str_starts_with($lang, '@'), 'LANGTAG must start with @');
+                $lang = substr($lang, 1);
+                assert($lang !== '', 'LANGTAG is empty');
             } elseif ($this->reader->getTokenType() === TrigTokenType::HatHat) {
                 $hasNext = $this->reader->next();
                 assert($hasNext, 'expected iri after ^^');
@@ -718,9 +719,7 @@ final class TrigParser extends FiberIterator
         assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
         $ord = (int) hexdec($hex);
         assert($ord <= 0x10FFFF, 'code point out of range');
-        $chr = mb_chr($ord, 'UTF-8');
-
-        return $chr !== false ? $chr : '';
+        return mb_chr($ord, 'UTF-8');
     }
 
     private function decodeEchar(string $char): string

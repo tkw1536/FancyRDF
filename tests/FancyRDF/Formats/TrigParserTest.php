@@ -62,10 +62,7 @@ final class TrigParserTest extends TestCase
                 false,
             ],
             'with @prefix' => [
-                <<<'TURTLE'
-@prefix ex: <http://example.org/terms#> .
-<http://example.org/subject> ex:title "Hello World" .
-TURTLE,
+                '@prefix ex: <http://example.org/terms#> . <http://example.org/subject> ex:title "Hello World" .',
                 [
                     [
                         new Iri('http://example.org/subject'),
@@ -77,11 +74,7 @@ TURTLE,
                 false,
             ],
             'typed node with a' => [
-                <<<'TURTLE'
-@prefix ex: <http://example.org/terms#> .
-<http://example.org/book1> a ex:Book ;
-    ex:title "Dogs in Hats" .
-TURTLE,
+                '@prefix ex: <http://example.org/terms#> . <http://example.org/book1> a ex:Book ; ex:title "Dogs in Hats" .',
                 [
                     [
                         new Iri('http://example.org/book1'),
@@ -99,10 +92,7 @@ TURTLE,
                 false,
             ],
             'resource as object' => [
-                <<<'TURTLE'
-@prefix ex: <http://example.org/terms#> .
-<http://example.org/person> ex:knows <http://example.org/friend> .
-TURTLE,
+                '@prefix ex: <http://example.org/terms#> . <http://example.org/person> ex:knows <http://example.org/friend> .',
                 [
                     [
                         new Iri('http://example.org/person'),
@@ -114,11 +104,7 @@ TURTLE,
                 false,
             ],
             'multiple triples' => [
-                <<<'TURTLE'
-@prefix ex: <http://example.org/terms#> .
-<http://example.org/s1> ex:prop1 "value1" .
-<http://example.org/s2> ex:prop2 "value2" .
-TURTLE,
+                '@prefix ex: <http://example.org/terms#> . <http://example.org/s1> ex:prop1 "value1" . <http://example.org/s2> ex:prop2 "value2" .',
                 [
                     [
                         new Iri('http://example.org/s1'),
@@ -136,11 +122,7 @@ TURTLE,
                 false,
             ],
             'blank node with label' => [
-                <<<'TURTLE'
-@prefix ex: <http://example.org/terms#> .
-_:alice a ex:Person ;
-    ex:name "Alice" .
-TURTLE,
+                '@prefix ex: <http://example.org/terms#> . _:alice a ex:Person ; ex:name "Alice" .',
                 [
                     [
                         new BlankNode('alice'),
@@ -158,10 +140,7 @@ TURTLE,
                 false,
             ],
             'object list' => [
-                <<<'TURTLE'
-@prefix ex: <http://example.org/terms#> .
-<http://example.org/s> ex:name "Spiderman", "Человек-паук"@ru .
-TURTLE,
+                '@prefix ex: <http://example.org/terms#> . <http://example.org/s> ex:name "Spiderman", "Человек-паук"@ru .',
                 [
                     [
                         new Iri('http://example.org/s'),
@@ -179,12 +158,7 @@ TURTLE,
                 false,
             ],
             'TriG named graph' => [
-                <<<'TRIG'
-@prefix ex: <http://example.org/terms#> .
-<http://example.org/g1> {
-    <http://example.org/s> ex:p "in graph" .
-}
-TRIG,
+                '@prefix ex: <http://example.org/terms#> . <http://example.org/g1> { <http://example.org/s> ex:p "in graph" . }',
                 [
                     [
                         new Iri('http://example.org/s'),
@@ -196,18 +170,31 @@ TRIG,
                 true,
             ],
             'TriG default graph block' => [
-                <<<'TRIG'
-@prefix ex: <http://example.org/terms#> .
-{
-    <http://example.org/s> ex:p "default" .
-}
-TRIG,
+                '@prefix ex: <http://example.org/terms#> . { <http://example.org/s> ex:p "default" . }',
                 [
                     [
                         new Iri('http://example.org/s'),
                         new Iri('http://example.org/terms#p'),
                         new Literal('default'),
                         null,
+                    ],
+                ],
+                true,
+            ],
+            'default graph followed by other graph' => [
+                '@prefix ex: <http://example.org/terms#> . { <http://example.org/s> ex:p "default" . } <http://example.org/g1> { <http://example.org/s> ex:p "in graph" . }',
+                [
+                    [
+                        new Iri('http://example.org/s'),
+                        new Iri('http://example.org/terms#p'),
+                        new Literal('default'),
+                        null,
+                    ],
+                    [
+                        new Iri('http://example.org/s'),
+                        new Iri('http://example.org/terms#p'),
+                        new Literal('in graph'),
+                        new Iri('http://example.org/g1'),
                     ],
                 ],
                 true,
