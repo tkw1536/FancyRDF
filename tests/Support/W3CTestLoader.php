@@ -37,9 +37,12 @@ final class W3CTestLoader
             if ($pos === false) {
                 continue;
             }
+
             $relativePath = substr($path, $pos + strlen($prefix));
+
             return $base . $relativePath;
         }
+
         return null;
     }
 

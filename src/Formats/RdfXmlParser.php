@@ -39,11 +39,6 @@ class RdfXmlParser extends FiberIterator
     }
 
     // =================================
-    // General setup and fiber handling.
-    // =================================
-
-
-    // =================================
     // URI handling
     // =================================
 
