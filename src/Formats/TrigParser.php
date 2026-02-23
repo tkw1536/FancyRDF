@@ -237,11 +237,19 @@ final class TrigParser extends FiberIterator
             return;
         }
 
-        $this->parseTriples($type);
+        $this->parseTriples($type, TrigTokenType::RCurly);
+        if ($this->reader->getTokenType() === TrigTokenType::RCurly || $this->reader->getTokenType() === TrigTokenType::LCurly) {
+            return;
+        }
+
         while ($this->reader->next()) {
             $type = $this->reader->getTokenType();
             if ($type === TrigTokenType::RCurly) {
                 break;
+            }
+
+            if ($type === TrigTokenType::LCurly) {
+                return;
             }
 
             if ($type === TrigTokenType::Dot) {
@@ -253,23 +261,45 @@ final class TrigParser extends FiberIterator
                 if ($type === TrigTokenType::RCurly) {
                     break;
                 }
+
+                if ($type === TrigTokenType::LCurly) {
+                    return;
+                }
             }
 
-            $this->parseTriples($type);
+            $this->parseTriples($type, TrigTokenType::RCurly);
+            if ($this->reader->getTokenType() === TrigTokenType::RCurly || $this->reader->getTokenType() === TrigTokenType::LCurly) {
+                return;
+            }
         }
     }
 
-    private function parseTriples(TrigTokenType $subjectType): void
+    private function parseTriples(TrigTokenType $subjectType, TrigTokenType|null $endToken = null): void
     {
         $this->curSubject = $this->parseSubject($subjectType);
         $hasNext          = $this->reader->next();
         assert($hasNext, 'expected verb');
-        $this->parsePredicateObjectList($this->reader->getTokenType());
+        $verbType = $this->reader->getTokenType();
+        if ($endToken !== null && $verbType === $endToken) {
+            return;
+        }
+
+        $this->parsePredicateObjectList($verbType, $endToken);
     }
 
     private function parsePredicateObjectList(TrigTokenType $verbType, TrigTokenType|null $endToken = null): void
     {
         while (true) {
+            while ($verbType === TrigTokenType::Semicolon) {
+                $hasNext = $this->reader->next();
+                assert($hasNext, 'expected verb or .' . ($endToken !== null ? ' or ]' : ''));
+                $verbType = $this->reader->getTokenType();
+            }
+
+            if ($verbType === TrigTokenType::Dot || ($endToken !== null && $verbType === $endToken) || $verbType === TrigTokenType::LCurly || $verbType === TrigTokenType::RSquare) {
+                break;
+            }
+
             $predicate          = $this->parseVerb($verbType);
             $this->curPredicate = $predicate;
             $hasNext            = $this->reader->next();
