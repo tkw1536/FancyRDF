@@ -628,9 +628,6 @@ final class TrigReader
         }
 
         $cp = mb_ord($ch, 'UTF-8');
-        if ($cp === false) {
-            return false;
-        }
 
         if ($cp <= 0x7F) {
             return ($cp >= 0x41 && $cp <= 0x5A) || ($cp >= 0x61 && $cp <= 0x7A);
@@ -664,9 +661,26 @@ final class TrigReader
         return $ch === '_' || self::isPnCharsBase($ch);
     }
 
+    /**
+     * [164s] PN_CHARS ::= PN_CHARS_U | '-' | [0-9] | #x00B7 | [#x0300-#x036F] | [#x203F-#x2040]
+     * Uses code point checks so all Turtle PN_CHARS match (e.g. U+02FF ˿); PHP's \p{L} does not
+     * include modifier letters like U+02FF.
+     */
     private static function isPnChars(string $ch): bool
     {
-        return $ch !== '' && preg_match('/^[\p{L}_0-9\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]$/u', $ch) === 1;
+        if ($ch === '') {
+            return false;
+        }
+
+        if (self::isPnCharsU($ch) || $ch === '-' || self::isDigit($ch)) {
+            return true;
+        }
+
+        $cp = mb_ord($ch, 'UTF-8');
+
+        return $cp === 0x00B7
+            || ($cp >= 0x0300 && $cp <= 0x036F)
+            || ($cp >= 0x203F && $cp <= 0x2040);
     }
 
     private static function isHex(string $ch): bool
@@ -808,16 +822,19 @@ final class TrigReader
                 $source .= $ch;
                 $offset += strlen($ch);
                 $pos     = strlen($source);
-                if ($pos >= 6 && substr($source, -3) === $end) {
-                    $backslashes = 0;
-                    $i          = $pos - 4;
-                    while ($i >= 0 && $source[$i] === '\\') {
-                        $backslashes++;
-                        $i--;
-                    }
-                    if ($backslashes % 2 === 0) {
-                        break;
-                    }
+                if ($pos < 6 || substr($source, -3) !== $end) {
+                    continue;
+                }
+
+                $backslashes = 0;
+                $i           = $pos - 4;
+                while ($i >= 0 && $source[$i] === '\\') {
+                    $backslashes++;
+                    $i--;
+                }
+
+                if ($backslashes % 2 === 0) {
+                    break;
                 }
             }
 
