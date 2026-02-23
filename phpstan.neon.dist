@@ -38,6 +38,7 @@ parameters:
     checkMissingCallableSignature: true
     checkStrictPrintfPlaceholderTypes: true
     checkMissingOverrideMethodAttribute: true
+    rememberPossiblyImpureFunctionValues: false
     exceptions:
         check:
             throwTypeCovariance: true
