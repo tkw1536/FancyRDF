@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats;
 
-use Exception;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
 use FancyRDF\Xml\XMLUtils;
-use Fiber;
-use IteratorAggregate;
 use Override;
 use SplStack;
-use Traversable;
 use XMLReader;
 
 use function assert;
@@ -30,9 +26,9 @@ use function str_contains;
  * A streaming RDF/XML parser that emits triples as they are encountered.
  *
  * @phpstan-import-type TripleArray from Quad
- * @implements IteratorAggregate<int|string, TripleArray>
+ * @extends FiberIterator<TripleArray>
  */
-class RdfXmlParser implements IteratorAggregate
+class RdfXmlParser extends FiberIterator
 {
     public const string RDF_NAMESPACE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 
@@ -46,62 +42,6 @@ class RdfXmlParser implements IteratorAggregate
     // General setup and fiber handling.
     // =================================
 
-    /** @var bool if the getIterator() method has been previously called */
-    private bool $getIteratorStarted = false;
-
-    /** @return Traversable<int|string, TripleArray> */
-    #[Override]
-    public function getIterator(): Traversable
-    {
-        if ($this->getIteratorStarted) {
-            throw new Exception('Can only use getIterator() once');
-        }
-
-        $this->getIteratorStarted = true;
-
-        // To allow for more structured code, instead of "yield"ing directly
-        // we use a fiber to run the parsing logic.
-        // This allows us to have "yield"-like functionality deep within function calls.
-        //
-        // To emit a triple, the fiber is suspended with that value.
-        // This function then yields the triple, and resumes the fiber
-        // once control is passed back to this function.
-        //
-        // The primary parsing logic is implemented in the doParse() function.
-        // The emit() function is a type-safe helper that performs the
-        // suspension of the fiber.
-        //
-        // [1]: https://www.php.net/manual/en/language.fibers.php
-
-        /** @var Fiber<void, TripleArray, void, TripleArray> $fiber */
-        $fiber = new Fiber([$this, 'doParse']);
-
-        $value = $fiber->start();
-        if ($value !== null) {
-            yield $value;
-        }
-
-        while (! $fiber->isTerminated()) {
-            $value = $fiber->resume();
-            if ($value === null) {
-                continue;
-            }
-
-            yield $value;
-        }
-    }
-
-    /**
-     * Emits a set of quads by suspending the fiber.
-     *
-     * @param TripleArray $quads The quads to emit
-     */
-    private function emit(array ...$quads): void
-    {
-        foreach ($quads as $quad) {
-            Fiber::suspend($quad);
-        }
-    }
 
     // =================================
     // URI handling
@@ -510,7 +450,8 @@ class RdfXmlParser implements IteratorAggregate
     /**
      * Function that does the actual parsing.
      */
-    private function doParse(): void
+    #[Override]
+    protected function doIterate(): void
     {
         while ($this->reader->read()) {
             // If an element closes, and we are back at the right depth, then we need to pop the stack.
