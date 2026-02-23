@@ -155,6 +155,16 @@ final class UriReferenceTest extends TestCase
                 true,
             ],
 
+            // IRI with ucschar in path (W3C localName_with_non_leading_extras: · U+00B7, ̀ U+0300, ͯ U+036F, ‿ U+203F, ⁀ U+2040)
+            'http://a.example/a·̀ͯ‿.⁀' => [
+                new UriReference('http', 'a.example', '/a·̀ͯ‿.⁀', null, null),
+                false,
+                true,
+                false,
+                false, // isRFC3986UriReference (path contains non-ASCII)
+                true,  // isRFC3987IriReference
+            ],
+
             // Relative references: path-only, query-only, fragment-only
             'g' => [
                 new UriReference(null, null, 'g', null, null),
