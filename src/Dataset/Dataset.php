@@ -49,12 +49,28 @@ final class Dataset implements IteratorAggregate
      * @return array<list<TripleOrQuadArray>, list<TripleOrQuadArray>>
      *   The first array contains the grounded quads, the second array contains the non-grounded quads.
      */
-    public function splitQuads(): array
+    private function splitQuads(bool $literal): array
     {
+        $all = $this->quads;
+        usort($all, [Quad::class, 'compare']);
+
+        $unique = [];
+        $prev   = null;
+        foreach ($all as $quad) {
+            if ($prev !== null && Quad::equals($prev, $quad, $literal)) {
+                continue;
+            }
+
+            $unique[] = $quad;
+            $prev     = $quad;
+        }
+
+        $all = $unique;
+
         $grounded    = [];
         $nonGrounded = [];
 
-        foreach ($this->quads as $quad) {
+        foreach ($all as $quad) {
             if (Quad::isGrounded($quad)) {
                 $grounded[] = $quad;
             } else {
@@ -73,12 +89,8 @@ final class Dataset implements IteratorAggregate
      */
     public function isIsomorphicTo(Dataset $other, array &$partial, bool $literal = true): bool
     {
-        if (count($this->quads) !== count($other->quads)) {
-            return false;
-        }
-
-        [$groundedThis, $nonGroundedThis]   = $this->splitQuads();
-        [$groundedOther, $nonGroundedOther] = $other->splitQuads();
+        [$groundedThis, $nonGroundedThis]   = $this->splitQuads($literal);
+        [$groundedOther, $nonGroundedOther] = $other->splitQuads($literal);
 
         if (count($groundedThis) !== count($groundedOther)) {
             return false;
@@ -89,8 +101,7 @@ final class Dataset implements IteratorAggregate
         }
 
         // Compare grounded quads by lexicographical ordering (sort then compare).
-        usort($groundedThis, [Quad::class, 'compare']);
-        usort($groundedOther, [Quad::class, 'compare']);
+
         for ($i = 0; $i < count($groundedThis); $i++) {
             if (! Quad::equals($groundedThis[$i], $groundedOther[$i], $literal)) {
                 return false;

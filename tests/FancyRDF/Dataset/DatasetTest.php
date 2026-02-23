@@ -8,89 +8,120 @@ use FancyRDF\Dataset\Dataset;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+
+use function ksort;
 
 final class DatasetTest extends TestCase
 {
-    public function testIsIsomorphicToGrounded(): void
+    /** @return iterable<string, array{Dataset, Dataset, array<string, string>, array<string, string>, bool, bool}> */
+    public static function isIsomorphicToProvider(): iterable
     {
-        $s    = new Iri('https://example.org/s');
-        $p    = new Iri('https://example.org/p');
-        $o    = new Literal('o');
-        $g    = new Iri('https://example.org/g');
-        $quad = [$s, $p, $o, $g];
-
-        $equalA        = new Dataset([$quad]);
-        $equalB        = new Dataset([$quad]);
-        $differentSize = new Dataset([$quad, $quad]);
-
-        $partial = [];
-        self::assertTrue($equalA->isIsomorphicTo($equalB, $partial));
-        self::assertSame([], $partial);
-
-        $partial = [];
-        self::assertFalse($equalA->isIsomorphicTo($differentSize, $partial));
-        $partial = [];
-        self::assertFalse($equalB->isIsomorphicTo($differentSize, $partial));
-    }
-
-    public function testIsIsomorphicToNonGrounded(): void
-    {
+        $s = new Iri('https://example.org/s');
         $p = new Iri('https://example.org/p');
         $o = new Literal('o');
         $g = new Iri('https://example.org/g');
+        $h = new Iri('https://example.org/h');
 
-        $blankA = new BlankNode('b1');
-        $quadA  = [$blankA, $p, $o, $g];
+        $quad1 = [$s, $p, $o, $g];
+        $quad2 = [$s, $p, $o, $h];
 
-        $blankB = new BlankNode('x');
-        $quadB  = [$blankB, $p, $o, $g];
+        $ds1 = new Dataset([$quad1]);
+        $ds2 = new Dataset([$quad1]);
+        $ds3  = new Dataset([$quad1, $quad2]);
 
-        $datasetA = new Dataset([$quadA]);
-        $datasetB = new Dataset([$quadB]);
+        yield 'grounded equal' => [$ds1, $ds2, [], [], true, true];
+        yield 'different size (A vs larger)' => [$ds1, $ds3, [], [], true, false];
+        yield 'different size (B vs larger)' => [$ds2, $ds3, [], [], true, false];
 
-        $partial = [];
-        self::assertTrue($datasetA->isIsomorphicTo($datasetB, $partial));
-        self::assertSame(['b1' => 'x'], $partial);
+        $p     = new Iri('https://example.org/p');
+        $o     = new Literal('o');
+        $g     = new Iri('https://example.org/g');
+        $quad1 = [new BlankNode('b1'), $p, $o, $g];
+        $quad2 = [new BlankNode('x'), $p, $o, $g];
+
+        $ds1 = new Dataset([$quad1]);
+        $ds2 = new Dataset([$quad2]);
+
+        yield 'non-grounded isomorphic' => [$ds1, $ds2, [], ['b1' => 'x'], true, true];
+
+        $g            = new Iri('https://example.org/g');
+        $p1            = new Iri('https://example.org/p1');
+        $o1            = new Literal('o1');
+        $p2           = new Iri('https://example.org/p2');
+        $o2           = new Literal('o2');
+        $b1       = new BlankNode('b1');
+        $b2       = new BlankNode('b2');
+        $x        = new BlankNode('x');
+        $y        = new BlankNode('y');
+
+        $quad1         = [$b1, $p1, $o1, $g];
+        $quadX         = [$x, $p1, $o1, $g];
+        $quad2         = [$b2, $p2, $o2, $g];
+        $quadY         = [$y, $p2, $o2, $g];
+        $datasetAOrder = new Dataset([$quad2, $quad1]);
+        $datasetBOrder = new Dataset([$quadX, $quadY]);
+        $datasetCOrder = new Dataset([$quad1, $quad2]);
+        $datasetDOrder = new Dataset([$quadX, $quadY]);
+
+        yield 'unifiable different order (b2,b1 vs x,y)' => [$datasetAOrder, $datasetBOrder, [], ['b2' => 'y', 'b1' => 'x'], true, true];
+        yield 'unifiable same order (b1,b2 vs x,y)' => [$datasetCOrder, $datasetDOrder, [], ['b1' => 'x', 'b2' => 'y'], true, true];
+        yield 'unifiable self' => [$datasetAOrder, $datasetAOrder, [], ['b2' => 'b2', 'b1' => 'b1'], true, true];
+
+        // a dataset with lots of repeated triples.
+        $blah                 = new Literal('http://example.org/bar#blah');
+        $datasetRepeats       = new Dataset([
+            [$blah, $blah, $blah, null],
+            [$blah, $blah, $blah, null],
+        ]);
+        $datasetDoesNotRepeat = new Dataset([
+            [$blah, $blah, $blah, null],
+        ]);
+
+        yield 'same triple repeated' => [$datasetRepeats, $datasetDoesNotRepeat, [], [], true, true];
+
+        $s = new Iri('https://example.org/s');
+        $p = new Iri('https://example.org/p');
+        $o = new Literal('o');
+        $b = new BlankNode('b');
+
+        $datasetNonEqualB = new Dataset([
+            [$s, $p, $o, null],
+            [$s, $p, $b, null],
+        ]);
+        $datasetNonEqualA = new Dataset([
+            [$s, $p, $o, null],
+            [$b, $p, $o, null],
+        ]);
+
+        yield 'non-equal different order' => [$datasetNonEqualB, $datasetNonEqualA, [], [], true, false];
     }
 
-    public function testIsIsomorphicToUnifiableQuadsDifferentOrder(): void
+    /**
+     * @param array<string, string> $inputPartial    Initial blank-node mapping passed into isIsomorphicTo.
+     * @param array<string, string> $expectedPartial Expected mapping after the call (only asserted when $expectedEqual).
+     */
+    #[TestDox('$_dataname')]
+    #[DataProvider('isIsomorphicToProvider')]
+    public function testIsIsomorphicTo(Dataset $datasetA, Dataset $datasetB, array $inputPartial, array $expectedPartial, bool $literal, bool $expectedEqual): void
     {
-        $g = new Iri('https://example.org/g');
+        $partial = $inputPartial;
+        $result  = $datasetA->isIsomorphicTo($datasetB, $partial, $literal);
+        self::assertSame($expectedEqual, $result);
 
-        $p1 = new Iri('https://example.org/p1');
-        $o1 = new Literal('o1');
-        $p2 = new Iri('https://example.org/p2');
-        $o2 = new Literal('o2');
+        if (! $expectedEqual) {
+            return;
+        }
 
-        $blankB1 = new BlankNode('b1');
-        $blankB2 = new BlankNode('b2');
+        // sort expected output by keys
+        // because the order of keys is not guaranteed.
+        $expectedSorted = $expectedPartial;
+        $partialSorted  = $partial;
+        ksort($expectedSorted);
+        ksort($partialSorted);
 
-        $blankX = new BlankNode('x');
-        $blankY = new BlankNode('y');
-
-        $quad1 = [$blankB1, $p1, $o1, $g];
-        $quadX = [$blankX, $p1, $o1, $g];
-
-        $quad2 = [$blankB2, $p2, $o2, $g];
-        $quadY = [$blankY, $p2, $o2, $g];
-
-        $datasetA = new Dataset([$quad2, $quad1]);
-        $datasetB = new Dataset([$quadX, $quadY]);
-
-        $datasetC = new Dataset([$quad1, $quad2]);
-        $datasetD = new Dataset([$quadX, $quadY]);
-
-        $partial = [];
-        self::assertTrue($datasetA->isIsomorphicTo($datasetB, $partial));
-        self::assertSame(['b2' => 'y', 'b1' => 'x'], $partial);
-
-        $partial = [];
-        self::assertTrue($datasetC->isIsomorphicTo($datasetD, $partial));
-        self::assertSame(['b1' => 'x', 'b2' => 'y'], $partial);
-
-        $partial = [];
-        self::assertTrue($datasetA->isIsomorphicTo($datasetA, $partial));
-        self::assertSame(['b2' => 'b2', 'b1' => 'b1'], $partial);
+        self::assertSame($expectedSorted, $partialSorted);
     }
 }
