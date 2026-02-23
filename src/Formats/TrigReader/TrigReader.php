@@ -36,9 +36,10 @@ final class TrigReader
     /** Longest keyword length + 1 for word-boundary lookahead (e.g. "false" = 5). */
     private const int KEYWORD_LOOKAHEAD = 6;
 
-    private string $buffer = '';
+    /** Longest possible UTF-8 code point length. */
+    private const int MAX_CODE_POINT_LENGTH = 4;
 
-    private int $position = 0;
+
 
     private TrigTokenType $currentTokenType = TrigTokenType::EndOfInput;
 
@@ -72,7 +73,7 @@ final class TrigReader
         }
 
         $this->currentTokenType  = $type;
-        $this->currentTokenValue = $this->consumeRecognizedToken($ch, $type);
+        $this->currentTokenValue = $this->consumeRecognizedToken($type);
         $this->slideBuffer();
 
         return true;
@@ -87,6 +88,20 @@ final class TrigReader
     {
         return $this->currentTokenValue;
     }
+
+    // ================================
+    // Buffer management
+    // ================================
+
+    /**
+     * The current buffer of characters read from the underlying source.
+     */
+    private string $buffer = '';
+
+    /**
+     * The current position in the buffer.
+     */
+    private int $position = 0;
 
     /**
      * Refill reads data from the underlying stream into the buffer.
@@ -110,15 +125,25 @@ final class TrigReader
         }
     }
 
-    public const int MAX_UTF8_CODE_POINT_LENGTH = 4;
+    /**
+     * Slides the buffer over, removing any characters before the current position from the buffer.
+     */
+    private function slideBuffer(): void
+    {
+        $this->buffer   = substr($this->buffer, $this->position);
+        $this->position = 0;
+    }
 
     /**
      * Returns the next character in the input, loading buffer if needed.
+     *
+     * @return non-empty-string|null
+     *     null if the end of input has been reached.
      */
     private function peekChar(): string|null
     {
         // Load the substring from the current position.
-        $this->refill(self::MAX_UTF8_CODE_POINT_LENGTH);
+        $this->refill(self::MAX_CODE_POINT_LENGTH);
         $rest = substr($this->buffer, $this->position);
         if ($rest === '') {
             return null;
@@ -130,50 +155,70 @@ final class TrigReader
     }
 
     /**
-     * Advances the position by one character.
+     * Advances the position by the given character.
      */
-    private function advance(string $char): void
+    private function eatChar(string $char): void
     {
         $this->position += strlen($char);
     }
 
-    private function advanceAndAppend(string &$dest): void
+    /**
+     * Peeks at the next character, appends it to dest, and returns it.
+     */
+    private function appendChar(string &$dest): string|null
     {
         $ch = $this->peekChar();
         if ($ch === null) {
-            return;
+            return null;
         }
 
         $dest .= $ch;
-        $this->advance($ch);
+        $this->eatChar($ch);
+
+        return $ch;
     }
 
+    /**
+     * Reads a string of the same length as s from the buffer.
+     */
+    private function eatString(string $s): string
+    {
+        $this->refill(strlen($s));
+        $result          = substr($this->buffer, $this->position, strlen($s));
+        $this->position += strlen($s);
+
+        return $result;
+    }
+
+    // ================================
+    // Token recognition
+    // ================================
+
+    /**
+     * Skips whitespace and comments.
+     *
+     * This method will advance the buffer position to the next non-whitespace, non-comment character or end of input.
+     */
     private function skipWhitespaceAndComments(): void
     {
+        $ch = $this->peekChar();
         while (true) {
-            $ch = $this->peekChar();
-            if ($ch === null) {
+            // skip pure whitespace
+            while ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
+                $this->eatChar($ch);
+                $ch = $this->peekChar();
+            }
+
+            // if there is a comment, skip until end of line.
+            // if there isn't a comment, we have reached end-of-input.
+            if ($ch !== '#') {
                 return;
             }
 
-            if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-                $this->advance($ch);
-                continue;
+            while ($ch !== "\n" && $ch !== "\r" && $ch !== null) {
+                $this->eatChar($ch);
+                $ch = $this->peekChar();
             }
-
-            if ($ch === '#') {
-                while (true) {
-                    $this->advance($ch);
-                    $ch = $this->peekChar();
-                    if ($ch === null || $ch === "\n" || $ch === "\r") {
-                        break;
-                    }
-                }
-
-                continue;
-            }
-
-            return;
         }
     }
 
@@ -308,34 +353,34 @@ final class TrigReader
         return null;
     }
 
-    private function consumeRecognizedToken(string $firstCh, TrigTokenType $type): string
+    private function consumeRecognizedToken(TrigTokenType $type): string
     {
         $source = '';
 
         switch ($type) {
             case TrigTokenType::AtPrefix:
-                return $this->consumeExactly('@prefix');
+                return $this->eatString('@prefix');
 
             case TrigTokenType::AtBase:
-                return $this->consumeExactly('@base');
+                return $this->eatString('@base');
 
             case TrigTokenType::A:
-                return $this->consumeExactly('a');
+                return $this->eatString('a');
 
             case TrigTokenType::True:
-                return $this->consumeExactly('true');
+                return $this->eatString('true');
 
             case TrigTokenType::False:
-                return $this->consumeExactly('false');
+                return $this->eatString('false');
 
             case TrigTokenType::Graph:
-                return $this->consumeCaseInsensitive('GRAPH');
+                return $this->eatString('GRAPH');
 
             case TrigTokenType::Prefix:
-                return $this->consumeCaseInsensitive('PREFIX');
+                return $this->eatString('PREFIX');
 
             case TrigTokenType::Base:
-                return $this->consumeCaseInsensitive('BASE');
+                return $this->eatString('BASE');
 
             case TrigTokenType::Dot:
             case TrigTokenType::Semicolon:
@@ -346,12 +391,12 @@ final class TrigReader
             case TrigTokenType::RParen:
             case TrigTokenType::LCurly:
             case TrigTokenType::RCurly:
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
 
                 return $source;
 
             case TrigTokenType::HatHat:
-                return $this->consumeExactly('^^');
+                return $this->eatString('^^');
 
             case TrigTokenType::IriRef:
                 return $this->consumeIriRef();
@@ -384,59 +429,27 @@ final class TrigReader
         }
     }
 
-    private function consumeExactly(string $s): string
-    {
-        $source = '';
-        $len    = strlen($s);
-        for ($i = 0; $i < $len; $i++) {
-            $this->advanceAndAppend($source);
-        }
-
-        return $source;
-    }
-
-    private function consumeCaseInsensitive(string $s): string
-    {
-        $source = '';
-        $len    = strlen($s);
-        for ($i = 0; $i < $len; $i++) {
-            $this->advanceAndAppend($source);
-        }
-
-        return $source;
-    }
-
     private function consumeIriRef(): string
     {
         $source = '';
-        $this->advanceAndAppend($source);
-        assert($source === '<', 'IRIREF must start with <');
+        $ch     = $this->appendChar($source);
+        assert($ch === '<', 'IRIREF must start with <');
         while (true) {
-            $ch = $this->peekChar();
-            if ($ch === null) {
+            $ch = $this->appendChar($source);
+            if ($ch === null || $ch === '>') {
                 break;
             }
 
-            if ($ch === '>') {
-                $this->advanceAndAppend($source);
-                break;
-            }
-
-            if ($ch === '\\' && $this->position + 1 <= strlen($this->buffer)) {
-                $next = substr($this->buffer, $this->position + 1, 1);
-                if ($next === 'u' || $next === 'U') {
-                    $this->advanceAndAppend($source);
-                    $this->advanceAndAppend($source);
-                    $this->consumeUchar($source);
-                } else {
-                    $this->advanceAndAppend($source);
-                    $this->advanceAndAppend($source);
-                }
-
+            if ($ch !== '\\' || $this->position > strlen($this->buffer)) {
                 continue;
             }
 
-            $this->advanceAndAppend($source);
+            $next = $this->appendChar($source);
+            if ($next !== 'u' && $next !== 'U') {
+                continue;
+            }
+
+            $this->consumeUchar($source);
         }
 
         return $source;
@@ -456,7 +469,7 @@ final class TrigReader
                 break;
             }
 
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
         }
 
         assert(strlen($source) >= 2 + $hexLen, 'incomplete \\u or \\U escape');
@@ -470,13 +483,13 @@ final class TrigReader
         $isLong = false;
         $delim  = $ch;
         if ($delim === '"' || $delim === "'") {
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
             $next = $this->peekChar();
             if ($next === $delim) {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
                 $next2 = $this->peekChar();
                 if ($next2 === $delim) {
-                    $this->advanceAndAppend($source);
+                    $this->appendChar($source);
                     $isLong = true;
                 }
             }
@@ -490,7 +503,7 @@ final class TrigReader
                     break;
                 }
 
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
                 $pos = strlen($source);
                 if ($pos >= 6 && substr($source, -3) === $end) {
                     break;
@@ -507,15 +520,15 @@ final class TrigReader
             }
 
             if ($ch === $delim) {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
                 break;
             }
 
             if ($ch === '\\') {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
                 $next = $this->peekChar();
                 if ($next !== null) {
-                    $this->advanceAndAppend($source);
+                    $this->appendChar($source);
                     if ($next === 'u' || $next === 'U') {
                         $this->consumeUchar($source);
                     }
@@ -524,7 +537,7 @@ final class TrigReader
                 continue;
             }
 
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
         }
 
         return $source;
@@ -533,8 +546,8 @@ final class TrigReader
     private function consumeBlankNodeLabel(): string
     {
         $source = '';
-        $this->advanceAndAppend($source);
-        $this->advanceAndAppend($source);
+        $this->appendChar($source);
+        $this->appendChar($source);
         assert(substr($source, -2) === '_:', 'blank node label must start with _:');
         $rest = substr($this->buffer, $this->position);
         $m    = null;
@@ -546,7 +559,7 @@ final class TrigReader
             }
 
             for ($i = 0; $i < $len; $i++) {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
             }
         }
 
@@ -556,7 +569,7 @@ final class TrigReader
     private function consumeAnon(): string
     {
         $source = '';
-        $this->advanceAndAppend($source);
+        $this->appendChar($source);
         assert($source === '[', 'ANON must start with [');
         while (true) {
             $ch = $this->peekChar();
@@ -565,13 +578,13 @@ final class TrigReader
             }
 
             if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
                 continue;
             }
 
             if ($ch === '#') {
                 while (true) {
-                    $this->advanceAndAppend($source);
+                    $this->appendChar($source);
                     $ch = $this->peekChar();
                     if ($ch === null || $ch === "\n" || $ch === "\r") {
                         break;
@@ -586,7 +599,7 @@ final class TrigReader
 
         $ch = $this->peekChar();
         assert($ch === ']', 'ANON must be [ WS* ]');
-        $this->advanceAndAppend($source);
+        $this->appendChar($source);
 
         return $source;
     }
@@ -596,7 +609,7 @@ final class TrigReader
         $source = '';
         $ch     = $this->peekChar();
         if ($ch === '+' || $ch === '-') {
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
         }
 
         while (true) {
@@ -605,27 +618,27 @@ final class TrigReader
                 break;
             }
 
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
         }
 
         if ($this->peekChar() === '.') {
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
             while (true) {
                 $ch = $this->peekChar();
                 if ($ch === null || ! self::isDigit($ch)) {
                     break;
                 }
 
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
             }
         }
 
         $ch = $this->peekChar();
         if ($ch === 'e' || $ch === 'E') {
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
             $ch = $this->peekChar();
             if ($ch === '+' || $ch === '-') {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
             }
 
             while (true) {
@@ -634,7 +647,7 @@ final class TrigReader
                     break;
                 }
 
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
             }
         }
 
@@ -649,10 +662,10 @@ final class TrigReader
         if (preg_match('/\G@[a-zA-Z]+(-[a-zA-Z0-9]+)*/u', $rest, $m) === 1) {
             $len = strlen($m[0]);
             for ($i = 0; $i < $len; $i++) {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
             }
         } else {
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
         }
 
         return $source;
@@ -665,13 +678,13 @@ final class TrigReader
         $m      = null;
         if (preg_match('/\G[a-zA-Z\x{00C0}-\x{00D6}\x{00D8}-\x{00F6}\x{00F8}-\x{02FF}](?:[\p{L}_0-9.\x{00B7}\x{0300}-\x{036F}\x{203F}\x{2040}-]|\\.)*/u', $rest, $m) === 1) {
             foreach (self::mbChars($m[0]) as $_c) {
-                $this->advanceAndAppend($source);
+                $this->appendChar($source);
             }
         }
 
         $ch = $this->peekChar();
         if ($ch === ':') {
-            $this->advanceAndAppend($source);
+            $this->appendChar($source);
         }
 
         return $source;
@@ -690,7 +703,7 @@ final class TrigReader
                 $b = ord($local[$i]);
                 $n = $b < 0x80 ? 1 : ($b < 0xE0 ? 2 : ($b < 0xF0 ? 3 : 4));
                 for ($j = 0; $j < $n && $i < $len; $j++, $i++) {
-                    $this->advanceAndAppend($source);
+                    $this->appendChar($source);
                 }
             }
         }
@@ -839,11 +852,5 @@ final class TrigReader
         $o = ord($ch[0]);
 
         return $o >= 0x30 && $o <= 0x39;
-    }
-
-    private function slideBuffer(): void
-    {
-        $this->buffer   = substr($this->buffer, $this->position);
-        $this->position = 0;
     }
 }
