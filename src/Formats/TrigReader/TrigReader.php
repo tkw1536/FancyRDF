@@ -286,17 +286,6 @@ final class TrigReader
         return [TrigTokenType::LangTag, $value];
     }
 
-    private static function isLangTagLetter(string $ch): bool
-    {
-        if ($ch === '' || strlen($ch) !== 1) {
-            return false;
-        }
-
-        $o = ord($ch[0]);
-
-        return ($o >= 0x41 && $o <= 0x5A) || ($o >= 0x61 && $o <= 0x7A);
-    }
-
     /**
      * Matches any numeric literal at the start of the stream.
      * Only uses peekChar($offset); does not consume.
@@ -431,11 +420,6 @@ final class TrigReader
         return [TrigTokenType::Integer, $offset];
     }
 
-    private static function isDigit(string $ch): bool
-    {
-        return $ch !== '' && strlen($ch) === 1 && ord($ch[0]) >= 0x30 && ord($ch[0]) <= 0x39;
-    }
-
     /**
      * Attempts to match a PNAME_LN or PNAME_NS at the current position.
      * Only uses peekChar($offset). On match, consumes the token and returns [type, value].
@@ -567,21 +551,6 @@ final class TrigReader
         return 0;
     }
 
-    /** Whether there is a PN_LOCAL at $offset (first char of local part). */
-    private function isPnLocalStart(int $offset): bool
-    {
-        $ch = $this->stream->peek($offset);
-        if ($ch === null) {
-            return false;
-        }
-
-        if (self::isPnCharsU($ch) || $ch === ':' || self::isDigit($ch)) {
-            return true;
-        }
-
-        return $this->tryPlxLength($offset) !== 0;
-    }
-
     /** Returns byte length of PLX at $offset, or 0 if not PLX. */
     private function tryPlxLength(int $offset): int
     {
@@ -615,88 +584,6 @@ final class TrigReader
         }
 
         return 0;
-    }
-
-    /**
-     * [163s] PN_CHARS_BASE ::= [A-Z] | [a-z] | [#00C0-#00D6] | [#00D8-#00F6] | [#00F8-#02FF] | ...
-     * Uses code point ranges so all Turtle PN_CHARS_BASE characters match (e.g. U+02FF ˿).
-     */
-    private static function isPnCharsBase(string $ch): bool
-    {
-        if ($ch === '') {
-            return false;
-        }
-
-        $cp = mb_ord($ch, 'UTF-8');
-
-        if ($cp <= 0x7F) {
-            return ($cp >= 0x41 && $cp <= 0x5A) || ($cp >= 0x61 && $cp <= 0x7A);
-        }
-
-        $ranges = [
-            [0x00C0, 0x00D6],
-            [0x00D8, 0x00F6],
-            [0x00F8, 0x02FF],
-            [0x0370, 0x037D],
-            [0x037F, 0x1FFF],
-            [0x200C, 0x200D],
-            [0x2070, 0x218F],
-            [0x2C00, 0x2FEF],
-            [0x3001, 0xD7FF],
-            [0xF900, 0xFDCF],
-            [0xFDF0, 0xFFFD],
-            [0x10000, 0xEFFFF],
-        ];
-        foreach ($ranges as [$lo, $hi]) {
-            if ($cp >= $lo && $cp <= $hi) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static function isPnCharsU(string $ch): bool
-    {
-        return $ch === '_' || self::isPnCharsBase($ch);
-    }
-
-    /**
-     * [164s] PN_CHARS ::= PN_CHARS_U | '-' | [0-9] | #x00B7 | [#x0300-#x036F] | [#x203F-#x2040]
-     * Uses code point checks so all Turtle PN_CHARS match (e.g. U+02FF ˿); PHP's \p{L} does not
-     * include modifier letters like U+02FF.
-     */
-    private static function isPnChars(string $ch): bool
-    {
-        if ($ch === '') {
-            return false;
-        }
-
-        if (self::isPnCharsU($ch) || $ch === '-' || self::isDigit($ch)) {
-            return true;
-        }
-
-        $cp = mb_ord($ch, 'UTF-8');
-
-        return $cp === 0x00B7
-            || ($cp >= 0x0300 && $cp <= 0x036F)
-            || ($cp >= 0x203F && $cp <= 0x2040);
-    }
-
-    private static function isHex(string $ch): bool
-    {
-        if ($ch === '' || strlen($ch) !== 1) {
-            return false;
-        }
-
-        $o = ord($ch[0]);
-
-        return ($o >= 0x30 && $o <= 0x39) || ($o >= 0x41 && $o <= 0x46) || ($o >= 0x61 && $o <= 0x66);
-    }
-
-    private static function isPnLocalEscChar(string $ch): bool
-    {
-        return $ch !== '' && preg_match("/^[_~.\\-!\\\$&'()*+,;=\\/?#@%]$/u", $ch) === 1;
     }
 
     /**
@@ -931,5 +818,118 @@ final class TrigReader
         }
 
         return $this->stream->consume($offset);
+    }
+
+    // ================================
+    // Character classes
+    // ================================
+
+    /** is character a digit? */
+    private static function isDigit(string $ch): bool
+    {
+        return $ch !== '' && strlen($ch) === 1 && ord($ch[0]) >= 0x30 && ord($ch[0]) <= 0x39;
+    }
+
+    /** is the character a lang tag letter? */
+    private static function isLangTagLetter(string $ch): bool
+    {
+        if ($ch === '' || strlen($ch) !== 1) {
+            return false;
+        }
+
+        $o = ord($ch[0]);
+
+        return ($o >= 0x41 && $o <= 0x5A) || ($o >= 0x61 && $o <= 0x7A);
+    }
+
+    /** Whether there is a PN_LOCAL at $offset (first char of local part). */
+    private function isPnLocalStart(int $offset): bool
+    {
+        $ch = $this->stream->peek($offset);
+        if ($ch === null) {
+            return false;
+        }
+
+        if (self::isPnCharsU($ch) || $ch === ':' || self::isDigit($ch)) {
+            return true;
+        }
+
+        return $this->tryPlxLength($offset) !== 0;
+    }
+
+    private static function isPnCharsBase(string $ch): bool
+    {
+        if ($ch === '') {
+            return false;
+        }
+
+        // [163s]   PN_CHARS_BASE   ::= [A-Z] | [a-z] | [#00C0-#00D6] | [#00D8-#00F6] | [#00F8-#02FF] | [#0370-#037D] | [#037F-#1FFF] | [#200C-#200D] | [#2070-#218F] | [#2C00-#2FEF] | [#3001-#D7FF] | [#F900-#FDCF] | [#FDF0-#FFFD] | [#10000-#EFFFF]
+        $cp = mb_ord($ch, 'UTF-8');
+
+        if ($cp <= 0x7F) {
+            return ($cp >= 0x41 && $cp <= 0x5A) || ($cp >= 0x61 && $cp <= 0x7A);
+        }
+
+        $ranges = [
+            [0x00C0, 0x00D6],
+            [0x00D8, 0x00F6],
+            [0x00F8, 0x02FF],
+            [0x0370, 0x037D],
+            [0x037F, 0x1FFF],
+            [0x200C, 0x200D],
+            [0x2070, 0x218F],
+            [0x2C00, 0x2FEF],
+            [0x3001, 0xD7FF],
+            [0xF900, 0xFDCF],
+            [0xFDF0, 0xFFFD],
+            [0x10000, 0xEFFFF],
+        ];
+        foreach ($ranges as [$lo, $hi]) {
+            if ($cp >= $lo && $cp <= $hi) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isPnCharsU(string $ch): bool
+    {
+        return $ch === '_' || self::isPnCharsBase($ch);
+    }
+
+    private static function isPnChars(string $ch): bool
+    {
+        if ($ch === '') {
+            return false;
+        }
+
+        // [166s]   PN_CHARS    ::= PN_CHARS_U | '-' | [0-9] | #00B7 | [#0300-#036F] | [#203F-#2040]
+
+        if (self::isPnCharsU($ch) || $ch === '-' || self::isDigit($ch)) {
+            return true;
+        }
+
+        $cp = mb_ord($ch, 'UTF-8');
+
+        return $cp === 0x00B7
+            || ($cp >= 0x0300 && $cp <= 0x036F)
+            || ($cp >= 0x203F && $cp <= 0x2040);
+    }
+
+    private static function isHex(string $ch): bool
+    {
+        if ($ch === '' || strlen($ch) !== 1) {
+            return false;
+        }
+
+        $o = ord($ch[0]);
+
+        return ($o >= 0x30 && $o <= 0x39) || ($o >= 0x41 && $o <= 0x46) || ($o >= 0x61 && $o <= 0x66);
+    }
+
+    private static function isPnLocalEscChar(string $ch): bool
+    {
+        return $ch !== '' && preg_match("/^[_~.\\-!\\\$&'()*+,;=\\/?#@%]$/u", $ch) === 1;
     }
 }

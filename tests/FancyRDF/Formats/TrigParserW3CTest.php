@@ -12,6 +12,7 @@ use FancyRDF\Streaming\ResourceStreamReader;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancyRDF\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use Throwable;
 
@@ -67,6 +68,7 @@ final class TrigParserW3CTest extends TestCase
 
     /** @param list<TripleOrQuadArray> $expected */
     #[DataProvider('goodTrigProvider')]
+    #[TestDox('Good Trig file $path parses to expected quads')]
     public function testGoodTrig(string $path, array $expected, string|null $documentBase): void
     {
         $stream = fopen($path, 'r');
@@ -76,9 +78,9 @@ final class TrigParserW3CTest extends TestCase
 
         $reader = new TrigReader(new ResourceStreamReader($stream));
         $parser = new TrigParser($reader, true);
-        $got    = iterator_to_array($parser);
 
         try {
+            $got = iterator_to_array($parser);
             self::assertThat($got, new IsomorphicAsDatasetsConstraint($expected, false));
         } catch (Throwable $e) {
             self::markTestIncomplete($e->getMessage());

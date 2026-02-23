@@ -292,7 +292,7 @@ final class TrigParser extends FiberIterator
         while (true) {
             while ($verbType === TrigTokenType::Semicolon) {
                 $hasNext = $this->reader->next();
-                assert($hasNext, 'expected verb or .' . ($endToken !== null ? ' or ]' : ''));
+                assert($hasNext, 'expected verb or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
                 $verbType = $this->reader->getTokenType();
             }
 
@@ -315,7 +315,7 @@ final class TrigParser extends FiberIterator
                 break;
             }
 
-            assert($next === TrigTokenType::Semicolon, 'expected ; or .' . ($endToken !== null ? ' or ]' : ''));
+            assert($next === TrigTokenType::Semicolon, 'expected ; or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
             $verbType = TrigTokenType::Semicolon;
             $hasNext  = $this->reader->next();
             assert($hasNext, 'expected verb or object after ;');
