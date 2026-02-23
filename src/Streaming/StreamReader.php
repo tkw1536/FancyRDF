@@ -81,7 +81,9 @@ abstract class StreamReader
             return null;
         }
 
-        return mb_substr($rest, 0, 1, 'UTF-8');
+        $res = mb_substr($rest, 0, 1, 'UTF-8');
+
+        return $res === '' ? null : $res;
     }
 
     /**
