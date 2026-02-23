@@ -561,8 +561,6 @@ class RdfXmlParser extends FiberIterator
                         $predicate = new Iri($attrNamespace . $attrLocalName);
                         $value     = $this->reader->value;
 
-                        assert($this->subject !== null, 'subject must be set when processing Description attributes');
-
                         // rdf:type attribute values are URIs, not literals
                         if ($attrNamespace === self::RDF_NAMESPACE && $attrLocalName === 'type') {
                             $resolvedURI = $this->resolveURI($value);
@@ -770,7 +768,7 @@ class RdfXmlParser extends FiberIterator
             // RDF container elements (Bag, Seq, Alt, List) are typed nodes only when there's no subject (top-level)
             $isRdfContainer = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true) && $this->subject === null;
             // Typed node: non-RDF namespace element OR RDF container element (only when no subject), but not RDF or Description
-            $isTypedNode = $localName !== 'RDF' && ($namespace !== self::RDF_NAMESPACE || ($isRdfContainer && $this->subject === null) || $localName !== 'Description') && ($isNodeElement || ($namespace !== self::RDF_NAMESPACE && $this->subject === null) || $isRdfContainer);
+            $isTypedNode = $localName !== 'RDF' && ($namespace !== self::RDF_NAMESPACE || $isRdfContainer || $localName !== 'Description') && ($isNodeElement || ($namespace !== self::RDF_NAMESPACE && $this->subject === null) || $isRdfContainer);
 
             if ($isTypedNode) {
                 $typedNodeDepth = $this->reader->depth;
