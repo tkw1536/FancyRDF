@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Tests\FancyRDF\Formats;
+namespace FancyRDF\Tests\FancyRDF\Formats\TrigReader;
 
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigTokenType;

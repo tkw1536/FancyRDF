@@ -443,6 +443,8 @@ final class TrigReader
             if ($ch === '\\' && $this->position + 1 <= strlen($this->buffer)) {
                 $next = substr($this->buffer, $this->position + 1, 1);
                 if ($next === 'u' || $next === 'U') {
+                    $this->advanceAndAppend($source);
+                    $this->advanceAndAppend($source);
                     $this->consumeUchar($source);
                 } else {
                     $this->advanceAndAppend($source);
@@ -458,14 +460,13 @@ final class TrigReader
         return $source;
     }
 
+    /**
+     * Consume the hex digits of a \u or \U escape. Caller must have already
+     * appended the backslash and 'u' or 'U' to $source (so $source ends with 'u' or 'U').
+     */
     private function consumeUchar(string &$source): void
     {
-        $start = $this->position;
-        $this->advanceAndAppend($source);
-        assert($source !== '' && substr($source, -1) === '\\', 'backslash expected');
-        $ch = $this->peekChar();
-        assert($ch === 'u' || $ch === 'U', '\\u or \\U expected');
-        $this->advanceAndAppend($source);
+        assert($source !== '' && (substr($source, -1) === 'u' || substr($source, -1) === 'U'), 'source must end with u or U');
         $hexLen = substr($source, -1) === 'u' ? 4 : 8;
         for ($i = 0; $i < $hexLen; $i++) {
             $c = $this->peekChar();
@@ -476,7 +477,7 @@ final class TrigReader
             $this->advanceAndAppend($source);
         }
 
-        assert(strlen($source) - $start >= 2 + $hexLen, 'incomplete \\u or \\U escape');
+        assert(strlen($source) >= 2 + $hexLen, 'incomplete \\u or \\U escape');
     }
 
     private function consumeString(): string
