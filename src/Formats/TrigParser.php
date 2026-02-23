@@ -749,6 +749,7 @@ final class TrigParser extends FiberIterator
         assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
         $ord = (int) hexdec($hex);
         assert($ord <= 0x10FFFF, 'code point out of range');
+
         return mb_chr($ord, 'UTF-8');
     }
 

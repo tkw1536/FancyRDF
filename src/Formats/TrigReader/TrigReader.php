@@ -7,6 +7,7 @@ namespace FancyRDF\Formats\TrigReader;
 use function assert;
 use function fread;
 use function max;
+use function mb_substr;
 use function ord;
 use function preg_match;
 use function strcasecmp;
@@ -31,6 +32,9 @@ use function substr;
 final class TrigReader
 {
     private const int READ_CHUNK_SIZE = 8192;
+
+    /** Longest keyword length + 1 for word-boundary lookahead (e.g. "false" = 5). */
+    private const int KEYWORD_LOOKAHEAD = 6;
 
     private string $buffer = '';
 
@@ -84,76 +88,53 @@ final class TrigReader
         return $this->currentTokenValue;
     }
 
-    private function refill(): void
+    /**
+     * Refill reads data from the underlying stream into the buffer.
+     *
+     * After a call to refill at least one of the following is true:
+     *
+     * - there are at least $numBytes read from the stream into the buffer past the current position.
+     * - the input stream has ended, and all available bytes are available in the buffer.
+     */
+    private function refill(int $numBytes = 1): void
     {
-        if ($this->position < strlen($this->buffer)) {
-            return;
-        }
+        $available = strlen($this->buffer) - $this->position;
+        while ($available < $numBytes) {
+            $chunk = fread($this->source, max(1, $this->readChunkSize));
+            if ($chunk === false || $chunk === '') {
+                return;
+            }
 
-        $chunk = fread($this->source, max(1, $this->readChunkSize));
-        if ($chunk === false || $chunk === '') {
-            return;
+            $this->buffer .= $chunk;
+            $available     = strlen($this->buffer) - $this->position;
         }
-
-        $this->buffer .= $chunk;
     }
+
+    public const int MAX_UTF8_CODE_POINT_LENGTH = 4;
 
     /**
-     * Ensure we have at least one full UTF-8 code point at position; return its length in bytes.
+     * Returns the next character in the input, loading buffer if needed.
      */
-    private function utf8CodePointLength(): int
-    {
-        $len = strlen($this->buffer);
-        $p   = $this->position;
-        if ($p >= $len) {
-            return 0;
-        }
-
-        $b = ord($this->buffer[$p]);
-        if ($b < 0x80) {
-            return 1;
-        }
-
-        if ($b < 0xE0) {
-            return 2;
-        }
-
-        if ($b < 0xF0) {
-            return 3;
-        }
-
-        if ($b < 0xF8) {
-            return 4;
-        }
-
-        return 1;
-    }
-
     private function peekChar(): string|null
     {
-        $this->refill();
-        $need = $this->utf8CodePointLength();
-        if ($need === 0) {
+        // Load the substring from the current position.
+        $this->refill(self::MAX_UTF8_CODE_POINT_LENGTH);
+        $rest = substr($this->buffer, $this->position);
+        if ($rest === '') {
             return null;
         }
 
-        while ($this->position + $need > strlen($this->buffer)) {
-            $this->refill();
-            if ($this->position >= strlen($this->buffer)) {
-                return null;
-            }
+        $char = mb_substr($rest, 0, 1);
 
-            $need = $this->utf8CodePointLength();
-        }
-
-        return substr($this->buffer, $this->position, $need);
+        return $char !== '' ? $char : null;
     }
 
-    private function advance(): void
+    /**
+     * Advances the position by one character.
+     */
+    private function advance(string $char): void
     {
-        $n = $this->utf8CodePointLength();
-        assert($n >= 1, 'advance at invalid position');
-        $this->position += $n;
+        $this->position += strlen($char);
     }
 
     private function advanceAndAppend(string &$dest): void
@@ -164,7 +145,7 @@ final class TrigReader
         }
 
         $dest .= $ch;
-        $this->advance();
+        $this->advance($ch);
     }
 
     private function skipWhitespaceAndComments(): void
@@ -176,13 +157,13 @@ final class TrigReader
             }
 
             if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-                $this->advance();
+                $this->advance($ch);
                 continue;
             }
 
             if ($ch === '#') {
                 while (true) {
-                    $this->advance();
+                    $this->advance($ch);
                     $ch = $this->peekChar();
                     if ($ch === null || $ch === "\n" || $ch === "\r") {
                         break;
@@ -201,6 +182,7 @@ final class TrigReader
      */
     private function recognizeToken(string $ch): TrigTokenType|null
     {
+        $this->refill(self::KEYWORD_LOOKAHEAD);
         $rest = substr($this->buffer, $this->position);
 
         if ($ch === '@') {
