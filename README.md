@@ -45,10 +45,11 @@ The library provides several stream-based implementations of parsers and seriali
 - [ ] [Turtle](https://www.w3.org/TR/turtle/) and [Trig](https://www.w3.org/TR/trig/)
     - ✅ Tokenizer: [TrigReader](src/Formats/TrigReader/TrigReader.php)
         - ✅ all positive tests tokenize 
-    - [ ] Parser: TODO
+    - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
     - [ ] Serializer: TODO
     - ✅ passes W3C [Test Suite](https://www.w3.org/2013/TrigTests/)
        - ✅ all positive tests tokenize
+       - [ ] all but 6 positive tests parse correctly 
        - ✅ all negative tests do not produce errors in production mode.
 - [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
     - ✅ Parser: [NFormatParser](src/Formats/NFormatParser.php)

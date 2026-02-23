@@ -60,6 +60,7 @@ slevomat
 sparql
 Sparql
 SPARQL
+Spiderman
 squizlabs
 Stringable
 subcomponent
@@ -68,6 +69,7 @@ testcase
 testcases
 testsuite
 testsuites
+tokenizes
 UCSCHAR
 unescaping
 uppercased
@@ -79,3 +81,5 @@ WissKI
 WRITEFUNCTION
 xmlreader
 XMLW
+паук
+Человек
