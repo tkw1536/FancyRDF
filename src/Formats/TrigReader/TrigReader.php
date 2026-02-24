@@ -385,6 +385,12 @@ final class TrigReader
         }
 
         if ($ch === '.') {
+            $dotOffset  = $offset + strlen($ch);
+            $chAfterDot = $this->stream->peek($dotOffset);
+            if ($chAfterDot !== null && ! self::isDigit($chAfterDot) && $chAfterDot !== 'e' && $chAfterDot !== 'E') {
+                return [TrigTokenType::Integer, $offset];
+            }
+
             $offset          += strlen($ch);
             $ch               = $this->stream->peek($offset);
             $hasDigitAfterDot = false;

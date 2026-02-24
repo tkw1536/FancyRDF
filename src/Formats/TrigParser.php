@@ -283,6 +283,7 @@ final class TrigParser extends FiberIterator
 
     private function parsePredicateObjectList(TrigTokenType $verbType, TrigTokenType|null $endToken = null): void
     {
+        $hasPredicate = false;
         while (true) {
             while ($verbType === TrigTokenType::Semicolon) {
                 $hasNext = $this->reader->next();
@@ -291,6 +292,7 @@ final class TrigParser extends FiberIterator
             }
 
             if ($verbType === TrigTokenType::Dot || ($endToken !== null && $verbType === $endToken) || $verbType === TrigTokenType::LCurly || $verbType === TrigTokenType::RSquare) {
+                assert($hasPredicate || $verbType === TrigTokenType::Dot, 'expected at least one predicate or object');
                 break;
             }
 
@@ -299,6 +301,7 @@ final class TrigParser extends FiberIterator
             $hasNext            = $this->reader->next();
             assert($hasNext, 'expected object after verb');
             $this->parseObjectList($endToken);
+            $hasPredicate = true;
 
             $next = $this->reader->getTokenType();
             if ($next === TrigTokenType::Dot) {
@@ -455,6 +458,7 @@ final class TrigParser extends FiberIterator
         assert(strlen($tokenValue) >= 2 && $tokenValue[0] === '<' && $tokenValue[strlen($tokenValue) - 1] === '>', 'IRIREF must be <...>');
         $inner     = substr($tokenValue, 1, -1);
         $unescaped = $this->unescapeIri($inner);
+        assert(preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $unescaped) !== 1, 'IRIREF contains disallowed character');
 
         $iri = $this->base !== '' ? UriReference::resolveRelative($this->base, $unescaped) : $unescaped;
         assert($iri !== '', 'resolved IRI is empty');
@@ -618,7 +622,7 @@ final class TrigParser extends FiberIterator
         $objects = [];
         while (true) {
             $type = $this->reader->getTokenType();
-            if ($type === TrigTokenType::RParen) {
+            if ($type === TrigTokenType::RParen || $type === TrigTokenType::Dot) {
                 break;
             }
 
@@ -643,27 +647,16 @@ final class TrigParser extends FiberIterator
 
             // Advance to the next item in the collection without skipping over it.
             if ($startType === TrigTokenType::String) {
-                $afterType = $this->reader->getTokenType();
-                // parseLiteral() may leave us positioned on a trailing language tag
-                // or datatype IRI; consume it so that we land on the next item.
-                if (
-                    $afterType === TrigTokenType::LangTag
-                    || $afterType === TrigTokenType::IriRef
-                    || $afterType === TrigTokenType::PnameLn
-                    || $afterType === TrigTokenType::PnameNs
-                ) {
-                    if (! $this->reader->next()) {
-                        break;
-                    }
-                }
-            } else {
-                // For all other starting token types, the corresponding parse*
-                // method leaves us at the last token of the item; step once to
-                // reach the beginning of the next item or the closing ')'.
-                if (! $this->reader->next()) {
-                    break;
-                }
+                continue;
             }
+
+            if (! $this->reader->next()) {
+                break;
+            }
+        }
+
+        if (! $isSubject) {
+            $this->reader->next();
         }
 
         if ($objects === []) {
@@ -708,12 +701,14 @@ final class TrigParser extends FiberIterator
                 assert(str_starts_with($lang, '@'), 'LANGTAG must start with @');
                 $lang = substr($lang, 1);
                 assert($lang !== '', 'LANGTAG is empty');
+                $this->reader->next();
             } elseif ($this->reader->getTokenType() === TrigTokenType::HatHat) {
                 $hasNext = $this->reader->next();
                 assert($hasNext, 'expected iri after ^^');
                 $type = $this->reader->getTokenType();
                 assert($type === TrigTokenType::IriRef || $type === TrigTokenType::PnameLn || $type === TrigTokenType::PnameNs, 'expected datatype iri');
                 $datatype = $this->expandPnameOrIriRef($type, $this->reader->getTokenValue());
+                $this->reader->next();
             }
         }
 
@@ -744,7 +739,23 @@ final class TrigParser extends FiberIterator
 
     private function unescapeIri(string $s): string
     {
-        return $this->unescapeUcharOnly($s);
+        $result = '';
+        $i      = 0;
+        $len    = strlen($s);
+        while ($i < $len) {
+            if ($s[$i] === '\\') {
+                assert($i + 1 < $len && ($s[$i + 1] === 'u' || $s[$i + 1] === 'U'), 'only \\u and \\U allowed in IRIREF');
+                $result .= $this->decodeUcharFromString($s, $i);
+                $hexLen  = $s[$i + 1] === 'u' ? 4 : 8;
+                $i      += 2 + $hexLen;
+                continue;
+            }
+
+            $result .= $s[$i];
+            $i++;
+        }
+
+        return $result;
     }
 
     private function unescapeString(string $tokenValue): string
@@ -796,26 +807,6 @@ final class TrigParser extends FiberIterator
         return $result;
     }
 
-    private function unescapeUcharOnly(string $s): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($s);
-        while ($i < $len) {
-            if ($s[$i] === '\\' && $i + 1 < $len && ($s[$i + 1] === 'u' || $s[$i + 1] === 'U')) {
-                $result .= $this->decodeUcharFromString($s, $i);
-                $hexLen  = $s[$i + 1] === 'u' ? 4 : 8;
-                $i      += 2 + $hexLen;
-                continue;
-            }
-
-            $result .= $s[$i];
-            $i++;
-        }
-
-        return $result;
-    }
-
     private function decodeUcharFromString(string $s, int $pos): string
     {
         assert($s[$pos] === '\\' && $pos + 2 <= strlen($s));
@@ -826,6 +817,7 @@ final class TrigParser extends FiberIterator
         assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
         $ord = (int) hexdec($hex);
         assert($ord <= 0x10FFFF, 'code point out of range');
+        assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
         $res = mb_chr($ord, 'UTF-8');
 
         /** @phpstan-ignore function.alreadyNarrowedType (in production mode the assertion above may fail) */
@@ -834,7 +826,7 @@ final class TrigParser extends FiberIterator
 
     private function decodeEchar(string $char): string
     {
-        return match ($char) {
+        $result = match ($char) {
             't' => "\t",
             'b' => "\x08",
             'n' => "\n",
@@ -843,8 +835,11 @@ final class TrigParser extends FiberIterator
             '"' => '"',
             "'" => "'",
             '\\' => '\\',
-            default => $char,
+            default => null,
         };
+        assert($result !== null, 'invalid string escape \\' . $char);
+
+        return $result;
     }
 
     private function unescapePnameLocal(string $local): string
