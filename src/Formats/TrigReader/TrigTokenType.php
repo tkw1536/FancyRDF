@@ -53,6 +53,8 @@ enum TrigTokenType: string
     // Other
     case LangTag = 'LANGTAG';
 
-    // Control
+    /**
+     * The token has
+     */
     case EndOfInput = 'EndOfInput';
 }

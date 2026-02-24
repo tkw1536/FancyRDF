@@ -200,6 +200,30 @@ final class TrigParserTest extends TestCase
                 ],
                 true,
             ],
+            'nested blank node property lists' => [
+                '{[ <http://a.example/p1> [ <http://a.example/p2> <http://a.example/o2> ] ; <http://a.example/p> <http://a.example/o> ].}',
+                [
+                    [
+                        new BlankNode('outer'),
+                        new Iri('http://a.example/p1'),
+                        new BlankNode('inner'),
+                        null,
+                    ],
+                    [
+                        new BlankNode('inner'),
+                        new Iri('http://a.example/p2'),
+                        new Iri('http://a.example/o2'),
+                        null,
+                    ],
+                    [
+                        new BlankNode('outer'),
+                        new Iri('http://a.example/p'),
+                        new Iri('http://a.example/o'),
+                        null,
+                    ],
+                ],
+                true,
+            ],
         ];
     }
 

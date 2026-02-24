@@ -48,8 +48,8 @@ The library provides several stream-based implementations of parsers and seriali
     - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
     - [ ] Serializer: TODO
     - ✅ passes W3C [Test Suite](https://www.w3.org/2013/TrigTests/)
-       - ✅ all positive tests tokenize
-       - [ ] all but 3 positive tests parse correctly 
+       - ✅ all positive tests tokenize correctly
+       - ✅ all positive tests parse correctly and produce equivalent N-Quads datasets
        - ✅ all negative tests do not produce errors in production mode.
 - [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
     - ✅ Parser: [NFormatParser](src/Formats/NFormatParser.php)

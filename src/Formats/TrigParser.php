@@ -534,6 +534,11 @@ final class TrigParser extends FiberIterator
         return $this->makeBlankNode($label);
     }
 
+    /**
+     * Parse a blank node used as subject: [ predicateObjectList ].
+     * Leaves the reader on the closing ] so that the caller (e.g. parseTriples) can
+     * call next() to advance to the verb.
+     */
     private function parseBlankNodePropertyListSubject(): BlankNode
     {
         $bnode            = $this->parseAnon();
@@ -547,12 +552,18 @@ final class TrigParser extends FiberIterator
             $this->parsePredicateObjectList($type, TrigTokenType::RSquare);
         }
 
+        assert($this->reader->getTokenType() === TrigTokenType::RSquare, 'expected ] after blank node property list');
+
         $this->curSubject   = $savedSubject;
         $this->curPredicate = $savedPredicate;
 
         return $bnode;
     }
 
+    /**
+     * Parse a blank node used as object: [ predicateObjectList ].
+     * Consumes the closing ] so that callers are positioned on the next token.
+     */
     private function parseBlankNodePropertyListObject(): BlankNode
     {
         $bnode            = $this->parseAnon();
@@ -565,6 +576,9 @@ final class TrigParser extends FiberIterator
         if ($type !== TrigTokenType::RSquare) {
             $this->parsePredicateObjectList($type, TrigTokenType::RSquare);
         }
+
+        assert($this->reader->getTokenType() === TrigTokenType::RSquare, 'expected ] after blank node property list');
+        $this->reader->next();
 
         $this->curSubject   = $savedSubject;
         $this->curPredicate = $savedPredicate;
@@ -593,9 +607,14 @@ final class TrigParser extends FiberIterator
         }
 
         $objects = [];
-        $type    = $this->reader->getTokenType();
         while (true) {
-            $obj = match ($type) {
+            $type = $this->reader->getTokenType();
+            if ($type === TrigTokenType::RParen) {
+                break;
+            }
+
+            $startType = $type;
+            $obj       = match ($type) {
                 TrigTokenType::IriRef => $this->parseIriRefTerm(),
                 TrigTokenType::PnameLn, TrigTokenType::PnameNs => $this->parsePnameTerm(),
                 TrigTokenType::BlankNodeLabel => $this->parseBlankNodeLabel(),
@@ -607,34 +626,60 @@ final class TrigParser extends FiberIterator
                 default => throw new Exception('expected object in collection'),
             };
             $objects[] = $obj;
-            if (! $this->reader->next()) {
-                break;
-            }
 
-            $type = $this->reader->getTokenType();
-            if ($type === TrigTokenType::RParen) {
-                break;
+            // Advance to the next item in the collection without skipping over it.
+            if ($startType === TrigTokenType::String) {
+                $afterType = $this->reader->getTokenType();
+                // parseLiteral() may leave us positioned on a trailing language tag
+                // or datatype IRI; consume it so that we land on the next item.
+                if (
+                    $afterType === TrigTokenType::LangTag
+                    || $afterType === TrigTokenType::IriRef
+                    || $afterType === TrigTokenType::PnameLn
+                    || $afterType === TrigTokenType::PnameNs
+                ) {
+                    if (! $this->reader->next()) {
+                        break;
+                    }
+                }
+            } else {
+                // For all other starting token types, the corresponding parse*
+                // method leaves us at the last token of the item; step once to
+                // reach the beginning of the next item or the closing ')'.
+                if (! $this->reader->next()) {
+                    break;
+                }
             }
         }
 
-        $rdfFirst    = new Iri(self::RDF_NAMESPACE . 'first');
-        $rdfRest     = new Iri(self::RDF_NAMESPACE . 'rest');
-        $rdfNil      = new Iri(self::RDF_NAMESPACE . 'nil');
-        $graph       = $this->isTrig ? $this->curGraph : null;
-        $currentList = null;
-        foreach ($objects as $index => $item) {
+        if ($objects === []) {
+            return new Iri(self::RDF_NAMESPACE . 'nil');
+        }
+
+        $rdfFirst = new Iri(self::RDF_NAMESPACE . 'first');
+        $rdfRest  = new Iri(self::RDF_NAMESPACE . 'rest');
+        $rdfNil   = new Iri(self::RDF_NAMESPACE . 'nil');
+        $graph    = $this->isTrig ? $this->curGraph : null;
+
+        $headNode    = null;
+        $currentNode = null;
+        foreach ($objects as $item) {
             $listNode = $this->parseAnon();
-            if ($currentList !== null) {
-                $this->emit([$currentList, $rdfRest, $listNode, $graph]);
+            if ($headNode === null) {
+                $headNode = $listNode;
+            }
+
+            if ($currentNode !== null) {
+                $this->emit([$currentNode, $rdfRest, $listNode, $graph]);
             }
 
             $this->emit([$listNode, $rdfFirst, $item, $graph]);
-            $currentList = $listNode;
+            $currentNode = $listNode;
         }
 
-        $this->emit([$currentList, $rdfRest, $rdfNil, $graph]);
+        $this->emit([$currentNode, $rdfRest, $rdfNil, $graph]);
 
-        return $currentList;
+        return $headNode;
     }
 
     private function parseLiteral(): Literal

@@ -14,7 +14,6 @@ use FancyRDF\Tests\Support\W3CTestLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
-use Throwable;
 
 use function array_values;
 use function fopen;
@@ -79,12 +78,8 @@ final class TrigParserW3CTest extends TestCase
         $reader = new TrigReader(new ResourceStreamReader($stream));
         $parser = new TrigParser($reader, true, $documentBase ?? '');
 
-        try {
-            $got = iterator_to_array($parser);
-            self::assertThat($got, new IsomorphicAsDatasetsConstraint($expected, false));
-        } catch (Throwable $e) {
-            self::markTestIncomplete($e->getMessage());
-        }
+        $got = iterator_to_array($parser);
+        self::assertThat($got, new IsomorphicAsDatasetsConstraint($expected, false));
     }
 
     // /** @return array<string, array{string, string|null}> */
