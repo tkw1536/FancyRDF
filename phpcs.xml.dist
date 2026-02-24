@@ -5,11 +5,21 @@
     <!-- This must work with PHP 8.4 and above -->
     <config name="php_version" value="80400"/>
 
-    <!-- slevomat coding standard -->
+    <!-- Doctrine coding standard -->
     <rule ref="Doctrine">
         <exclude name="Generic.Files.LineLength.TooLong" />
     </rule>
-        
+
+    <!-- require exactly 4 spaces everywhere -->
+    <arg name="tab-width" value="4"/>
+    <rule ref="Generic.WhiteSpace.ScopeIndent">
+        <properties>
+            <property name="indent" value="4"/>
+            <property name="tabIndent" value="false" />
+            <!-- enforce also for comments -->
+            <property name="ignoreIndentationTokens" type="array" />
+        </properties>
+    </rule>
 
     <!-- files to be included -->
     <file>src</file>

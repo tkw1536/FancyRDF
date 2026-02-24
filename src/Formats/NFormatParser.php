@@ -112,15 +112,15 @@ final class NFormatParser
     private static int $len     = 0;
     private static int $pos     = 0;
 
-  /**
-   * Parses a single N-Quads line into a quad or null.
-   *
-   * @param string $line
-   *   One line (subject predicate object [graph]).
-   *
-   * @return TripleOrQuadArray|null
-   *   The triple, quad, or null if the line is empty or a comment.
-   */
+    /**
+     * Parses a single N-Quads line into a quad or null.
+     *
+     * @param string $line
+     *   One line (subject predicate object [graph]).
+     *
+     * @return TripleOrQuadArray|null
+     *   The triple, quad, or null if the line is empty or a comment.
+     */
     public static function parseLine(string $line): array|null
     {
         self::$line = $line;
@@ -197,9 +197,9 @@ final class NFormatParser
         return new Iri(self::parseIriRef());
     }
 
-  /**
-   * Skips space and tab.
-   */
+    /**
+     * Skips space and tab.
+     */
     private static function skipWhitespace(): void
     {
         while (self::$pos < self::$len && (self::$line[self::$pos] === ' ' || self::$line[self::$pos] === "\t")) {
@@ -207,12 +207,12 @@ final class NFormatParser
         }
     }
 
-  /**
-   * Parses an IRI reference <...>, with \u and \U unescaping.
-   *
-   * @return non-empty-string
-   *   The IRI string.
-   */
+    /**
+     * Parses an IRI reference <...>, with \u and \U unescaping.
+     *
+     * @return non-empty-string
+     *   The IRI string.
+     */
     private static function parseIriRef(): string
     {
         assert(self::$line[self::$pos] === '<', 'expected "<" at position ' . self::$pos);
@@ -261,15 +261,15 @@ final class NFormatParser
         return ! $ref->isRelativeReference() && $ref->isRFC3987IriReference();
     }
 
-  /**
-   * Parses a blank node label _:label and returns only the label.
-   *
-   * Label is built on PN_CHARS_BASE, with: _ and [0-9] anywhere; . anywhere except
-   * first or last; -, U+00B7, U+0300–U+036F, U+203F–U+2040 anywhere except first.
-   * Colon is not allowed (W3C N-Triples).
-   *
-   * @return non-empty-string
-   */
+    /**
+     * Parses a blank node label _:label and returns only the label.
+     *
+     * Label is built on PN_CHARS_BASE, with: _ and [0-9] anywhere; . anywhere except
+     * first or last; -, U+00B7, U+0300–U+036F, U+203F–U+2040 anywhere except first.
+     * Colon is not allowed (W3C N-Triples).
+     *
+     * @return non-empty-string
+     */
     private static function parseBlankNodeLabel(): string
     {
         assert(self::$line[self::$pos] === '_' && self::$line[self::$pos + 1] === ':', 'expected _: at position ' . self::$pos);
@@ -301,9 +301,9 @@ final class NFormatParser
         return $label;
     }
 
-  /**
-   * Parses a literal: "..." with optional @lang or ^^<datatype>.
-   */
+    /**
+     * Parses a literal: "..." with optional @lang or ^^<datatype>.
+     */
     private static function parseLiteral(): Literal
     {
         $lexical = self::parseStringLiteralQuote();
@@ -328,12 +328,12 @@ final class NFormatParser
         return new Literal($lexical, $lang, $datatype);
     }
 
-  /**
-   * Parses a quoted string "...", with ECHAR and UCHAR unescaping.
-   *
-   * @return string
-   *   The lexical form.
-   */
+    /**
+     * Parses a quoted string "...", with ECHAR and UCHAR unescaping.
+     *
+     * @return string
+     *   The lexical form.
+     */
     private static function parseStringLiteralQuote(): string
     {
         assert(self::$line[self::$pos] === '"', 'expected quote at position ' . self::$pos);
@@ -378,9 +378,9 @@ final class NFormatParser
         return '';
     }
 
-  /**
-   * Decodes one \uXXXX or \UXXXXXXXX sequence; $pos is advanced.
-   */
+    /**
+     * Decodes one \uXXXX or \UXXXXXXXX sequence; $pos is advanced.
+     */
     private static function decodeUchar(): string
     {
         assert(self::$line[self::$pos] === '\\', 'expected backslash at position ' . self::$pos);
@@ -409,9 +409,9 @@ final class NFormatParser
         return mb_chr($ord, 'UTF-8');
     }
 
-  /**
-   * Decodes one ECHAR (single character escape).
-   */
+    /**
+     * Decodes one ECHAR (single character escape).
+     */
     private static function decodeEchar(string $char, int $pos): string
     {
         return match ($char) {

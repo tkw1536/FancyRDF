@@ -83,9 +83,9 @@ final class NFormatSerializer
         return '_:' . $blankNode->identifier;
     }
 
-  /**
-   * Serializes a Literal as STRING_LITERAL_QUOTE with optional @lang or ^^IRI.
-   */
+    /**
+     * Serializes a Literal as STRING_LITERAL_QUOTE with optional @lang or ^^IRI.
+     */
     private static function serializeLiteral(Literal $term): string
     {
         $out = '"' . self::escapeLiteralString($term->lexical) . '"';
@@ -98,12 +98,12 @@ final class NFormatSerializer
         return $out;
     }
 
-  /**
-   * Escapes a string for use inside IRIREF (between < and >).
-   *
-   * N-Triples IRIREF excludes #x00-#x20, <, >, ", {, }, |, ^, `, \.
-   * Those are encoded as \uXXXX or \UXXXXXXXX per the grammar.
-   */
+    /**
+     * Escapes a string for use inside IRIREF (between < and >).
+     *
+     * N-Triples IRIREF excludes #x00-#x20, <, >, ", {, }, |, ^, `, \.
+     * Those are encoded as \uXXXX or \UXXXXXXXX per the grammar.
+     */
     private static function escapeIri(string $uri): string
     {
         $result = '';
@@ -137,11 +137,11 @@ final class NFormatSerializer
         return $result;
     }
 
-  /**
-   * Escapes a string for use inside STRING_LITERAL_QUOTE (between " and ").
-   *
-   * ECHAR for \ " ' \t \n \r \b \f; UCHAR for other control and non-ASCII.
-   */
+    /**
+     * Escapes a string for use inside STRING_LITERAL_QUOTE (between " and ").
+     *
+     * ECHAR for \ " ' \t \n \r \b \f; UCHAR for other control and non-ASCII.
+     */
     private static function escapeLiteralString(string $value): string
     {
         $result = '';
@@ -199,9 +199,9 @@ final class NFormatSerializer
         return $result;
     }
 
-  /**
-   * Formats a code point as N-Triples UCHAR (\uXXXX or \UXXXXXXXX).
-   */
+    /**
+     * Formats a code point as N-Triples UCHAR (\uXXXX or \UXXXXXXXX).
+     */
     private static function uchar(int $ord): string
     {
         if ($ord <= 0xFFFF) {

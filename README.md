@@ -61,7 +61,6 @@ The library provides several stream-based implementations of parsers and seriali
 
 ## TODO List
 - clean up TrigParser and TrigReader
-- add `phpcs` for indentation
 - add missing Serializers
 - consider moving from assertions to an explicit "strict" flag
 
