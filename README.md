@@ -53,7 +53,9 @@ The library provides several stream-based implementations of parsers and seriali
     - ✅ Tokenizer: [TrigReader](src/Formats/TrigReader/TrigReader.php)
     - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
     - [ ] Serializer: TODO
-    - [ ] does not yet pass the W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/) and [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
+    - Test Suites:
+        -  ✅ can pass W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/)
+        - [ ] does not yet pass [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
 
 ## Dependencies
 

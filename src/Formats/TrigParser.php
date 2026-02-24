@@ -216,8 +216,9 @@ final class TrigParser extends FiberIterator
         $this->curSubject = $subject;
         $hasNext          = $this->reader->next();
         assert($hasNext, 'expected verb');
-        $verbType = $this->reader->getTokenType();
-        $this->parsePredicateObjectList($verbType);
+        $verbType         = $this->reader->getTokenType();
+        $allowSoleSubject = $firstType === TrigTokenType::LSquare;
+        $this->parsePredicateObjectList($verbType, null, $allowSoleSubject);
     }
 
     private function parseTriplesBlock(): void
@@ -278,10 +279,11 @@ final class TrigParser extends FiberIterator
             return;
         }
 
-        $this->parsePredicateObjectList($verbType, $endToken);
+        $allowSoleSubject = $subjectType === TrigTokenType::LSquare;
+        $this->parsePredicateObjectList($verbType, $endToken, $allowSoleSubject);
     }
 
-    private function parsePredicateObjectList(TrigTokenType $verbType, TrigTokenType|null $endToken = null): void
+    private function parsePredicateObjectList(TrigTokenType $verbType, TrigTokenType|null $endToken = null, bool $allowSoleSubject = false): void
     {
         $hasPredicate = false;
         while (true) {
@@ -291,14 +293,17 @@ final class TrigParser extends FiberIterator
                 $verbType = $this->reader->getTokenType();
             }
 
-            if ($verbType === TrigTokenType::Dot || ($endToken !== null && $verbType === $endToken) || $verbType === TrigTokenType::LCurly || $verbType === TrigTokenType::RSquare) {
+            if ($verbType === TrigTokenType::Dot || ($endToken !== null && $verbType === $endToken) || $verbType === TrigTokenType::LCurly || $verbType === TrigTokenType::RSquare || $verbType === TrigTokenType::EndOfInput) {
+                assert($hasPredicate || $allowSoleSubject || $verbType !== TrigTokenType::Dot, 'expected verb');
                 break;
             }
 
             $predicate          = $this->parseVerb($verbType);
             $this->curPredicate = $predicate;
-            $hasNext            = $this->reader->next();
+
+            $hasNext = $this->reader->next();
             assert($hasNext, 'expected object after verb');
+
             $this->parseObjectList($endToken);
             $hasPredicate = true;
 
@@ -311,7 +316,9 @@ final class TrigParser extends FiberIterator
                 break;
             }
 
-            assert($next === TrigTokenType::Semicolon, 'expected ; or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
+            assert($next === TrigTokenType::Semicolon, 'expected ;');
+
+            // assert(, 'expected ; or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
             $verbType = TrigTokenType::Semicolon;
             $hasNext  = $this->reader->next();
             assert($hasNext, 'expected verb or object after ;');
@@ -476,12 +483,15 @@ final class TrigParser extends FiberIterator
         $colonPos = strpos($tokenValue, ':');
         assert($colonPos !== false, 'PNAME must contain :');
         $prefix = substr($tokenValue, 0, $colonPos + 1);
-        assert(isset($this->namespaces[$prefix]), 'undefined prefix: ' . $prefix);
-        $local = substr($tokenValue, $colonPos + 1);
-        $local = $this->unescapePnameLocal($local);
-        $ns    = $this->namespaces[$prefix];
-        $full  = $ns . $local;
-        if ($this->base !== '' && (strpos($ns, ':') === false || UriReference::parse($ns)->isRelativeReference())) {
+        $local  = substr($tokenValue, $colonPos + 1);
+        $local  = $this->unescapePnameLocal($local);
+
+        $ns = $this->namespaces[$prefix] ?? null;
+        assert($ns !== null, 'undefined prefix: ' . $prefix);
+
+        $full = $ns . $local;
+
+        if ($this->base !== '') {
             $full = UriReference::resolveRelative($this->base, $full);
         }
 
@@ -615,6 +625,10 @@ final class TrigParser extends FiberIterator
         }
 
         if ($this->reader->getTokenType() === TrigTokenType::RParen) {
+            if (! $isSubject) {
+                $this->reader->next();
+            }
+
             return new Iri(self::RDF_NAMESPACE . 'nil');
         }
 
@@ -814,7 +828,7 @@ final class TrigParser extends FiberIterator
         assert($pos + 2 + $hexLen <= strlen($s), 'incomplete \\u or \\U escape');
         $hex = substr($s, $pos + 2, $hexLen);
         assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
-        $ord = (int) hexdec($hex);
+        $ord = (int) @hexdec($hex);
         assert($ord <= 0x10FFFF, 'code point out of range');
         assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
         $res = mb_chr($ord, 'UTF-8');
@@ -834,9 +848,10 @@ final class TrigParser extends FiberIterator
             '"' => '"',
             "'" => "'",
             '\\' => '\\',
-            default => null,
+            default => '',
         };
-        assert($result !== null, 'invalid string escape \\' . $char);
+
+        assert($result !== '', 'invalid string escape \\' . $char);
 
         return $result;
     }

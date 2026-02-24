@@ -29,12 +29,6 @@ use function iterator_to_array;
 final class TurtleTest extends TestBase
 {
     #[Override]
-    public function setUp(): void
-    {
-        self::markTestIncomplete('Turtle tests do not yet work');
-    }
-
-    #[Override]
     protected static function getTestSuiteName(): string
     {
         return 'rdf-turtle';

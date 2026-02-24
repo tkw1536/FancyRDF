@@ -70,9 +70,7 @@ final class TrigReader
             }
 
             if ($ch !== '#') {
-                if ($offset > 0) {
-                    $this->stream->consume($offset);
-                }
+                $this->stream->consume($offset);
 
                 return;
             }
