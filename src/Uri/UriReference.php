@@ -10,6 +10,7 @@ use function assert;
 use function chr;
 use function hexdec;
 use function is_numeric;
+use function is_string;
 use function preg_match;
 use function preg_replace_callback;
 use function str_starts_with;
@@ -18,6 +19,8 @@ use function strrpos;
 use function strtolower;
 use function strtoupper;
 use function substr;
+
+use const PREG_UNMATCHED_AS_NULL;
 
 /**
  * Represents an RFC 3986 URI  or RFC 3987 IRI References.
@@ -41,9 +44,6 @@ final class UriReference
      * @see https://www.rfc-editor.org/rfc/rfc3987#section-2
      *
      * @param non-empty-string|null $scheme
-     * @param non-empty-string|null $authority
-     * @param non-empty-string|null $query
-     * @param non-empty-string|null $fragment
      */
     public function __construct(
         public readonly string|null $scheme,
@@ -158,7 +158,7 @@ final class UriReference
             return false;
         }
 
-        return $host !== '' && self::componentIsValidRfc3986($host);
+        return self::componentIsValidRfc3986($host);
     }
 
     /**
@@ -178,7 +178,7 @@ final class UriReference
             return false;
         }
 
-        return $host !== '' && self::componentIsValidRfc3987($host);
+        return self::componentIsValidRfc3987($host);
     }
 
     /** RFC 3986: unreserved | gen-delims | sub-delims | pct-encoded (ASCII only checked separately) */
@@ -466,7 +466,7 @@ final class UriReference
                     if (str_starts_with($refPath, '/')) {
                         $targetPath = self::removeDotSegments($refPath);
                     } else {
-                        $targetPath = $this->mergePath($basePath, $refPath);
+                        $targetPath = $this->mergePath($baseAuthority, $basePath, $refPath);
                         $targetPath = self::removeDotSegments($targetPath);
                     }
 
@@ -497,12 +497,12 @@ final class UriReference
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-5.2.3
      * Merges base path with reference path per RFC 3986 §5.2.3.
      */
-    private function mergePath(string $basePath, string $refPath): string
+    private function mergePath(string|null $baseAuthority, string $basePath, string $refPath): string
     {
         // If the base URI has a defined authority component and an empty
         // path, then return a string consisting of "/" concatenated with the
-        // reference's path
-        if ($basePath === '' || $basePath === '/') {
+        // reference's path; otherwise
+        if (is_string($baseAuthority) && $basePath === '') {
             return '/' . $refPath;
         }
 
@@ -678,10 +678,6 @@ final class UriReference
      * @see \FancyRDF\Url\UriReference::normalize()
      *
      * @param non-empty-string|null &$scheme
-     * @param non-empty-string|null &$authority
-     * @param non-empty-string|null &$query
-     * @param non-empty-string|null &$fragment
-     * @param non-empty-string|null $fragment
      */
     private static function normalizeComponents(
         string|null &$scheme,
@@ -721,9 +717,6 @@ final class UriReference
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-6.2.2.1
      *
      * @param non-empty-string|null $scheme
-     * @param non-empty-string|null $authority
-     * @param non-empty-string|null $query
-     * @param non-empty-string|null $fragment
      */
     private static function normalizeCase(
         string|null &$scheme,
@@ -774,9 +767,6 @@ final class UriReference
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-2.3
      *
      * @param non-empty-string|null $scheme
-     * @param non-empty-string|null $authority
-     * @param non-empty-string|null $query
-     * @param non-empty-string|null $fragment
      */
     private static function normalizePercentEncodingInUriString(
         string|null &$scheme,
@@ -821,10 +811,6 @@ final class UriReference
     /**
      * Lowercases the host subcomponent within an authority string per RFC 3986 §6.2.2.1.
      * authority = [ userinfo "@" ] host [ ":" port ]; host is case-insensitive.
-     *
-     * @param non-empty-string $authority
-     *
-     * @return non-empty-string
      */
     private static function lowercaseHostInAuthority(string $authority): string
     {
@@ -934,22 +920,22 @@ final class UriReference
         // [1] https://www.rfc-editor.org/rfc/rfc3986#appendix-B
 
         // We use ~ as a delimiter for the regexp so we don't have to do more escaping!
-        if (! preg_match('~^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$~s', $uri, $matches)) {
+        if (! preg_match('~^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$~s', $uri, $matches, PREG_UNMATCHED_AS_NULL)) {
             return new self(null, null, $uri, null, null);
         }
 
         $scheme    = $matches[2];
         $authority = $matches[4];
         $path      = $matches[5];
-        $query     = $matches[7] ?? '';
-        $fragment  = $matches[9] ?? '';
+        $query     = $matches[7];
+        $fragment  = $matches[9];
 
         return new self(
-            $scheme !== '' ? $scheme : null,
-            $authority !== '' ? $authority : null,
+            $scheme,
+            $authority,
             $path,
-            $query !== '' ? $query : null,
-            $fragment !== '' ? $fragment : null,
+            $query,
+            $fragment,
         );
     }
 

@@ -286,6 +286,22 @@ final class UriReferenceTest extends TestCase
                 false,
                 false,
             ],
+            '?' => [
+                new UriReference(null, null, '', '', null),
+                true, // isRelativeReference
+                false,  // isAbsoluteURI
+                false, // isSuffixReference
+                true,  // isRFC3986UriReference
+                true,  // isRFC3987IriReference
+            ],
+            'file:///a/bb/ccc/g' => [
+                new UriReference('file', '', '/a/bb/ccc/g', null, null),
+                false,
+                true,
+                false,
+                true,
+                true,
+            ],
         ];
 
         $cases = [];
@@ -844,11 +860,11 @@ final class UriReferenceTest extends TestCase
     public function testParseParsesComponents(string $uri, UriReference $expected): void
     {
         $parsed = UriReference::parse($uri);
-        self::assertSame($expected->scheme, $parsed->scheme);
-        self::assertSame($expected->authority, $parsed->authority);
-        self::assertSame($expected->path, $parsed->path);
-        self::assertSame($expected->query, $parsed->query);
-        self::assertSame($expected->fragment, $parsed->fragment);
+        self::assertSame($expected->scheme, $parsed->scheme, 'correct scheme');
+        self::assertSame($expected->authority, $parsed->authority, 'correct authority');
+        self::assertSame($expected->path, $parsed->path, 'correct path');
+        self::assertSame($expected->query, $parsed->query, 'correct query');
+        self::assertSame($expected->fragment, $parsed->fragment, 'correct fragment');
     }
 
     #[DataProvider('rfc3986SpecParseProvider')]
