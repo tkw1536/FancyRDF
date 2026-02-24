@@ -16,6 +16,7 @@ use Override;
 
 use function assert;
 use function hexdec;
+use function is_string;
 use function mb_chr;
 use function preg_match;
 use function str_ends_with;
@@ -41,15 +42,8 @@ final class TrigParser extends FiberIterator
     private const string RDF_NAMESPACE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
     private const string XSD_NAMESPACE = 'http://www.w3.org/2001/XMLSchema#';
 
-    private string $base = '';
-
     /** @var array<string, string> */
     private array $namespaces = [];
-
-    /** @var array<string, BlankNode> */
-    private array $bnodeLabels = [];
-
-    private int $anonCounter = 0;
 
     private Iri|BlankNode|null $curSubject = null;
 
@@ -61,6 +55,7 @@ final class TrigParser extends FiberIterator
     public function __construct(
         private readonly TrigReader $reader,
         private readonly bool $isTrig = false,
+        private string $base = '',
     ) {
     }
 
@@ -497,19 +492,46 @@ final class TrigParser extends FiberIterator
         return $this->getOrCreateBlankNode($label);
     }
 
+     // ===========================
+    // Blank node handling
+    // ===========================
+
+    private int $blankNodeCounter = 0;
+
+    /** @var array<string, non-empty-string> */
+    private array $blankNodeMap = [];
+
+    /**
+     * Makes a blank node resource.
+     *
+     * @param string|null $name
+     *   If non-null, a string that uniquely identifies this blank node
+     *   within the current document.
+     *   If null, a fresh blank node label is returned.
+     */
+    private function makeBlankNode(string|null $name): BlankNode
+    {
+        // Pick the existing blank node label, or create a new one.
+        $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
+        $id ??= 'b' . ($this->blankNodeCounter++);
+
+        // Store the mapping if we were given a name.
+        if (is_string($name)) {
+            $this->blankNodeMap[$name] = $id;
+        }
+
+        return new BlankNode($id);
+    }
+
     private function parseAnon(): BlankNode
     {
-        return new BlankNode('_anon_' . (++$this->anonCounter));
+        return $this->makeBlankNode(null);
     }
 
     /** @param non-empty-string $label */
     private function getOrCreateBlankNode(string $label): BlankNode
     {
-        if (! isset($this->bnodeLabels[$label])) {
-            $this->bnodeLabels[$label] = new BlankNode($label);
-        }
-
-        return $this->bnodeLabels[$label];
+        return $this->makeBlankNode($label);
     }
 
     private function parseBlankNodePropertyListSubject(): BlankNode

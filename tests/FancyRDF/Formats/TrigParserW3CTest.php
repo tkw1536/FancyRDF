@@ -77,7 +77,7 @@ final class TrigParserW3CTest extends TestCase
         }
 
         $reader = new TrigReader(new ResourceStreamReader($stream));
-        $parser = new TrigParser($reader, true);
+        $parser = new TrigParser($reader, true, $documentBase ?? '');
 
         try {
             $got = iterator_to_array($parser);
