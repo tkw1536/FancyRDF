@@ -10,6 +10,7 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
 use Traversable;
+use TypeError;
 
 use function assert;
 use function fclose;
@@ -18,6 +19,7 @@ use function hexdec;
 use function mb_chr;
 use function preg_match;
 use function preg_split;
+use function rtrim;
 use function str_ends_with;
 use function strlen;
 use function substr;
@@ -89,6 +91,8 @@ final class NFormatParser
                     break;
                 }
 
+                $line = rtrim($line, "\r\n");
+
                 $term = self::parseLine($line);
                 if ($term === null) {
                     continue;
@@ -97,7 +101,10 @@ final class NFormatParser
                 yield $term;
             }
         } finally {
-            fclose($stream);
+            try {
+                fclose($stream);
+            } catch (TypeError) {
+            }
         }
     }
 
@@ -396,7 +403,7 @@ final class NFormatParser
         self::$pos += $hexLen;
 
         // do the actual decoding.
-        $ord = (int) hexdec($hex);
+        $ord = (int) @hexdec($hex);
         assert($ord <= 0x10FFFF, 'code point out of range at position ' . self::$pos);
 
         return mb_chr($ord, 'UTF-8');

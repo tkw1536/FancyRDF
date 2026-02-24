@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats;
 
-use Exception;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigTokenType;
@@ -100,7 +99,7 @@ final class TrigParser extends FiberIterator
                     $this->parseGraphKeywordBlock();
                 }
 
-                assert(! $this->isTrig, 'GRAPH keyword not allowed in Turtle mode');
+                assert($this->isTrig, 'GRAPH keyword not allowed in Turtle mode');
 
                 return;
 
@@ -352,7 +351,12 @@ final class TrigParser extends FiberIterator
             TrigTokenType::BlankNodeLabel => $this->parseBlankNodeLabel(),
             TrigTokenType::LSquare => $this->parseBlankNodePropertyListSubject(),
             TrigTokenType::LParen => $this->parseCollectionSubject(),
-            default => throw new Exception('expected subject, got ' . $type->value),
+            default => (static function () use ($type): BlankNode {
+                /** @phpstan-ignore function.impossibleType (GIGO) */
+                assert(false, 'expected subject, got ' . $type->value);
+
+                return new BlankNode('gigo');
+            })()
         };
     }
 
@@ -402,7 +406,12 @@ final class TrigParser extends FiberIterator
             TrigTokenType::String => $this->parseLiteral(),
             TrigTokenType::Integer, TrigTokenType::Decimal, TrigTokenType::Double => $this->parseNumericLiteral(),
             TrigTokenType::True, TrigTokenType::False => $this->parseBooleanLiteral(),
-            default => throw new Exception('expected object, got ' . $type->value),
+            default => (static function () use ($type): BlankNode {
+                /** @phpstan-ignore function.impossibleType (GIGO) */
+                assert(false, 'expected object, got ' . $type->value);
+
+                return new BlankNode('gigo');
+            })()
         };
         assert($this->curSubject !== null && $this->curPredicate !== null, 'subject and predicate must be set');
         $graph = $this->isTrig ? $this->curGraph : null;
@@ -623,7 +632,12 @@ final class TrigParser extends FiberIterator
                 TrigTokenType::String => $this->parseLiteral(),
                 TrigTokenType::Integer, TrigTokenType::Decimal, TrigTokenType::Double => $this->parseNumericLiteral(),
                 TrigTokenType::True, TrigTokenType::False => $this->parseBooleanLiteral(),
-                default => throw new Exception('expected object in collection'),
+                default => (static function (): BlankNode {
+                    /** @phpstan-ignore function.impossibleType (GIGO) */
+                    assert(false, 'expected object in collection');
+
+                    return new BlankNode('gigo');
+                })()
             };
             $objects[] = $obj;
 
@@ -812,8 +826,10 @@ final class TrigParser extends FiberIterator
         assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
         $ord = (int) hexdec($hex);
         assert($ord <= 0x10FFFF, 'code point out of range');
+        $res = mb_chr($ord, 'UTF-8');
 
-        return mb_chr($ord, 'UTF-8');
+        /** @phpstan-ignore function.alreadyNarrowedType (in production mode the assertion above may fail) */
+        return is_string($res) ? $res : '';
     }
 
     private function decodeEchar(string $char): string

@@ -25,6 +25,15 @@ use function strcmp;
 final class BlankNode extends Term
 {
     /**
+     * Label of the blank node.
+     *
+     * The string '_:' followed by the identifier.
+     *
+     * @var non-empty-string
+     */
+    public readonly string $label;
+
+    /**
      * Constructs a new blank node from it's identifier.
      *
      * @see https://www.w3.org/TR/rdf11-concepts/#section-blank-nodes
@@ -34,6 +43,7 @@ final class BlankNode extends Term
      */
     public function __construct(readonly string $identifier)
     {
+        $this->label = '_:' . $identifier;
     }
 
     #[Override]

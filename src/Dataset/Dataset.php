@@ -10,8 +10,11 @@ use Traversable;
 
 use function array_shift;
 use function array_splice;
+use function array_values;
 use function assert;
 use function count;
+use function is_array;
+use function iterator_to_array;
 use function usort;
 
 /**
@@ -24,16 +27,21 @@ use function usort;
  */
 final class Dataset implements IteratorAggregate
 {
+    /** @var list<TripleOrQuadArray> */
+    private readonly array $quads;
+
     /**
      * Constructs a new dataset.
      *
-     * @param list<TripleOrQuadArray> $quads
+     * @param iterable<TripleOrQuadArray> $quads
      *
      * @return void
      */
     public function __construct(
-        public readonly array $quads = [],
+        mixed $quads = [],
     ) {
+        $quads       = ! is_array($quads) ? iterator_to_array($quads) : $quads;
+        $this->quads = array_values($quads);
     }
 
     /** @return Traversable<TripleOrQuadArray> */
@@ -79,6 +87,21 @@ final class Dataset implements IteratorAggregate
         }
 
         return [$grounded, $nonGrounded];
+    }
+
+    /**
+     * Instantiates two new datasets and checks if they are isomorphic.
+     *
+     * @see Dataset::isIsomorphicTo()
+     *
+     * @param iterable<TripleOrQuadArray> $a
+     * @param iterable<TripleOrQuadArray> $b
+     * @param array<string, string>       &$partial
+     *   Blank node mapping from this dataset's blank node IDs to the other's (updated when matching non-grounded quads).
+     */
+    public static function areIsomorphic(mixed $a, mixed $b, array &$partial, bool $literal = true): bool
+    {
+        return new Dataset($a)->isIsomorphicTo(new Dataset($b), $partial, $literal);
     }
 
     /**

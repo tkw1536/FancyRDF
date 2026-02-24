@@ -19,7 +19,7 @@ use function sort;
 /** @phpstan-import-type TripleOrQuadArray from Quad */
 final class IsomorphicAsDatasetsConstraint extends Constraint
 {
-    /** @param list<TripleOrQuadArray> $expected */
+    /** @param array<TripleOrQuadArray> $expected */
     public function __construct(private readonly array $expected, private readonly bool $literal = true)
     {
     }
@@ -83,7 +83,7 @@ final class IsomorphicAsDatasetsConstraint extends Constraint
     /**
      * Formats an array of triples as ntriples format (one per line, sorted).
      *
-     * @param list<TripleOrQuadArray> $quads
+     * @param array<TripleOrQuadArray> $quads
      */
     private function renderTriples(array $quads): string
     {

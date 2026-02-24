@@ -42,15 +42,6 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all positive tests parse correctly and produce equivalent N-Triples datasets
         - ✅ all negative tests produce an assertion error in development mode.
         - ✅ all negative tests do not produce errors in production mode.
-- [ ] [Turtle](https://www.w3.org/TR/turtle/) and [Trig](https://www.w3.org/TR/trig/)
-    - ✅ Tokenizer: [TrigReader](src/Formats/TrigReader/TrigReader.php)
-        - ✅ all positive tests tokenize 
-    - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
-    - [ ] Serializer: TODO
-    - ✅ passes W3C [Test Suite](https://www.w3.org/2013/TrigTests/)
-       - ✅ all positive tests tokenize correctly
-       - ✅ all positive tests parse correctly and produce equivalent N-Quads datasets
-       - ✅ all negative tests do not produce errors in production mode.
 - [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
     - ✅ Parser: [NFormatParser](src/Formats/NFormatParser.php)
     - ✅ Serializer: [NFormatSerializer](src/Formats/NFormatSerializer.php)
@@ -58,6 +49,11 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all positive tests parse and round-trip correctly.
         - ✅ all negative tests produce an assertion error in development mode.
         - ✅ all negative tests do not produce errors in production mode. 
+- [Turtle](https://www.w3.org/TR/turtle/) and [Trig](https://www.w3.org/TR/trig/)
+    - ✅ Tokenizer: [TrigReader](src/Formats/TrigReader/TrigReader.php)
+    - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
+    - [ ] Serializer: TODO
+    - [ ] does not yet pass the W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/) and [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
 
 ## Dependencies
 
@@ -98,14 +94,28 @@ This requires `cspell` to be installed and available on your `PATH`.
 
 The library contains a complete test suite using [phpunit](https://phpunit.de/).
 
-The Makefile target `make test` runs the tests. 
+### RDF 1.1 Test Suite
+
+> [!INFO]
+> See above for concrete tests suits currently passing.
+
+The code is expected to pass the [official RDF 1.1 Testcases](https://www.w3.org/TR/rdf11-testcases/).
+The compliance falls into several categories, which map to PHPUnit groups.
+
+- `positive-syntax` tests check that a parser can parse the syntax in a given file.
+- `positive-evaluation` tests can that a parser can parse a file and produces a dataset equivalent to a provided one.
+- `negative-syntax` tests are run twice, once in production mode and once in development mode.
+    - `negative-syntax-strict` check that a parser in development mode triggers assertions when trying to parse the file.
+    - `negative-syntax-lenient` check that a parser in development mode does not trigger any assertions when trying to parse the file and does not run into any infinite loops.
+    The output is not checked.
 
 ## License
 
 > [!WARNING]
 > A license will be added once the library has reached feature completion.
 
-There is no license for the library and primary testing code, as the code is still in development.
+There is no license for the library and testing code, as the code is still in development.
 
-Some of the test data in `rdf_tests` has been adapted from W3C and other sources and is therefore licensed under specific conditions.
-See licensing information in the [rdf_tests/README.md](rdf_tests/README.md) file for details.
+One exception to this is the RDF 1.1 testdata.
+It contains official testdata from the W3C RDF 1.1 Working Group, and is licensed separately. 
+See [the appropriate README](tests/W3CRdf11Tests/testdata/README.md) for more information.

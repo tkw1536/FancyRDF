@@ -50,6 +50,8 @@ phpcodesniffer
 phpcs
 phpstan
 phpunit
+RDFS
+rdft
 rdfxml
 reencoded
 reif
@@ -67,6 +69,7 @@ subcomponent
 subcomponents
 testcase
 testcases
+testdata
 testsuite
 testsuites
 tokenizes
