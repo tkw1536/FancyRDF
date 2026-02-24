@@ -382,46 +382,46 @@ final class TrigReader
             return [TrigTokenType::Double, $offset];
         }
 
-        if ($ch === '.') {
-            $dotOffset  = $offset + strlen($ch);
-            $chAfterDot = $this->stream->peek($dotOffset);
-            if ($chAfterDot !== null && ! self::isDigit($chAfterDot) && $chAfterDot !== 'e' && $chAfterDot !== 'E') {
-                return [TrigTokenType::Integer, $offset];
-            }
-
-            $offset          += strlen($ch);
-            $ch               = $this->stream->peek($offset);
-            $hasDigitAfterDot = false;
-            while ($ch !== null && self::isDigit($ch)) {
-                $hasDigitAfterDot = true;
-                $offset          += strlen($ch);
-                $ch               = $this->stream->peek($offset);
-            }
-
-            if ($ch === 'e' || $ch === 'E') {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-                if ($ch === '+' || $ch === '-') {
-                    $offset += strlen($ch);
-                    $ch      = $this->stream->peek($offset);
-                }
-
-                if ($ch === null || ! self::isDigit($ch)) {
-                    return null;
-                }
-
-                while ($ch !== null && self::isDigit($ch)) {
-                    $offset += strlen($ch);
-                    $ch      = $this->stream->peek($offset);
-                }
-
-                return [TrigTokenType::Double, $offset];
-            }
-
-            return $hasDigitAfterDot ? [TrigTokenType::Decimal, $offset] : null;
+        if ($ch !== '.') {
+            return [TrigTokenType::Integer, $offset];
         }
 
-        return [TrigTokenType::Integer, $offset];
+        $dotOffset  = $offset + strlen($ch);
+        $chAfterDot = $this->stream->peek($dotOffset);
+        if ($chAfterDot !== null && ! self::isDigit($chAfterDot) && $chAfterDot !== 'e' && $chAfterDot !== 'E') {
+            return [TrigTokenType::Integer, $offset];
+        }
+
+        $offset          += strlen($ch);
+        $ch               = $this->stream->peek($offset);
+        $hasDigitAfterDot = false;
+        while ($ch !== null && self::isDigit($ch)) {
+            $hasDigitAfterDot = true;
+            $offset          += strlen($ch);
+            $ch               = $this->stream->peek($offset);
+        }
+
+        if ($ch === 'e' || $ch === 'E') {
+            $offset += strlen($ch);
+            $ch      = $this->stream->peek($offset);
+            if ($ch === '+' || $ch === '-') {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peek($offset);
+            }
+
+            if ($ch === null || ! self::isDigit($ch)) {
+                return null;
+            }
+
+            while ($ch !== null && self::isDigit($ch)) {
+                $offset += strlen($ch);
+                $ch      = $this->stream->peek($offset);
+            }
+
+            return [TrigTokenType::Double, $offset];
+        }
+
+        return $hasDigitAfterDot ? [TrigTokenType::Decimal, $offset] : null;
     }
 
     /**

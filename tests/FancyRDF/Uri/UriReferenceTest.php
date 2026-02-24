@@ -672,8 +672,6 @@ final class UriReferenceTest extends TestCase
                 'http://example.org/dir/',
                 'relfile',
                 'http://example.org/dir/relfile',
-                true,
-                true,
             ],
         ];
     }
@@ -714,8 +712,6 @@ final class UriReferenceTest extends TestCase
             'fragment percent-encoding hex uppercased' => [
                 'http://example.com/#%7b',
                 'http://example.com/#%7B',
-                true,
-                true,
             ],
         ];
     }
@@ -760,8 +756,6 @@ final class UriReferenceTest extends TestCase
             'decode in fragment' => [
                 'http://example.com#%73ection',
                 'http://example.com#section',
-                true,
-                true,
             ],
         ];
     }
@@ -810,8 +804,6 @@ final class UriReferenceTest extends TestCase
             'relative path with dot segments' => [
                 'g/./h',
                 'g/h',
-                true,
-                true,
             ],
         ];
     }

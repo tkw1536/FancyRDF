@@ -45,7 +45,6 @@ final class IteratorStreamTest extends TestCase
         $stat = fstat($stream);
 
         self::assertIsArray($stat);
-        self::assertArrayHasKey('size', $stat);
         self::assertSame($expectedSize, $stat['size']);
     }
 

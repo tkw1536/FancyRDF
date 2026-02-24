@@ -59,6 +59,13 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all negative tests produce an assertion error in development mode.
         - ✅ all negative tests do not produce errors in production mode.
 
+## TODO List
+- clean up TrigParser and TrigReader
+- add `phpcs` for indentation
+- add missing Serializers
+- consider moving from assertions to an explicit "strict" flag
+
+
 ## Dependencies
 
 A production installation of this library requires [PHP 8.4+](https://www.php.net/releases/8.4/en.php) with the following extensions:
