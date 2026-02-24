@@ -53,7 +53,7 @@ final class TrigParser extends FiberIterator
 
     public function __construct(
         private readonly TrigReader $reader,
-        private readonly bool $isTrig = false,
+        public readonly bool $isTrig = false,
         private string $base = '',
     ) {
     }
@@ -95,7 +95,7 @@ final class TrigParser extends FiberIterator
 
                 break;
             case TrigTokenType::Graph:
-                if (! $this->isTrig) {
+                if ($this->isTrig) {
                     $this->parseGraphKeywordBlock();
                 }
 
@@ -166,9 +166,18 @@ final class TrigParser extends FiberIterator
     {
         $hasNext = $this->reader->next();
         assert($hasNext, 'expected label after GRAPH');
-        $label = $this->parseLabelOrSubject();
-        assert($label !== null, 'expected graph label');
-        $this->curGraph = $label;
+        $labelType = $this->reader->getTokenType();
+        if ($labelType === TrigTokenType::LSquare) {
+            $label   = $this->parseAnon();
+            $hasNext = $this->reader->next();
+            assert($hasNext, 'expected ] after [');
+            assert($this->reader->getTokenType() === TrigTokenType::RSquare, 'blank node property list not allowed as graph label');
+            $this->curGraph = $label;
+        } else {
+            $label = $this->parseLabelOrSubject();
+            assert($label !== null, 'expected graph label');
+            $this->curGraph = $label;
+        }
 
         $hasNext = $this->reader->next();
         assert($hasNext, 'expected LCurly');
@@ -216,7 +225,17 @@ final class TrigParser extends FiberIterator
         $this->curSubject = $subject;
         $hasNext          = $this->reader->next();
         assert($hasNext, 'expected verb');
-        $verbType         = $this->reader->getTokenType();
+        $verbType = $this->reader->getTokenType();
+        if ($this->isTrig && $verbType === TrigTokenType::LCurly) {
+            assert($firstType === TrigTokenType::LSquare, 'expected verb');
+            assert($this->lastBlankNodePropertyListWasEmpty, 'blank node property list not allowed as graph label');
+            $this->curGraph = $subject;
+            $this->parseTriplesBlock();
+            assert($this->reader->getTokenType() === TrigTokenType::RCurly, 'expected }');
+
+            return;
+        }
+
         $allowSoleSubject = $firstType === TrigTokenType::LSquare;
         $this->parsePredicateObjectList($verbType, null, $allowSoleSubject);
     }
@@ -247,20 +266,7 @@ final class TrigParser extends FiberIterator
                 return;
             }
 
-            if ($type === TrigTokenType::Dot) {
-                if (! $this->reader->next()) {
-                    break;
-                }
-
-                $type = $this->reader->getTokenType();
-                if ($type === TrigTokenType::RCurly) {
-                    break;
-                }
-
-                if ($type === TrigTokenType::LCurly) {
-                    return;
-                }
-            }
+            assert($type !== TrigTokenType::Dot, 'unexpected .');
 
             $this->parseTriples($type, TrigTokenType::RCurly);
             if ($this->reader->getTokenType() === TrigTokenType::RCurly || $this->reader->getTokenType() === TrigTokenType::LCurly) {
@@ -275,11 +281,14 @@ final class TrigParser extends FiberIterator
         $hasNext          = $this->reader->next();
         assert($hasNext, 'expected verb');
         $verbType = $this->reader->getTokenType();
+
+        $allowSoleSubject = $subjectType === TrigTokenType::LSquare;
         if ($endToken !== null && $verbType === $endToken) {
+            assert($allowSoleSubject, 'expected verb');
+
             return;
         }
 
-        $allowSoleSubject = $subjectType === TrigTokenType::LSquare;
         $this->parsePredicateObjectList($verbType, $endToken, $allowSoleSubject);
     }
 
@@ -520,6 +529,8 @@ final class TrigParser extends FiberIterator
 
     private int $blankNodeCounter = 0;
 
+    private bool $lastBlankNodePropertyListWasEmpty = true;
+
     /** @var array<string, non-empty-string> */
     private array $blankNodeMap = [];
 
@@ -569,7 +580,8 @@ final class TrigParser extends FiberIterator
         $this->curSubject = $bnode;
         $hasNext          = $this->reader->next();
         assert($hasNext, 'expected predicateObjectList or ]');
-        $type = $this->reader->getTokenType();
+        $type                                    = $this->reader->getTokenType();
+        $this->lastBlankNodePropertyListWasEmpty = $type === TrigTokenType::RSquare;
         if ($type !== TrigTokenType::RSquare) {
             $this->parsePredicateObjectList($type, TrigTokenType::RSquare);
         }

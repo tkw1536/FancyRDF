@@ -54,8 +54,10 @@ The library provides several stream-based implementations of parsers and seriali
     - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
     - [ ] Serializer: TODO
     - Test Suites:
-        -  ✅ can pass W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/)
-        - [ ] does not yet pass [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
+        - ✅ passes W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/) and [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
+        - ✅ all positive tests parse correctly and produce equivalent RDF datasets.
+        - ✅ all negative tests produce an assertion error in development mode.
+        - ✅ all negative tests do not produce errors in production mode.
 
 ## Dependencies
 

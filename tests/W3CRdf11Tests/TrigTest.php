@@ -28,12 +28,6 @@ use function iterator_to_array;
 final class TrigTest extends TestBase
 {
     #[Override]
-    public function setUp(): void
-    {
-        self::markTestIncomplete('Trig tests do not yet work');
-    }
-
-    #[Override]
     protected static function getTestSuiteName(): string
     {
         return 'rdf-trig';
@@ -109,7 +103,7 @@ final class TrigTest extends TestBase
 
         try {
             $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true);
+            $parser = new TrigParser($reader, true, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -130,7 +124,7 @@ final class TrigTest extends TestBase
 
         try {
             $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true);
+            $parser = new TrigParser($reader, true, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -150,7 +144,7 @@ final class TrigTest extends TestBase
 
         try {
             $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true);
+            $parser = new TrigParser($reader, true, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -171,7 +165,7 @@ final class TrigTest extends TestBase
 
         try {
             $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true);
+            $parser = new TrigParser($reader, true, $action);
 
             $got = iterator_to_array($parser);
 
