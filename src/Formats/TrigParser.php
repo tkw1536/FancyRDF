@@ -292,7 +292,6 @@ final class TrigParser extends FiberIterator
             }
 
             if ($verbType === TrigTokenType::Dot || ($endToken !== null && $verbType === $endToken) || $verbType === TrigTokenType::LCurly || $verbType === TrigTokenType::RSquare) {
-                assert($hasPredicate || $verbType === TrigTokenType::Dot, 'expected at least one predicate or object');
                 break;
             }
 
@@ -645,12 +644,12 @@ final class TrigParser extends FiberIterator
             };
             $objects[] = $obj;
 
-            // Advance to the next item in the collection without skipping over it.
-            if ($startType === TrigTokenType::String) {
-                continue;
-            }
-
-            if (! $this->reader->next()) {
+            // Only advance when the item parser did not already consume the next token.
+            // parseLiteral(), parseBlankNodePropertyListObject(), parseCollectionObject() advance the reader.
+            $compoundItem = $startType === TrigTokenType::String
+                || $startType === TrigTokenType::LSquare
+                || $startType === TrigTokenType::LParen;
+            if (! $compoundItem && ! $this->reader->next()) {
                 break;
             }
         }
