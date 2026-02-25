@@ -7,18 +7,24 @@ namespace FancyRDF\Formats\TrigReader;
 use FancyRDF\Streaming\StreamReader;
 
 use function assert;
+use function hexdec;
+use function is_string;
+use function mb_chr;
 use function mb_ord;
 use function ord;
 use function preg_match;
+use function str_ends_with;
 use function strlen;
+use function strpos;
 use function substr;
 
 /**
  * Tokenizer for TriG / Turtle format.
  *
- * Reads from a stream and yields tokens (type + exact source slice). Whitespace and
- * comments are skipped. Invalid input is asserted; when assertions are disabled,
- * the tokenizer makes a best-effort guess so it still yields a token sequence (GIGO).
+ * Reads from a stream and yields tokens (type + decoded value where applicable).
+ * Whitespace and comments are skipped. Invalid input is asserted; when assertions
+ * are disabled, the tokenizer makes a best-effort guess so it still yields a token
+ * sequence (GIGO).
  *
  * The client must call next() at least once before getTokenType() / getTokenValue().
  * Initially, after the first next() that returns true, the current token is set;
@@ -94,7 +100,7 @@ final class TrigReader
      * Consumes the next token from the stream.
      *
      * @return array{TrigToken, string}
-     *   The token type and it's raw value.
+     *   The token type and its (decoded) value.
      */
     private function process(): array
     {
@@ -274,22 +280,9 @@ final class TrigReader
             $off  += strlen($c);
         }
 
-        $value = $this->stream->consume(strlen('@' . $name));
-        if ($this->currentTokenType === TrigToken::String) {
-            return [TrigToken::LangTag, $value];
-        }
+        $this->stream->consume(strlen('@' . $name));
 
-        if ($name === 'prefix') {
-            return [TrigToken::AtPrefix, $value];
-        }
-
-        if ($name === 'base') {
-            return [TrigToken::AtBase, $value];
-        }
-
-        // This case shouldn't happen, we just have a weird at.
-        // But whatever!
-        return [TrigToken::LangTag, $value];
+        return [TrigToken::AtKeyword, $name];
     }
 
     /**
@@ -457,7 +450,10 @@ final class TrigReader
                 ? $offset + $this->pnLocalByteLength($offset)
                 : $offset;
 
-            return [$type, $this->stream->consume($len)];
+            $raw   = $this->stream->consume($len);
+            $value = $this->decodePnameValue($raw);
+
+            return [$type, $value];
         }
 
         if (! self::isPnCharsBase($ch)) {
@@ -484,7 +480,10 @@ final class TrigReader
                     ? $offset + $this->pnLocalByteLength($offset)
                     : $offset;
 
-                return [$type, $this->stream->consume($len)];
+                $raw   = $this->stream->consume($len);
+                $value = $this->decodePnameValue($raw);
+
+                return [$type, $value];
             }
 
             if ($ch === '.') {
@@ -651,7 +650,9 @@ final class TrigReader
 
         $this->stream->consume($offset);
 
-        return $source;
+        $inner = substr($source, 1, -1);
+
+        return $this->unescapeIri($inner);
     }
 
     /**
@@ -706,7 +707,9 @@ final class TrigReader
         }
 
         if (! $isLong && $offset === 2) {
-            return $this->stream->consume($offset);
+            $raw = $this->stream->consume($offset);
+
+            return $this->unescapeStringToContent($raw);
         }
 
         if ($isLong) {
@@ -737,7 +740,9 @@ final class TrigReader
                 }
             }
 
-            return $this->stream->consume($offset);
+            $raw = $this->stream->consume($offset);
+
+            return $this->unescapeStringToContent($raw);
         }
 
         while (true) {
@@ -768,7 +773,9 @@ final class TrigReader
             $offset += strlen($ch);
         }
 
-        return $this->stream->consume($offset);
+        $raw = $this->stream->consume($offset);
+
+        return $this->unescapeStringToContent($raw);
     }
 
     /**
@@ -822,7 +829,156 @@ final class TrigReader
             $offset -= $lastDotByteLen;
         }
 
-        return $this->stream->consume($offset);
+        $raw   = $this->stream->consume($offset);
+        $label = substr($raw, 2);
+        if (str_ends_with($label, '.')) {
+            $label = substr($label, 0, -1);
+        }
+
+        return $label;
+    }
+
+    // ================================
+    // Decoding helpers (string → decoded value)
+    // ================================
+
+    /** unescapes an IRIREF */
+    private function unescapeIri(string $s): string
+    {
+        $result = '';
+        $i      = 0;
+        $len    = strlen($s);
+        while ($i < $len) {
+            if ($s[$i] === '\\') {
+                assert($i + 1 < $len && ($s[$i + 1] === 'u' || $s[$i + 1] === 'U'), 'only \\u and \\U allowed in IRIREF');
+                $result .= $this->decodeUcharFromString($s, $i);
+                $hexLen  = $s[$i + 1] === 'u' ? 4 : 8;
+                $i      += 2 + $hexLen;
+                continue;
+            }
+
+            $result .= $s[$i];
+            $i++;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Raw string literal (with delimiters) → decoded content only.
+     */
+    private function unescapeStringToContent(string $tokenValue): string
+    {
+        $len = strlen($tokenValue);
+        if ($len < 2) {
+            return $tokenValue;
+        }
+
+        $delim    = $tokenValue[0];
+        $isLong   = false;
+        $start    = 1;
+        $innerLen = $len - 2;
+        if (($delim === '"' || $delim === "'") && $len >= 6 && substr($tokenValue, 0, 3) === $delim . $delim . $delim) {
+            $isLong   = true;
+            $start    = 3;
+            $innerLen = $len - 6;
+        }
+
+        $inner = substr($tokenValue, $start, $innerLen);
+
+        return $this->unescapeStringInner($inner);
+    }
+
+    private function unescapeStringInner(string $s): string
+    {
+        $result = '';
+        $i      = 0;
+        $len    = strlen($s);
+        while ($i < $len) {
+            if ($s[$i] === '\\' && $i + 1 < $len) {
+                $next = $s[$i + 1];
+                if ($next === 'u' || $next === 'U') {
+                    $result .= $this->decodeUcharFromString($s, $i);
+                    $hexLen  = $next === 'u' ? 4 : 8;
+                    $i      += 2 + $hexLen;
+                    continue;
+                }
+
+                $result .= $this->decodeEchar($next);
+                $i      += 2;
+                continue;
+            }
+
+            $result .= $s[$i];
+            $i++;
+        }
+
+        return $result;
+    }
+
+    private function decodeUcharFromString(string $s, int $pos): string
+    {
+        assert($s[$pos] === '\\' && $pos + 2 <= strlen($s));
+        $u      = $s[$pos + 1] === 'u';
+        $hexLen = $u ? 4 : 8;
+        assert($pos + 2 + $hexLen <= strlen($s), 'incomplete \\u or \\U escape');
+        $hex = substr($s, $pos + 2, $hexLen);
+        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
+        $ord = (int) @hexdec($hex);
+        assert($ord <= 0x10FFFF, 'code point out of range');
+        assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
+        $res = mb_chr($ord, 'UTF-8');
+
+        /* @phpstan-ignore unction.alreadyNarrowedType (if the assertions do not hold these are wrong) */
+        return is_string($res) ? $res : '';
+    }
+
+    private function decodeEchar(string $char): string
+    {
+        $result = match ($char) {
+            't' => "\t",
+            'b' => "\x08",
+            'n' => "\n",
+            'r' => "\r",
+            'f' => "\f",
+            '"' => '"',
+            "'" => "'",
+            '\\' => '\\',
+            default => '',
+        };
+
+        assert($result !== '', 'invalid string escape \\' . $char);
+
+        return $result;
+    }
+
+    private function decodePnameValue(string $raw): string
+    {
+        $colonPos = strpos($raw, ':');
+        assert($colonPos !== false, 'PNAME must contain :');
+        $prefix = substr($raw, 0, $colonPos + 1);
+        $local  = substr($raw, $colonPos + 1);
+
+        return $prefix . $this->unescapePnameLocal($local);
+    }
+
+    private function unescapePnameLocal(string $local): string
+    {
+        $result = '';
+        $i      = 0;
+        $len    = strlen($local);
+        while ($i < $len) {
+            if ($local[$i] === '\\' && $i + 1 < $len) {
+                $result .= $local[$i + 1];
+                $i      += 2;
+                continue;
+            }
+
+            $result .= $local[$i];
+            $i++;
+        }
+
+        return $result;
     }
 
     // ================================

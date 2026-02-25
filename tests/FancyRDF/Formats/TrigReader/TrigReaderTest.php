@@ -77,8 +77,8 @@ TRIG;
             'keywords and punctuation' => [
                 '@prefix @base a true false . ; , [ ] ( ) { } ^^',
                 [
-                    [TrigToken::AtPrefix, '@prefix'],
-                    [TrigToken::AtBase, '@base'],
+                    [TrigToken::AtKeyword, 'prefix'],
+                    [TrigToken::AtKeyword, 'base'],
                     [TrigToken::A, 'a'],
                     [TrigToken::True, 'true'],
                     [TrigToken::False, 'false'],
@@ -110,25 +110,28 @@ TRIG;
             'IRI reference' => [
                 '<http://example.org/>',
                 [
-                    [TrigToken::IriRef, '<http://example.org/>'],
+                    [TrigToken::IriRef, 'http://example.org/'],
                     [TrigToken::EndOfInput, ''],
                 ],
             ],
             'string literals' => [
-                '"hello" \'world\' "with\\nnewline"',
+                '"hello" \'world\' "with\\nnewline" \'\'\'hello\nworld\'\'\' "\u0041\u0042\U00000043\u0044\u0045"',
                 [
-                    [TrigToken::String, '"hello"'],
-                    [TrigToken::String, "'world'"],
-                    [TrigToken::String, '"with\\nnewline"'],
+                    [TrigToken::String, 'hello'],
+                    [TrigToken::String, 'world'],
+                    [TrigToken::String, "with\nnewline"],
+                    [TrigToken::String, "hello\nworld"],
+                    [TrigToken::String, 'ABCDE'],
                     [TrigToken::EndOfInput, ''],
                 ],
             ],
             'numbers' => [
-                '42 -7 3.14 1e2 2.5e-1',
+                '42 -7 3.14 .5 1e2 2.5e-1',
                 [
                     [TrigToken::Integer, '42'],
                     [TrigToken::Integer, '-7'],
                     [TrigToken::Decimal, '3.14'],
+                    [TrigToken::Decimal, '.5'],
                     [TrigToken::Double, '1e2'],
                     [TrigToken::Double, '2.5e-1'],
                     [TrigToken::EndOfInput, ''],
@@ -137,16 +140,17 @@ TRIG;
             'blank node label and ANON' => [
                 '_:b0 [] _:label',
                 [
-                    [TrigToken::BlankNodeLabel, '_:b0'],
+                    [TrigToken::BlankNodeLabel, 'b0'],
                     [TrigToken::LSquare, '['],
                     [TrigToken::RSquare, ']'],
-                    [TrigToken::BlankNodeLabel, '_:label'],
+                    [TrigToken::BlankNodeLabel, 'label'],
                     [TrigToken::EndOfInput, ''],
                 ],
             ],
             'prefixed names' => [
-                'ex:foo :bar rdf:type',
+                ': ex:foo :bar rdf:type',
                 [
+                    [TrigToken::PnameNs, ':'],
                     [TrigToken::PnameLn, 'ex:foo'],
                     [TrigToken::PnameLn, ':bar'],
                     [TrigToken::PnameLn, 'rdf:type'],
@@ -163,13 +167,13 @@ TRIG;
             'short TriG snippet' => [
                 $shortTrigSnippet,
                 [
-                    [TrigToken::AtPrefix, '@prefix'],
+                    [TrigToken::AtKeyword, 'prefix'],
                     [TrigToken::PnameNs, 'ex:'],
-                    [TrigToken::IriRef, '<http://example.org/>'],
+                    [TrigToken::IriRef, 'http://example.org/'],
                     [TrigToken::Dot, '.'],
-                    [TrigToken::AtPrefix, '@prefix'],
+                    [TrigToken::AtKeyword, 'prefix'],
                     [TrigToken::PnameNs, ':'],
-                    [TrigToken::IriRef, '<http://example.org/def#>'],
+                    [TrigToken::IriRef, 'http://example.org/def#'],
                     [TrigToken::Dot, '.'],
                     [TrigToken::PnameLn, ':G1'],
                     [TrigToken::LCurly, '{'],
@@ -178,7 +182,7 @@ TRIG;
                     [TrigToken::PnameLn, 'ex:Person'],
                     [TrigToken::Semicolon, ';'],
                     [TrigToken::PnameLn, 'ex:name'],
-                    [TrigToken::String, '"Monica Murphy"'],
+                    [TrigToken::String, 'Monica Murphy'],
                     [TrigToken::Dot, '.'],
                     [TrigToken::RCurly, '}'],
                     [TrigToken::EndOfInput, ''],
@@ -187,34 +191,6 @@ TRIG;
             'empty input' => [
                 '',
                 [[TrigToken::EndOfInput, '']],
-            ],
-            'single quoted string' => [
-                '"hello"',
-                [
-                    [TrigToken::String, '"hello"'],
-                    [TrigToken::EndOfInput, ''],
-                ],
-            ],
-            'single blank node label' => [
-                '_:x',
-                [
-                    [TrigToken::BlankNodeLabel, '_:x'],
-                    [TrigToken::EndOfInput, ''],
-                ],
-            ],
-            'single integer' => [
-                '123',
-                [
-                    [TrigToken::Integer, '123'],
-                    [TrigToken::EndOfInput, ''],
-                ],
-            ],
-            'single decimal' => [
-                '1.5',
-                [
-                    [TrigToken::Decimal, '1.5'],
-                    [TrigToken::EndOfInput, ''],
-                ],
             ],
         ];
     }

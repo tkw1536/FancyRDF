@@ -14,14 +14,9 @@ use FancyRDF\Uri\UriReference;
 use Override;
 
 use function assert;
-use function hexdec;
 use function in_array;
 use function is_string;
-use function mb_chr;
 use function preg_match;
-use function str_ends_with;
-use function str_starts_with;
-use function strlen;
 use function strpos;
 use function substr;
 
@@ -68,9 +63,18 @@ final class TrigParser extends FiberIterator
                 break;
             }
 
+            $atVal = $type === TrigToken::AtKeyword ? $this->reader->getTokenValue() : null;
+            if ($type === TrigToken::AtKeyword && $atVal === 'prefix' || $type === TrigToken::Prefix) {
+                $this->parsePrefixDirective($type === TrigToken::AtKeyword);
+                continue;
+            }
+
+            if ($type === TrigToken::AtKeyword && $atVal === 'base' || $type === TrigToken::Base) {
+                $this->parseBaseDirective($type === TrigToken::AtKeyword);
+                continue;
+            }
+
             match ($type) {
-                TrigToken::AtPrefix, TrigToken::Prefix => $this->parsePrefixDirective($type),
-                TrigToken::AtBase, TrigToken::Base => $this->parseBaseDirective($type),
                 TrigToken::LCurly => $this->parseWrappedGraphDefault(),
                 TrigToken::Graph => $this->parseGraphKeywordBlock(),
                 default => $this->parseTriplesOrGraphBlock($type),
@@ -78,7 +82,8 @@ final class TrigParser extends FiberIterator
         }
     }
 
-    private function parsePrefixDirective(TrigToken $directiveType): void
+    /** @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX */
+    private function parsePrefixDirective(bool $isAtDirective): void
     {
         $this->reader->next();
         $type = $this->reader->getTokenType();
@@ -93,7 +98,7 @@ final class TrigParser extends FiberIterator
         $iri                     = $this->resolveIriRef($iriRef);
         $this->namespaces[$name] = $iri;
 
-        if ($directiveType !== TrigToken::AtPrefix) {
+        if (! $isAtDirective) {
             return;
         }
 
@@ -101,7 +106,8 @@ final class TrigParser extends FiberIterator
         assert($this->reader->getTokenType() === TrigToken::Dot, 'expected \'.\' after @prefix');
     }
 
-    private function parseBaseDirective(TrigToken $directiveType): void
+    /** @param bool $isAtDirective true for @base (expect DOT after), false for BASE */
+    private function parseBaseDirective(bool $isAtDirective): void
     {
         $this->reader->next();
         $type = $this->reader->getTokenType();
@@ -110,7 +116,7 @@ final class TrigParser extends FiberIterator
         $iriRef     = $this->reader->getTokenValue();
         $this->base = $this->resolveIriRef($iriRef);
 
-        if ($directiveType !== TrigToken::AtBase) {
+        if (! $isAtDirective) {
             return;
         }
 
@@ -406,14 +412,11 @@ final class TrigParser extends FiberIterator
     }
 
     /** @return non-empty-string */
-    private function resolveIriRef(string $tokenValue): string
+    private function resolveIriRef(string $decodedIri): string
     {
-        assert(strlen($tokenValue) >= 2 && $tokenValue[0] === '<' && $tokenValue[strlen($tokenValue) - 1] === '>', 'IRIREF must be <...>');
-        $inner     = substr($tokenValue, 1, -1);
-        $unescaped = $this->unescapeIri($inner);
-        assert(preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $unescaped) !== 1, 'IRIREF contains disallowed character');
+        assert(preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $decodedIri) !== 1, 'IRIREF contains disallowed character');
 
-        $iri = $this->base !== '' ? UriReference::resolveRelative($this->base, $unescaped) : $unescaped;
+        $iri = $this->base !== '' ? UriReference::resolveRelative($this->base, $decodedIri) : $decodedIri;
         assert($iri !== '', 'resolved IRI is empty');
 
         return $iri;
@@ -427,7 +430,6 @@ final class TrigParser extends FiberIterator
         assert($colonPos !== false, 'PNAME must contain :');
         $prefix = substr($tokenValue, 0, $colonPos + 1);
         $local  = substr($tokenValue, $colonPos + 1);
-        $local  = $this->unescapePnameLocal($local);
 
         $ns = $this->namespaces[$prefix] ?? null;
         assert($ns !== null, 'undefined prefix: ' . $prefix);
@@ -445,49 +447,10 @@ final class TrigParser extends FiberIterator
 
     private function parseBlankNodeLabel(): BlankNode
     {
-        $value = $this->reader->getTokenValue();
-        assert(strlen($value) >= 2 && substr($value, 0, 2) === '_:', 'BLANK_NODE_LABEL must start with _:');
-        $label = substr($value, 2);
-        if (str_ends_with($label, '.')) {
-            $label = substr($label, 0, -1);
-        }
-
+        $label = $this->reader->getTokenValue();
         assert($label !== '', 'BLANK_NODE_LABEL is empty');
 
         return $this->makeBlankNode($label);
-    }
-
-    // ===========================
-    // Blank node handling
-    // ===========================
-
-    private int $blankNodeCounter = 0;
-
-    private bool $lastBlankNodePropertyListWasEmpty = true;
-
-    /** @var array<string, non-empty-string> */
-    private array $blankNodeMap = [];
-
-    /**
-     * Makes a blank node resource.
-     *
-     * @param string|null $name
-     *   If non-null, a string that uniquely identifies this blank node
-     *   within the current document.
-     *   If null, a fresh blank node label is returned.
-     */
-    private function makeBlankNode(string|null $name): BlankNode
-    {
-        // Pick the existing blank node label, or create a new one.
-        $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
-        $id ??= 'b' . ($this->blankNodeCounter++);
-
-        // Store the mapping if we were given a name.
-        if (is_string($name)) {
-            $this->blankNodeMap[$name] = $id;
-        }
-
-        return new BlankNode($id);
     }
 
     /**
@@ -598,16 +561,13 @@ final class TrigParser extends FiberIterator
 
     private function parseLiteral(): Literal
     {
-        $value    = $this->reader->getTokenValue();
-        $lexical  = $this->unescapeString($value);
+        $lexical  = $this->reader->getTokenValue();
         $lang     = null;
         $datatype = null;
 
         if ($this->reader->next()) {
-            if ($this->reader->getTokenType() === TrigToken::LangTag) {
+            if ($this->reader->getTokenType() === TrigToken::AtKeyword) {
                 $lang = $this->reader->getTokenValue();
-                assert(str_starts_with($lang, '@'), 'LANGTAG must start with @');
-                $lang = substr($lang, 1);
                 assert($lang !== '', 'LANGTAG is empty');
                 $this->reader->next();
             } elseif ($this->reader->getTokenType() === TrigToken::HatHat) {
@@ -646,128 +606,36 @@ final class TrigParser extends FiberIterator
         );
     }
 
-    private function unescapeIri(string $s): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($s);
-        while ($i < $len) {
-            if ($s[$i] === '\\') {
-                assert($i + 1 < $len && ($s[$i + 1] === 'u' || $s[$i + 1] === 'U'), 'only \\u and \\U allowed in IRIREF');
-                $result .= $this->decodeUcharFromString($s, $i);
-                $hexLen  = $s[$i + 1] === 'u' ? 4 : 8;
-                $i      += 2 + $hexLen;
-                continue;
-            }
+    // ===========================
+    // Blank node handling
+    // ===========================
 
-            $result .= $s[$i];
-            $i++;
+    private int $blankNodeCounter = 0;
+
+    private bool $lastBlankNodePropertyListWasEmpty = true;
+
+    /** @var array<string, non-empty-string> */
+    private array $blankNodeMap = [];
+
+    /**
+     * Makes a blank node resource.
+     *
+     * @param string|null $name
+     *   If non-null, a string that uniquely identifies this blank node
+     *   within the current document.
+     *   If null, a fresh blank node label is returned.
+     */
+    private function makeBlankNode(string|null $name): BlankNode
+    {
+        // Pick the existing blank node label, or create a new one.
+        $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
+        $id ??= 'b' . ($this->blankNodeCounter++);
+
+        // Store the mapping if we were given a name.
+        if (is_string($name)) {
+            $this->blankNodeMap[$name] = $id;
         }
 
-        return $result;
-    }
-
-    private function unescapeString(string $tokenValue): string
-    {
-        $len = strlen($tokenValue);
-        if ($len < 2) {
-            return $tokenValue;
-        }
-
-        $delim    = $tokenValue[0];
-        $isLong   = false;
-        $start    = 1;
-        $innerLen = $len - 2;
-        if (($delim === '"' || $delim === "'") && $len >= 6 && substr($tokenValue, 0, 3) === $delim . $delim . $delim) {
-            $isLong   = true;
-            $start    = 3;
-            $innerLen = $len - 6;
-        }
-
-        $inner = substr($tokenValue, $start, $innerLen);
-
-        return $this->unescapeStringInner($inner);
-    }
-
-    private function unescapeStringInner(string $s): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($s);
-        while ($i < $len) {
-            if ($s[$i] === '\\' && $i + 1 < $len) {
-                $next = $s[$i + 1];
-                if ($next === 'u' || $next === 'U') {
-                    $result .= $this->decodeUcharFromString($s, $i);
-                    $hexLen  = $next === 'u' ? 4 : 8;
-                    $i      += 2 + $hexLen;
-                    continue;
-                }
-
-                $result .= $this->decodeEchar($next);
-                $i      += 2;
-                continue;
-            }
-
-            $result .= $s[$i];
-            $i++;
-        }
-
-        return $result;
-    }
-
-    private function decodeUcharFromString(string $s, int $pos): string
-    {
-        assert($s[$pos] === '\\' && $pos + 2 <= strlen($s));
-        $u      = $s[$pos + 1] === 'u';
-        $hexLen = $u ? 4 : 8;
-        assert($pos + 2 + $hexLen <= strlen($s), 'incomplete \\u or \\U escape');
-        $hex = substr($s, $pos + 2, $hexLen);
-        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
-        $ord = (int) @hexdec($hex);
-        assert($ord <= 0x10FFFF, 'code point out of range');
-        assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
-        $res = mb_chr($ord, 'UTF-8');
-
-        /** @phpstan-ignore function.alreadyNarrowedType (in production mode the assertion above may fail) */
-        return is_string($res) ? $res : '';
-    }
-
-    private function decodeEchar(string $char): string
-    {
-        $result = match ($char) {
-            't' => "\t",
-            'b' => "\x08",
-            'n' => "\n",
-            'r' => "\r",
-            'f' => "\f",
-            '"' => '"',
-            "'" => "'",
-            '\\' => '\\',
-            default => '',
-        };
-
-        assert($result !== '', 'invalid string escape \\' . $char);
-
-        return $result;
-    }
-
-    private function unescapePnameLocal(string $local): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($local);
-        while ($i < $len) {
-            if ($local[$i] === '\\' && $i + 1 < $len) {
-                $result .= $local[$i + 1];
-                $i      += 2;
-                continue;
-            }
-
-            $result .= $local[$i];
-            $i++;
-        }
-
-        return $result;
+        return new BlankNode($id);
     }
 }
