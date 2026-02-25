@@ -27,7 +27,8 @@
         "shipmonk/composer-dependency-analyser": "^1.8",
         "ext-sockets": "*",
         "phpstan/extension-installer": "^1.4",
-        "phpstan/phpstan-phpunit": "^2.0"
+        "phpstan/phpstan-phpunit": "^2.0",
+        "sirbrillig/phpcs-variable-analysis": "^2.13"
     },
     "autoload": {
         "psr-4": {

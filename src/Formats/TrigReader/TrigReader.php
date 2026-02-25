@@ -785,7 +785,6 @@ final class TrigReader
     private function processLongString(int $offset, string $delim): string|null
     {
         $result = '';
-        $end    = $delim . $delim . $delim;
 
         while (true) {
             $ch = $this->stream->peek($offset);

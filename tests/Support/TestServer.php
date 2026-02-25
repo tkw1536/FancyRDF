@@ -69,6 +69,7 @@ final class TestServer
             throw new RuntimeException('Could not write temporary server script.');
         }
 
+        $pipes   = null;
         $process = proc_open(
             [PHP_BINARY, '-S', $this->address . ':' . $this->port, $this->scriptPath],
             [

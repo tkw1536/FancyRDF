@@ -10,6 +10,14 @@
         <exclude name="Generic.Files.LineLength.TooLong" />
     </rule>
 
+    <!-- Unused variables: core PHPCS only reports unused function/method parameters -->
+    <rule ref="VariableAnalysis">
+        <properties>
+            <property name="ignoreUnusedRegexp" value="/^_/"/>
+            <property name="allowUnusedFunctionParameters" value="true" />
+        </properties>
+    </rule>
+
     <!-- require exactly 4 spaces everywhere -->
     <arg name="tab-width" value="4"/>
     <rule ref="Generic.WhiteSpace.ScopeIndent">

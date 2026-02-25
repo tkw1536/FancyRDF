@@ -413,6 +413,7 @@ final class UriReference
         $baseAuthority = $this->authority;
         $basePath      = $this->path;
         $baseQuery     = $this->query;
+        $baseFragment  = null;
 
         // Normalization of the base URI, as described in Sections 6.2.2 and
         // 6.2.3, is optional.
