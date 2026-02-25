@@ -598,7 +598,7 @@ final class TrigReader
     }
 
     /**
-     * Consumes and returns an IRIREF from the start of the stream.
+     * Consumes and returns an IRIREF from the start of the stream (decoded).
      *
      * If there isn't any IRIREF, returns null.
      */
@@ -614,45 +614,41 @@ final class TrigReader
             return null;
         }
 
-        $source  = $ch;
         $offset += strlen($ch);
+        $result  = '';
 
         while (true) {
             $ch = $this->stream->peek($offset);
             if ($ch === null || $ch === '>') {
                 if ($ch !== null) {
-                    $source .= $ch;
                     $offset += strlen($ch);
                 }
 
                 break;
             }
 
-            $source .= $ch;
+            if ($ch === '\\') {
+                $offset += strlen($ch);
+                $next    = $this->stream->peek($offset);
+                if ($next !== 'u' && $next !== 'U') {
+                    $result .= $ch;
+                    continue;
+                }
+
+                $offset            += strlen($next);
+                $hexLen             = $next === 'u' ? 4 : 8;
+                [$offset, $decoded] = $this->decodeUcharAtOffset($offset, $hexLen);
+                $result            .= $decoded;
+                continue;
+            }
+
+            $result .= $ch;
             $offset += strlen($ch);
-
-            if ($ch !== '\\') {
-                continue;
-            }
-
-            $next = $this->stream->peek($offset);
-            if ($next !== 'u' && $next !== 'U') {
-                continue;
-            }
-
-            $source .= $next;
-            $offset += strlen($next);
-
-            $hexLen             = $next === 'u' ? 4 : 8;
-            [$offset, $hexPart] = $this->consumeUcharAt($offset, $hexLen);
-            $source            .= $hexPart;
         }
 
         $this->stream->consume($offset);
 
-        $inner = substr($source, 1, -1);
-
-        return $this->unescapeIri($inner);
+        return $result;
     }
 
     /**
@@ -679,10 +675,34 @@ final class TrigReader
     }
 
     /**
-     * Matches a string literal at the current position using only peekChar($offset).
-     * Reuses consumeUcharAt for \u and \U escapes. Does not consume on failure.
+     * Decodes a UCHAR at $offset (offset points at first hex digit after \u or \U).
      *
-     * @return string|null Consumed string (including delimiters), or null if no match (nothing consumed)
+     * @return array{int, string} [new offset after the hex digits, decoded character]
+     */
+    private function decodeUcharAtOffset(int $offset, int $hexLen): array
+    {
+        [$newOffset, $hexPart] = $this->consumeUcharAt($offset, $hexLen);
+
+        return [$newOffset, $this->hexPartToDecodedChar($hexPart)];
+    }
+
+    private function hexPartToDecodedChar(string $hex): string
+    {
+        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
+        $ord = (int) @hexdec($hex);
+        assert($ord <= 0x10FFFF, 'code point out of range');
+        assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
+        $res = mb_chr($ord, 'UTF-8');
+
+        /* @phpstan-ignore function.alreadyNarrowedType (if the assertions do not hold this is wrong) */
+        return is_string($res) ? $res : '';
+    }
+
+    /**
+     * Matches a string literal at the current position; returns decoded content only.
+     * Builds the decoded string as it goes. Does not consume on failure.
+     *
+     * @return string|null Decoded string content, or null if no match (nothing consumed)
      */
     private function processString(): string|null
     {
@@ -707,44 +727,16 @@ final class TrigReader
         }
 
         if (! $isLong && $offset === 2) {
-            $raw = $this->stream->consume($offset);
+            $this->stream->consume($offset);
 
-            return $this->unescapeStringToContent($raw);
+            return '';
         }
 
         if ($isLong) {
-            $end    = $delim . $delim . $delim;
-            $source = $end;
-            while (true) {
-                $ch = $this->stream->peek($offset);
-                if ($ch === null) {
-                    return null;
-                }
-
-                $source .= $ch;
-                $offset += strlen($ch);
-                $pos     = strlen($source);
-                if ($pos < 6 || substr($source, -3) !== $end) {
-                    continue;
-                }
-
-                $backslashes = 0;
-                $i           = $pos - 4;
-                while ($i >= 0 && $source[$i] === '\\') {
-                    $backslashes++;
-                    $i--;
-                }
-
-                if ($backslashes % 2 === 0) {
-                    break;
-                }
-            }
-
-            $raw = $this->stream->consume($offset);
-
-            return $this->unescapeStringToContent($raw);
+            return $this->processLongString($offset, $delim);
         }
 
+        $result = '';
         while (true) {
             $ch = $this->stream->peek($offset);
             if ($ch === null) {
@@ -759,23 +751,121 @@ final class TrigReader
             if ($ch === '\\') {
                 $offset += strlen($ch);
                 $next    = $this->stream->peek($offset);
-                if ($next !== null) {
+                if ($next === null) {
+                    return null;
+                }
+
+                if ($next === 'u' || $next === 'U') {
+                    $offset            += strlen($next);
+                    $hexLen             = $next === 'u' ? 4 : 8;
+                    [$offset, $decoded] = $this->decodeUcharAtOffset($offset, $hexLen);
+                    $result            .= $decoded;
+                } else {
+                    $result .= $this->decodeEchar($next);
                     $offset += strlen($next);
-                    if ($next === 'u' || $next === 'U') {
-                        $hexLen   = $next === 'u' ? 4 : 8;
-                        [$offset] = $this->consumeUcharAt($offset, $hexLen);
-                    }
                 }
 
                 continue;
             }
 
+            $result .= $ch;
             $offset += strlen($ch);
         }
 
-        $raw = $this->stream->consume($offset);
+        $this->stream->consume($offset);
 
-        return $this->unescapeStringToContent($raw);
+        return $result;
+    }
+
+    /**
+     * Processes a long string ('''...'''); builds decoded content as it goes.
+     *
+     * @return string|null Decoded content, or null on failure
+     */
+    private function processLongString(int $offset, string $delim): string|null
+    {
+        $result = '';
+        $end    = $delim . $delim . $delim;
+
+        while (true) {
+            $ch = $this->stream->peek($offset);
+            if ($ch === null) {
+                return null;
+            }
+
+            if ($ch === $delim) {
+                $offset += strlen($ch);
+                $ch2     = $this->stream->peek($offset);
+                $offset += $ch2 !== null ? strlen($ch2) : 0;
+                $ch3     = $this->stream->peek($offset);
+                if ($ch2 === $delim && $ch3 === $delim) {
+                    $offset       += strlen($ch3);
+                    $firstDelimPos = $offset - 3;
+                    $backslashes   = $this->countBackslashesBefore($firstDelimPos);
+                    if ($backslashes % 2 === 0) {
+                        break;
+                    }
+
+                    $result .= $delim;
+                    $offset -= 2 * strlen($delim);
+                    continue;
+                }
+
+                $result .= $ch;
+                if ($ch2 !== null) {
+                    $result .= $ch2;
+                }
+
+                continue;
+            }
+
+            if ($ch === '\\') {
+                $offset += strlen($ch);
+                $next    = $this->stream->peek($offset);
+                if ($next === null) {
+                    return null;
+                }
+
+                if ($next === 'u' || $next === 'U') {
+                    $offset            += strlen($next);
+                    $hexLen             = $next === 'u' ? 4 : 8;
+                    [$offset, $decoded] = $this->decodeUcharAtOffset($offset, $hexLen);
+                    $result            .= $decoded;
+                } else {
+                    $result .= $this->decodeEchar($next);
+                    $offset += strlen($next);
+                }
+
+                continue;
+            }
+
+            $result .= $ch;
+            $offset += strlen($ch);
+        }
+
+        $this->stream->consume($offset);
+
+        return $result;
+    }
+
+    /**
+     * Counts consecutive backslashes immediately before stream position $offset (using peek backwards).
+     */
+    private function countBackslashesBefore(int $offset): int
+    {
+        $n   = 0;
+        $pos = $offset - 1;
+        while ($pos >= 0) {
+            $c = $this->stream->peek($pos);
+            if ($c !== '\\') {
+                break;
+            }
+
+            $n++;
+            $pos -= strlen($c);
+        }
+
+        return $n;
     }
 
     /**
@@ -839,100 +929,10 @@ final class TrigReader
     }
 
     // ================================
-    // Decoding helpers (string → decoded value)
+    // Decoding helpers
     // ================================
 
-    /** unescapes an IRIREF */
-    private function unescapeIri(string $s): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($s);
-        while ($i < $len) {
-            if ($s[$i] === '\\') {
-                assert($i + 1 < $len && ($s[$i + 1] === 'u' || $s[$i + 1] === 'U'), 'only \\u and \\U allowed in IRIREF');
-                $result .= $this->decodeUcharFromString($s, $i);
-                $hexLen  = $s[$i + 1] === 'u' ? 4 : 8;
-                $i      += 2 + $hexLen;
-                continue;
-            }
-
-            $result .= $s[$i];
-            $i++;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Raw string literal (with delimiters) → decoded content only.
-     */
-    private function unescapeStringToContent(string $tokenValue): string
-    {
-        $len = strlen($tokenValue);
-        if ($len < 2) {
-            return $tokenValue;
-        }
-
-        $delim    = $tokenValue[0];
-        $isLong   = false;
-        $start    = 1;
-        $innerLen = $len - 2;
-        if (($delim === '"' || $delim === "'") && $len >= 6 && substr($tokenValue, 0, 3) === $delim . $delim . $delim) {
-            $isLong   = true;
-            $start    = 3;
-            $innerLen = $len - 6;
-        }
-
-        $inner = substr($tokenValue, $start, $innerLen);
-
-        return $this->unescapeStringInner($inner);
-    }
-
-    private function unescapeStringInner(string $s): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($s);
-        while ($i < $len) {
-            if ($s[$i] === '\\' && $i + 1 < $len) {
-                $next = $s[$i + 1];
-                if ($next === 'u' || $next === 'U') {
-                    $result .= $this->decodeUcharFromString($s, $i);
-                    $hexLen  = $next === 'u' ? 4 : 8;
-                    $i      += 2 + $hexLen;
-                    continue;
-                }
-
-                $result .= $this->decodeEchar($next);
-                $i      += 2;
-                continue;
-            }
-
-            $result .= $s[$i];
-            $i++;
-        }
-
-        return $result;
-    }
-
-    private function decodeUcharFromString(string $s, int $pos): string
-    {
-        assert($s[$pos] === '\\' && $pos + 2 <= strlen($s));
-        $u      = $s[$pos + 1] === 'u';
-        $hexLen = $u ? 4 : 8;
-        assert($pos + 2 + $hexLen <= strlen($s), 'incomplete \\u or \\U escape');
-        $hex = substr($s, $pos + 2, $hexLen);
-        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
-        $ord = (int) @hexdec($hex);
-        assert($ord <= 0x10FFFF, 'code point out of range');
-        assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
-        $res = mb_chr($ord, 'UTF-8');
-
-        /* @phpstan-ignore unction.alreadyNarrowedType (if the assertions do not hold these are wrong) */
-        return is_string($res) ? $res : '';
-    }
-
+    /** @param non-empty-string $char */
     private function decodeEchar(string $char): string
     {
         $result = match ($char) {
