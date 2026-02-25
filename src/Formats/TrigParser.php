@@ -15,6 +15,7 @@ use Override;
 
 use function assert;
 use function hexdec;
+use function in_array;
 use function is_string;
 use function mb_chr;
 use function preg_match;
@@ -131,28 +132,8 @@ final class TrigParser extends FiberIterator
         assert($this->isTrig, 'GRAPH keyword not allowed in Turtle mode');
 
         $this->reader->next();
-        $type = $this->reader->getTokenType();
-        switch ($type) {
-            case TrigToken::IriRef:
-                $label = $this->parseIriRefTerm();
-                break;
-            case TrigToken::PnameLn:
-            case TrigToken::PnameNs:
-                $label = $this->parsePnameTerm();
-                break;
-            case TrigToken::BlankNodeLabel:
-                $label = $this->parseBlankNodeLabel();
-                break;
-            case TrigToken::LSquare:
-                $label = $this->makeBlankNode(null);
-                $this->reader->next();
-                assert($this->reader->getTokenType() === TrigToken::RSquare, 'expected ] after [');
-                break;
-            default:
-                $label = null;
-                assert($type !== TrigToken::EndOfInput, 'expected label after GRAPH');
-                break;
-        }
+        $type  = $this->reader->getTokenType();
+        $label = $this->parseGraphLabel($type);
 
         $this->curGraph = $label;
 
@@ -160,6 +141,49 @@ final class TrigParser extends FiberIterator
         assert($this->reader->getTokenType() === TrigToken::LCurly, 'expected {');
 
         $this->parseTriplesBlock();
+    }
+
+    /**
+     * Parses a graph label (IRI, blank node, or []). No collection () allowed.
+     *
+     * @return Iri|BlankNode|null null only for invalid/unknown token (caller must assert).
+     */
+    private function parseGraphLabel(TrigToken $type): Iri|BlankNode|null
+    {
+        return match ($type) {
+            TrigToken::IriRef => $this->parseIriRefTerm(),
+            TrigToken::PnameLn, TrigToken::PnameNs => $this->parsePnameTerm(),
+            TrigToken::BlankNodeLabel => $this->parseBlankNodeLabel(),
+            TrigToken::LSquare => $this->parseGraphLabelEmptyBnodePropertyList(),
+            default => $this->parseGraphLabelDefault($type),
+        };
+    }
+
+    private function parseGraphLabelDefault(TrigToken $type): null
+    {
+        assert($type !== TrigToken::EndOfInput, 'expected label after GRAPH');
+
+        return null;
+    }
+
+    /** Graph label allows only [] (empty blank node property list), not [ p o ]. */
+    private function parseGraphLabelEmptyBnodePropertyList(): BlankNode
+    {
+        $label = $this->makeBlankNode(null);
+        $this->reader->next();
+        assert($this->reader->getTokenType() === TrigToken::RSquare, 'expected ] after [');
+
+        return $label;
+    }
+
+    private function canStartGraphBlock(TrigToken $type): bool
+    {
+        return $this->isTrig && in_array($type, [
+            TrigToken::IriRef,
+            TrigToken::PnameLn,
+            TrigToken::PnameNs,
+            TrigToken::BlankNodeLabel,
+        ], true);
     }
 
     private function parseTriplesOrGraphBlock(TrigToken $type): void
@@ -179,15 +203,7 @@ final class TrigParser extends FiberIterator
             return;
         }
 
-        $mayBeGraphBlock = (
-            $this->isTrig &&
-            (
-                $type === TrigToken::IriRef ||
-                $type === TrigToken::PnameLn ||
-                $type === TrigToken::PnameNs ||
-                $type === TrigToken::BlankNodeLabel
-            )
-        );
+        $mayBeGraphBlock = $this->canStartGraphBlock($type);
         assert($mayBeGraphBlock || $allowSoleSubject, 'expected verb');
         assert($mayBeGraphBlock || $this->lastBlankNodePropertyListWasEmpty, 'blank node property list not allowed as graph label');
         $this->curGraph = $subject;
@@ -222,6 +238,21 @@ final class TrigParser extends FiberIterator
         }
     }
 
+    private function isPredicateObjectListTerminator(TrigToken $verbType, TrigToken|null $endToken, bool $allowSoleSubject, bool $hasPredicate): bool
+    {
+        $isTerminator = $verbType === TrigToken::Dot
+            || ($endToken !== null && $verbType === $endToken)
+            || $verbType === TrigToken::LCurly
+            || $verbType === TrigToken::RSquare
+            || $verbType === TrigToken::EndOfInput;
+
+        if ($isTerminator) {
+            assert($hasPredicate || $allowSoleSubject || $verbType !== TrigToken::Dot, 'expected verb');
+        }
+
+        return $isTerminator;
+    }
+
     private function parsePredicateObjectList(TrigToken $verbType, TrigToken|null $endToken = null, bool $allowSoleSubject = false): void
     {
         $hasPredicate = false;
@@ -232,8 +263,7 @@ final class TrigParser extends FiberIterator
                 $verbType = $this->reader->getTokenType();
             }
 
-            if ($verbType === TrigToken::Dot || ($endToken !== null && $verbType === $endToken) || $verbType === TrigToken::LCurly || $verbType === TrigToken::RSquare || $verbType === TrigToken::EndOfInput) {
-                assert($hasPredicate || $allowSoleSubject || $verbType !== TrigToken::Dot, 'expected verb');
+            if ($this->isPredicateObjectListTerminator($verbType, $endToken, $allowSoleSubject, $hasPredicate)) {
                 break;
             }
 
@@ -257,7 +287,6 @@ final class TrigParser extends FiberIterator
 
             assert($next === TrigToken::Semicolon, 'expected ;');
 
-            // assert(, 'expected ; or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
             $verbType = TrigToken::Semicolon;
             $hasNext  = $this->reader->next();
             assert($hasNext, 'expected verb or object after ;');
@@ -341,20 +370,24 @@ final class TrigParser extends FiberIterator
         return $result;
     }
 
-    private function parseIriRefTerm(): Iri
+    private function parseIriFromToken(TrigToken $type): Iri
     {
         $value    = $this->reader->getTokenValue();
-        $resolved = $this->resolveIriRef($value);
+        $resolved = $type === TrigToken::IriRef
+            ? $this->resolveIriRef($value)
+            : $this->expandPname($type, $value);
 
         return new Iri($resolved);
     }
 
+    private function parseIriRefTerm(): Iri
+    {
+        return $this->parseIriFromToken(TrigToken::IriRef);
+    }
+
     private function parseIriTerm(TrigToken $type): Iri
     {
-        $value    = $this->reader->getTokenValue();
-        $resolved = $this->expandPnameOrIriRef($type, $value);
-
-        return new Iri($resolved);
+        return $this->parseIriFromToken($type);
     }
 
     private function parsePnameTerm(): Iri|BlankNode
@@ -367,7 +400,7 @@ final class TrigParser extends FiberIterator
             return $this->makeBlankNode($value);
         }
 
-        $resolved = $this->expandPnameOrIriRef($type, $value);
+        $resolved = $this->expandPname($type, $value);
 
         return new Iri($resolved);
     }
@@ -387,12 +420,8 @@ final class TrigParser extends FiberIterator
     }
 
     /** @return non-empty-string */
-    private function expandPnameOrIriRef(TrigToken $type, string $tokenValue): string
+    private function expandPname(TrigToken $type, string $tokenValue): string
     {
-        if ($type === TrigToken::IriRef) {
-            return $this->resolveIriRef($tokenValue);
-        }
-
         assert($type === TrigToken::PnameLn || $type === TrigToken::PnameNs, 'expected PNAME');
         $colonPos = strpos($tokenValue, ':');
         assert($colonPos !== false, 'PNAME must contain :');
@@ -428,7 +457,7 @@ final class TrigParser extends FiberIterator
         return $this->makeBlankNode($label);
     }
 
-     // ===========================
+    // ===========================
     // Blank node handling
     // ===========================
 
@@ -462,24 +491,30 @@ final class TrigParser extends FiberIterator
     }
 
     /**
-     * Parse a blank node used as subject: [ predicateObjectList ].
-     * Leaves the reader on the closing ] so that the caller (e.g. parseTriples) can
-     * call next() to advance to the verb.
+     * Parse a blank node property list: [ predicateObjectList ].
+     *
+     * @param bool $consumeClosingBracket if true, consume the closing ] so callers are on the next token;
+     *                                     if false, leave reader on ] so caller can call next() to advance.
      */
-    private function parseBlankNodePropertyListSubject(): BlankNode
+    private function parseBlankNodePropertyList(bool $consumeClosingBracket): BlankNode
     {
-        $savedSubject   = $this->curSubject;
-        $savedPredicate = $this->curPredicate;
-
         $bnode            = $this->makeBlankNode(null);
+        $savedSubject     = $this->curSubject;
+        $savedPredicate   = $this->curPredicate;
         $this->curSubject = $bnode;
 
-        $this->reader->next();
+        $hasNext = $this->reader->next();
+        assert($hasNext, 'expected predicateObjectList or ]');
         $type = $this->reader->getTokenType();
 
         $this->lastBlankNodePropertyListWasEmpty = $type === TrigToken::RSquare;
         if ($type !== TrigToken::RSquare) {
             $this->parsePredicateObjectList($type, TrigToken::RSquare);
+        }
+
+        if ($consumeClosingBracket) {
+            assert($this->reader->getTokenType() === TrigToken::RSquare, 'expected ] after blank node property list');
+            $this->reader->next();
         }
 
         $this->curSubject   = $savedSubject;
@@ -489,29 +524,22 @@ final class TrigParser extends FiberIterator
     }
 
     /**
+     * Parse a blank node used as subject: [ predicateObjectList ].
+     * Leaves the reader on the closing ] so that the caller (e.g. parseTriples) can
+     * call next() to advance to the verb.
+     */
+    private function parseBlankNodePropertyListSubject(): BlankNode
+    {
+        return $this->parseBlankNodePropertyList(false);
+    }
+
+    /**
      * Parse a blank node used as object: [ predicateObjectList ].
      * Consumes the closing ] so that callers are positioned on the next token.
      */
     private function parseBlankNodePropertyListObject(): BlankNode
     {
-        $bnode            = $this->makeBlankNode(null);
-        $savedSubject     = $this->curSubject;
-        $savedPredicate   = $this->curPredicate;
-        $this->curSubject = $bnode;
-        $hasNext          = $this->reader->next();
-        assert($hasNext, 'expected predicateObjectList or ]');
-        $type = $this->reader->getTokenType();
-        if ($type !== TrigToken::RSquare) {
-            $this->parsePredicateObjectList($type, TrigToken::RSquare);
-        }
-
-        assert($this->reader->getTokenType() === TrigToken::RSquare, 'expected ] after blank node property list');
-        $this->reader->next();
-
-        $this->curSubject   = $savedSubject;
-        $this->curPredicate = $savedPredicate;
-
-        return $bnode;
+        return $this->parseBlankNodePropertyList(true);
     }
 
     private function parseCollection(bool $consumeFinalToken = true): Iri|BlankNode
@@ -574,6 +602,7 @@ final class TrigParser extends FiberIterator
         $lexical  = $this->unescapeString($value);
         $lang     = null;
         $datatype = null;
+
         if ($this->reader->next()) {
             if ($this->reader->getTokenType() === TrigToken::LangTag) {
                 $lang = $this->reader->getTokenValue();
@@ -586,7 +615,7 @@ final class TrigParser extends FiberIterator
                 assert($hasNext, 'expected iri after ^^');
                 $type = $this->reader->getTokenType();
                 assert($type === TrigToken::IriRef || $type === TrigToken::PnameLn || $type === TrigToken::PnameNs, 'expected datatype iri');
-                $datatype = $this->expandPnameOrIriRef($type, $this->reader->getTokenValue());
+                $datatype = $this->parseIriFromToken($type)->iri;
                 $this->reader->next();
             }
         }
