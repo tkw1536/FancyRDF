@@ -10,9 +10,10 @@ namespace FancyRDF\Formats\TrigReader;
  * @see https://www.w3.org/TR/trig/
  * @see https://www.w3.org/TR/turtle/
  */
-enum TrigTokenType: string
+enum TrigToken: string
 {
     // Keywords (case-sensitive)
+    // These always have themselves as a value.
     case AtPrefix = '@prefix';
     case AtBase   = '@base';
     case A        = 'a';
@@ -20,11 +21,13 @@ enum TrigTokenType: string
     case False    = 'false';
 
     // Keywords (case-insensitive): GRAPH, PREFIX, BASE
+    // These always have themselves as a value.
     case Graph  = 'GRAPH';
     case Prefix = 'PREFIX'; // or '@base'
     case Base   = 'BASE'; // or '@prefix'
 
     // Punctuation
+    // These always have themselves as a value.
     case Dot       = '.';
     case Semicolon = ';';
     case Comma     = ',';
@@ -54,7 +57,9 @@ enum TrigTokenType: string
     case LangTag = 'LANGTAG';
 
     /**
-     * The token has
+     * End of input was reached.
+     *
+     * Always has an empty value.
      */
-    case EndOfInput = 'EndOfInput';
+    case EndOfInput = '';
 }

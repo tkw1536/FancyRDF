@@ -29,11 +29,11 @@ use function substr;
  */
 final class TrigReader
 {
-    private TrigTokenType $currentTokenType = TrigTokenType::EndOfInput;
+    private TrigToken $currentTokenType = TrigToken::EndOfInput;
 
     private string $currentTokenValue = '';
 
-    public function getTokenType(): TrigTokenType
+    public function getTokenType(): TrigToken
     {
         return $this->currentTokenType;
     }
@@ -52,40 +52,48 @@ final class TrigReader
     {
         [$this->currentTokenType, $this->currentTokenValue] = $this->process();
 
-        return $this->currentTokenType !== TrigTokenType::EndOfInput;
+        return $this->currentTokenType !== TrigToken::EndOfInput;
     }
 
     /**
-     * Skips whitespace and comments using only peekChar($offset).
-     * Advances the stream to the next non-whitespace, non-comment character or end of input.
+     * Skips whitespace and comments until one of the following is true:
+     *
+     * - we have a non-whitespace, non-comment character next in the stream.
+     * - we have reached the end of the stream.
      */
     private function skip(): void
     {
         $offset = 0;
-        while (true) {
+
+        $ch = $this->stream->peek($offset);
+        while ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
+            $offset++;
+            $ch = $this->stream->peek($offset);
+        }
+
+        // While we have a comment, skip until the next line is reached
+        // and then skip whitespace again.
+        while ($ch === '#') {
+            while ($ch !== "\n" && $ch !== "\r" && $ch !== null) {
+                $offset++;
+                $ch = $this->stream->peek($offset);
+            }
+
             $ch = $this->stream->peek($offset);
             while ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-            }
-
-            if ($ch !== '#') {
-                $this->stream->consume($offset);
-
-                return;
-            }
-
-            while ($ch !== "\n" && $ch !== "\r" && $ch !== null) {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
+                $offset++;
+                $ch = $this->stream->peek($offset);
             }
         }
+
+        // Consume everything we skipped.
+        $this->stream->consume($offset);
     }
 
     /**
-     * Processes the stream to extract the next token.
+     * Consumes the next token from the stream.
      *
-     * @return array{TrigTokenType, string}
+     * @return array{TrigToken, string}
      *   The token type and it's raw value.
      */
     private function process(): array
@@ -94,7 +102,7 @@ final class TrigReader
 
         $ch = $this->stream->peek();
         if ($ch === null) {
-            return [TrigTokenType::EndOfInput, ''];
+            return [TrigToken::EndOfInput, ''];
         }
 
         // First look at unambiguous single character tokens.
@@ -102,14 +110,14 @@ final class TrigReader
         // It is thus unambiguous to return them immediately.
         foreach (
             [
-                ';' => TrigTokenType::Semicolon,
-                ',' => TrigTokenType::Comma,
-                '[' => TrigTokenType::LSquare,
-                ']' => TrigTokenType::RSquare,
-                '(' => TrigTokenType::LParen,
-                ')' => TrigTokenType::RParen,
-                '{' => TrigTokenType::LCurly,
-                '}' => TrigTokenType::RCurly,
+                ';' => TrigToken::Semicolon,
+                ',' => TrigToken::Comma,
+                '[' => TrigToken::LSquare,
+                ']' => TrigToken::RSquare,
+                '(' => TrigToken::LParen,
+                ')' => TrigToken::RParen,
+                '{' => TrigToken::LCurly,
+                '}' => TrigToken::RCurly,
 
             ] as $char => $tokenType
         ) {
@@ -124,25 +132,25 @@ final class TrigReader
 
         $iriref = $this->processIriRef();
         if ($iriref !== null) {
-            return [TrigTokenType::IriRef, $iriref];
+            return [TrigToken::IriRef, $iriref];
         }
 
         $blankNodeLabel = $this->processBlankNodeLabel();
         if ($blankNodeLabel !== null) {
-            return [TrigTokenType::BlankNodeLabel, $blankNodeLabel];
+            return [TrigToken::BlankNodeLabel, $blankNodeLabel];
         }
 
         if ($ch === '^') {
             $hatHat = $this->stream->consume(strlen('^^'));
             assert($hatHat === '^^', 'expected two hats');
 
-            return [TrigTokenType::HatHat, $hatHat];
+            return [TrigToken::HatHat, $hatHat];
         }
 
         if ($ch === '"' || $ch === "'") {
             $value = $this->processString();
             if ($value !== null) {
-                return [TrigTokenType::String, $value];
+                return [TrigToken::String, $value];
             }
         }
 
@@ -161,9 +169,9 @@ final class TrigReader
         // Check for fixed-character tokens.
         foreach (
             [
-                'a' => TrigTokenType::A,
-                'true' => TrigTokenType::True,
-                'false' => TrigTokenType::False,
+                'a' => TrigToken::A,
+                'true' => TrigToken::True,
+                'false' => TrigToken::False,
             ] as $word => $token
         ) {
             if (! $this->stream->peekPrefix($word)) {
@@ -179,9 +187,9 @@ final class TrigReader
         // these are case-insensitive.
         foreach (
             [
-                'GRAPH' => TrigTokenType::Graph,
-                'PREFIX' => TrigTokenType::Prefix,
-                'BASE' => TrigTokenType::Base,
+                'GRAPH' => TrigToken::Graph,
+                'PREFIX' => TrigToken::Prefix,
+                'BASE' => TrigToken::Base,
             ] as $word => $token
         ) {
             if (! $this->stream->peekPrefix($word, true)) {
@@ -204,14 +212,14 @@ final class TrigReader
         $this->stream->consume(strlen($ch));
         assert($ch === '.', 'expected dot, got ' . $ch);
 
-        return [TrigTokenType::Dot, $ch];
+        return [TrigToken::Dot, $ch];
     }
 
     /**
      * Matches @prefix, @base, or a language tag (@[a-zA-Z]+(-[a-zA-Z0-9]+)*).
      * Only uses peekChar($offset); does not consume.
      *
-     * @return array{TrigTokenType, string}|null
+     * @return array{TrigToken, string}|null
      */
     private function processAtChar(): array|null
     {
@@ -267,28 +275,28 @@ final class TrigReader
         }
 
         $value = $this->stream->consume(strlen('@' . $name));
-        if ($this->currentTokenType === TrigTokenType::String) {
-            return [TrigTokenType::LangTag, $value];
+        if ($this->currentTokenType === TrigToken::String) {
+            return [TrigToken::LangTag, $value];
         }
 
         if ($name === 'prefix') {
-            return [TrigTokenType::AtPrefix, $value];
+            return [TrigToken::AtPrefix, $value];
         }
 
         if ($name === 'base') {
-            return [TrigTokenType::AtBase, $value];
+            return [TrigToken::AtBase, $value];
         }
 
         // This case shouldn't happen, we just have a weird at.
         // But whatever!
-        return [TrigTokenType::LangTag, $value];
+        return [TrigToken::LangTag, $value];
     }
 
     /**
      * Matches any numeric literal at the start of the stream.
      * Only uses peekChar($offset); does not consume.
      *
-     * @return array{TrigTokenType, int}|null
+     * @return array{TrigToken, int}|null
      *   The token type and the byte length of the matched numeric literal.
      *   Null if no match.
      *
@@ -343,10 +351,10 @@ final class TrigReader
                     $ch      = $this->stream->peek($offset);
                 }
 
-                return [TrigTokenType::Double, $offset];
+                return [TrigToken::Double, $offset];
             }
 
-            return [TrigTokenType::Decimal, $offset];
+            return [TrigToken::Decimal, $offset];
         }
 
         if (! self::isDigit($ch)) {
@@ -359,7 +367,7 @@ final class TrigReader
         }
 
         if ($ch === null) {
-            return [TrigTokenType::Integer, $offset];
+            return [TrigToken::Integer, $offset];
         }
 
         if ($ch === 'e' || $ch === 'E') {
@@ -379,17 +387,17 @@ final class TrigReader
                 $ch      = $this->stream->peek($offset);
             }
 
-            return [TrigTokenType::Double, $offset];
+            return [TrigToken::Double, $offset];
         }
 
         if ($ch !== '.') {
-            return [TrigTokenType::Integer, $offset];
+            return [TrigToken::Integer, $offset];
         }
 
         $dotOffset  = $offset + strlen($ch);
         $chAfterDot = $this->stream->peek($dotOffset);
         if ($chAfterDot !== null && ! self::isDigit($chAfterDot) && $chAfterDot !== 'e' && $chAfterDot !== 'E') {
-            return [TrigTokenType::Integer, $offset];
+            return [TrigToken::Integer, $offset];
         }
 
         $offset          += strlen($ch);
@@ -418,17 +426,17 @@ final class TrigReader
                 $ch      = $this->stream->peek($offset);
             }
 
-            return [TrigTokenType::Double, $offset];
+            return [TrigToken::Double, $offset];
         }
 
-        return $hasDigitAfterDot ? [TrigTokenType::Decimal, $offset] : null;
+        return $hasDigitAfterDot ? [TrigToken::Decimal, $offset] : null;
     }
 
     /**
      * Attempts to match a PNAME_LN or PNAME_NS at the current position.
      * Only uses peekChar($offset). On match, consumes the token and returns [type, value].
      *
-     * @return array{TrigTokenType, string}|null [token type, consumed string] or null if no match
+     * @return array{TrigToken, string}|null [token type, consumed string] or null if no match
      */
     private function processPName(): array|null
     {
@@ -444,8 +452,8 @@ final class TrigReader
 
         if ($ch === ':') {
             $offset += strlen($ch);
-            $type    = $this->isPnLocalStart($offset) ? TrigTokenType::PnameLn : TrigTokenType::PnameNs;
-            $len     = $type === TrigTokenType::PnameLn
+            $type    = $this->isPnLocalStart($offset) ? TrigToken::PnameLn : TrigToken::PnameNs;
+            $len     = $type === TrigToken::PnameLn
                 ? $offset + $this->pnLocalByteLength($offset)
                 : $offset;
 
@@ -471,8 +479,8 @@ final class TrigReader
                 }
 
                 $offset += strlen($ch);
-                $type    = $this->isPnLocalStart($offset) ? TrigTokenType::PnameLn : TrigTokenType::PnameNs;
-                $len     = $type === TrigTokenType::PnameLn
+                $type    = $this->isPnLocalStart($offset) ? TrigToken::PnameLn : TrigToken::PnameNs;
+                $len     = $type === TrigToken::PnameLn
                     ? $offset + $this->pnLocalByteLength($offset)
                     : $offset;
 
@@ -773,20 +781,13 @@ final class TrigReader
      */
     private function processBlankNodeLabel(): string|null
     {
-        $offset = 0;
-        $ch     = $this->stream->peek($offset);
-        if ($ch !== '_') {
+        if (! $this->stream->peekPrefix('_:')) {
             return null;
         }
 
-        $offset += strlen($ch);
-        $ch      = $this->stream->peek($offset);
-        if ($ch !== ':') {
-            return null;
-        }
+        $offset = 2; // strlen('_:')
 
-        $offset += strlen($ch);
-        $ch      = $this->stream->peek($offset);
+        $ch = $this->stream->peek($offset);
         if ($ch === null || (! self::isPnCharsU($ch) && ! self::isDigit($ch))) {
             return null;
         }

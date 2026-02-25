@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Formats\TrigReader;
 
 use FancyRDF\Formats\TrigReader\TrigReader;
-use FancyRDF\Formats\TrigReader\TrigTokenType;
+use FancyRDF\Formats\TrigReader\TrigToken;
 use FancyRDF\Streaming\ResourceStreamReader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
@@ -42,7 +42,7 @@ final class TrigReaderTest extends TestCase
         return $stream;
     }
 
-    /** @param list<array{TrigTokenType, string}> $expected */
+    /** @param list<array{TrigToken, string}> $expected */
     #[DataProvider('tokenizeProvider')]
     #[TestDox('tokenizes input to expected token sequence')]
     public function testTokenize(string $input, array $expected): void
@@ -58,11 +58,11 @@ final class TrigReaderTest extends TestCase
             trigger_error($e->getMessage(), E_USER_WARNING);
         }
 
-        $tokens[] = [TrigTokenType::EndOfInput, $reader->getTokenValue()];
+        $tokens[] = [TrigToken::EndOfInput, $reader->getTokenValue()];
         self::assertSame($expected, $tokens);
     }
 
-    /** @return array<string, array{string, list<array{TrigTokenType, string}>}> */
+    /** @return array<string, array{string, list<array{TrigToken, string}>}> */
     public static function tokenizeProvider(): array
     {
         $shortTrigSnippet = <<<'TRIG'
@@ -77,143 +77,143 @@ TRIG;
             'keywords and punctuation' => [
                 '@prefix @base a true false . ; , [ ] ( ) { } ^^',
                 [
-                    [TrigTokenType::AtPrefix, '@prefix'],
-                    [TrigTokenType::AtBase, '@base'],
-                    [TrigTokenType::A, 'a'],
-                    [TrigTokenType::True, 'true'],
-                    [TrigTokenType::False, 'false'],
-                    [TrigTokenType::Dot, '.'],
-                    [TrigTokenType::Semicolon, ';'],
-                    [TrigTokenType::Comma, ','],
-                    [TrigTokenType::LSquare, '['],
-                    [TrigTokenType::RSquare, ']'],
-                    [TrigTokenType::LParen, '('],
-                    [TrigTokenType::RParen, ')'],
-                    [TrigTokenType::LCurly, '{'],
-                    [TrigTokenType::RCurly, '}'],
-                    [TrigTokenType::HatHat, '^^'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::AtPrefix, '@prefix'],
+                    [TrigToken::AtBase, '@base'],
+                    [TrigToken::A, 'a'],
+                    [TrigToken::True, 'true'],
+                    [TrigToken::False, 'false'],
+                    [TrigToken::Dot, '.'],
+                    [TrigToken::Semicolon, ';'],
+                    [TrigToken::Comma, ','],
+                    [TrigToken::LSquare, '['],
+                    [TrigToken::RSquare, ']'],
+                    [TrigToken::LParen, '('],
+                    [TrigToken::RParen, ')'],
+                    [TrigToken::LCurly, '{'],
+                    [TrigToken::RCurly, '}'],
+                    [TrigToken::HatHat, '^^'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'case-insensitive GRAPH, PREFIX, BASE' => [
                 'GRAPH prefix BASE graph PREFIX base',
                 [
-                    [TrigTokenType::Graph, 'GRAPH'],
-                    [TrigTokenType::Prefix, 'prefix'],
-                    [TrigTokenType::Base, 'BASE'],
-                    [TrigTokenType::Graph, 'graph'],
-                    [TrigTokenType::Prefix, 'PREFIX'],
-                    [TrigTokenType::Base, 'base'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::Graph, 'GRAPH'],
+                    [TrigToken::Prefix, 'prefix'],
+                    [TrigToken::Base, 'BASE'],
+                    [TrigToken::Graph, 'graph'],
+                    [TrigToken::Prefix, 'PREFIX'],
+                    [TrigToken::Base, 'base'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'IRI reference' => [
                 '<http://example.org/>',
                 [
-                    [TrigTokenType::IriRef, '<http://example.org/>'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::IriRef, '<http://example.org/>'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'string literals' => [
                 '"hello" \'world\' "with\\nnewline"',
                 [
-                    [TrigTokenType::String, '"hello"'],
-                    [TrigTokenType::String, "'world'"],
-                    [TrigTokenType::String, '"with\\nnewline"'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::String, '"hello"'],
+                    [TrigToken::String, "'world'"],
+                    [TrigToken::String, '"with\\nnewline"'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'numbers' => [
                 '42 -7 3.14 1e2 2.5e-1',
                 [
-                    [TrigTokenType::Integer, '42'],
-                    [TrigTokenType::Integer, '-7'],
-                    [TrigTokenType::Decimal, '3.14'],
-                    [TrigTokenType::Double, '1e2'],
-                    [TrigTokenType::Double, '2.5e-1'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::Integer, '42'],
+                    [TrigToken::Integer, '-7'],
+                    [TrigToken::Decimal, '3.14'],
+                    [TrigToken::Double, '1e2'],
+                    [TrigToken::Double, '2.5e-1'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'blank node label and ANON' => [
                 '_:b0 [] _:label',
                 [
-                    [TrigTokenType::BlankNodeLabel, '_:b0'],
-                    [TrigTokenType::LSquare, '['],
-                    [TrigTokenType::RSquare, ']'],
-                    [TrigTokenType::BlankNodeLabel, '_:label'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::BlankNodeLabel, '_:b0'],
+                    [TrigToken::LSquare, '['],
+                    [TrigToken::RSquare, ']'],
+                    [TrigToken::BlankNodeLabel, '_:label'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'prefixed names' => [
                 'ex:foo :bar rdf:type',
                 [
-                    [TrigTokenType::PnameLn, 'ex:foo'],
-                    [TrigTokenType::PnameLn, ':bar'],
-                    [TrigTokenType::PnameLn, 'rdf:type'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::PnameLn, 'ex:foo'],
+                    [TrigToken::PnameLn, ':bar'],
+                    [TrigToken::PnameLn, 'rdf:type'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'skips whitespace and comments' => [
                 "  \t\n# comment\n.",
                 [
-                    [TrigTokenType::Dot, '.'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::Dot, '.'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'short TriG snippet' => [
                 $shortTrigSnippet,
                 [
-                    [TrigTokenType::AtPrefix, '@prefix'],
-                    [TrigTokenType::PnameNs, 'ex:'],
-                    [TrigTokenType::IriRef, '<http://example.org/>'],
-                    [TrigTokenType::Dot, '.'],
-                    [TrigTokenType::AtPrefix, '@prefix'],
-                    [TrigTokenType::PnameNs, ':'],
-                    [TrigTokenType::IriRef, '<http://example.org/def#>'],
-                    [TrigTokenType::Dot, '.'],
-                    [TrigTokenType::PnameLn, ':G1'],
-                    [TrigTokenType::LCurly, '{'],
-                    [TrigTokenType::PnameLn, ':Monica'],
-                    [TrigTokenType::A, 'a'],
-                    [TrigTokenType::PnameLn, 'ex:Person'],
-                    [TrigTokenType::Semicolon, ';'],
-                    [TrigTokenType::PnameLn, 'ex:name'],
-                    [TrigTokenType::String, '"Monica Murphy"'],
-                    [TrigTokenType::Dot, '.'],
-                    [TrigTokenType::RCurly, '}'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::AtPrefix, '@prefix'],
+                    [TrigToken::PnameNs, 'ex:'],
+                    [TrigToken::IriRef, '<http://example.org/>'],
+                    [TrigToken::Dot, '.'],
+                    [TrigToken::AtPrefix, '@prefix'],
+                    [TrigToken::PnameNs, ':'],
+                    [TrigToken::IriRef, '<http://example.org/def#>'],
+                    [TrigToken::Dot, '.'],
+                    [TrigToken::PnameLn, ':G1'],
+                    [TrigToken::LCurly, '{'],
+                    [TrigToken::PnameLn, ':Monica'],
+                    [TrigToken::A, 'a'],
+                    [TrigToken::PnameLn, 'ex:Person'],
+                    [TrigToken::Semicolon, ';'],
+                    [TrigToken::PnameLn, 'ex:name'],
+                    [TrigToken::String, '"Monica Murphy"'],
+                    [TrigToken::Dot, '.'],
+                    [TrigToken::RCurly, '}'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'empty input' => [
                 '',
-                [[TrigTokenType::EndOfInput, '']],
+                [[TrigToken::EndOfInput, '']],
             ],
             'single quoted string' => [
                 '"hello"',
                 [
-                    [TrigTokenType::String, '"hello"'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::String, '"hello"'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'single blank node label' => [
                 '_:x',
                 [
-                    [TrigTokenType::BlankNodeLabel, '_:x'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::BlankNodeLabel, '_:x'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'single integer' => [
                 '123',
                 [
-                    [TrigTokenType::Integer, '123'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::Integer, '123'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
             'single decimal' => [
                 '1.5',
                 [
-                    [TrigTokenType::Decimal, '1.5'],
-                    [TrigTokenType::EndOfInput, ''],
+                    [TrigToken::Decimal, '1.5'],
+                    [TrigToken::EndOfInput, ''],
                 ],
             ],
         ];
@@ -230,10 +230,10 @@ TRIG;
             $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];
         }
 
-        $tokens[] = [TrigTokenType::EndOfInput, $reader->getTokenValue()];
+        $tokens[] = [TrigToken::EndOfInput, $reader->getTokenValue()];
         $expected = [
-            [TrigTokenType::Dot, '.'],
-            [TrigTokenType::EndOfInput, ''],
+            [TrigToken::Dot, '.'],
+            [TrigToken::EndOfInput, ''],
         ];
         self::assertSame($expected, $tokens);
     }
