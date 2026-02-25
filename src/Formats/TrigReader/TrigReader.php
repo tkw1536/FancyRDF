@@ -15,7 +15,6 @@ use function ord;
 use function preg_match;
 use function str_ends_with;
 use function strlen;
-use function strpos;
 use function substr;
 
 /**
@@ -124,7 +123,6 @@ final class TrigReader
                 ')' => TrigToken::RParen,
                 '{' => TrigToken::LCurly,
                 '}' => TrigToken::RCurly,
-
             ] as $char => $tokenType
         ) {
             if ($ch !== $char) {
@@ -427,9 +425,9 @@ final class TrigReader
 
     /**
      * Attempts to match a PNAME_LN or PNAME_NS at the current position.
-     * Only uses peekChar($offset). On match, consumes the token and returns [type, value].
+     * Builds the decoded value (prefix ':' local with local unescaped) as it goes.
      *
-     * @return array{TrigToken, string}|null [token type, consumed string] or null if no match
+     * @return array{TrigToken, string}|null [token type, decoded value] or null if no match
      */
     private function processPName(): array|null
     {
@@ -445,13 +443,16 @@ final class TrigReader
 
         if ($ch === ':') {
             $offset += strlen($ch);
-            $type    = $this->isPnLocalStart($offset) ? TrigToken::PnameLn : TrigToken::PnameNs;
-            $len     = $type === TrigToken::PnameLn
-                ? $offset + $this->pnLocalByteLength($offset)
-                : $offset;
+            $value   = ':';
+            if ($this->isPnLocalStart($offset)) {
+                [$offset, $localDecoded] = $this->readPnLocalDecoded($offset);
+                $value                  .= $localDecoded;
+                $type                    = TrigToken::PnameLn;
+            } else {
+                $type = TrigToken::PnameNs;
+            }
 
-            $raw   = $this->stream->consume($len);
-            $value = $this->decodePnameValue($raw);
+            $this->stream->consume($offset);
 
             return [$type, $value];
         }
@@ -460,9 +461,7 @@ final class TrigReader
             return null;
         }
 
-        $offset       += strlen($ch);
-        $lastWasPnChar = true;
-
+        $value = '';
         while (true) {
             $ch = $this->stream->peek($offset);
             if ($ch === null) {
@@ -470,31 +469,34 @@ final class TrigReader
             }
 
             if ($ch === ':') {
-                if (! $lastWasPnChar) {
+                if ($value !== '' && $value[strlen($value) - 1] === '.') {
                     return null;
                 }
 
+                $value  .= ':';
                 $offset += strlen($ch);
-                $type    = $this->isPnLocalStart($offset) ? TrigToken::PnameLn : TrigToken::PnameNs;
-                $len     = $type === TrigToken::PnameLn
-                    ? $offset + $this->pnLocalByteLength($offset)
-                    : $offset;
+                if ($this->isPnLocalStart($offset)) {
+                    [$offset, $localDecoded] = $this->readPnLocalDecoded($offset);
+                    $value                  .= $localDecoded;
+                    $type                    = TrigToken::PnameLn;
+                } else {
+                    $type = TrigToken::PnameNs;
+                }
 
-                $raw   = $this->stream->consume($len);
-                $value = $this->decodePnameValue($raw);
+                $this->stream->consume($offset);
 
                 return [$type, $value];
             }
 
             if ($ch === '.') {
-                $lastWasPnChar = false;
-                $offset       += strlen($ch);
+                $value  .= $ch;
+                $offset += strlen($ch);
                 continue;
             }
 
             if (self::isPnChars($ch)) {
-                $lastWasPnChar = true;
-                $offset       += strlen($ch);
+                $value  .= $ch;
+                $offset += strlen($ch);
                 continue;
             }
 
@@ -503,34 +505,69 @@ final class TrigReader
     }
 
     /**
-     * Byte length of PN_LOCAL starting at $offset (does not consume).
-     * PN_LOCAL cannot end with '.'; trailing '.' is not counted.
+     * Reads PN_LOCAL from $offset, building decoded string (backslash escapes resolved).
+     * PN_LOCAL cannot end with '.'; a trailing '.' is not included.
+     *
+     * @return array{int, string} [new offset after PN_LOCAL, decoded local part]
      */
-    private function pnLocalByteLength(int $offset): int
+    private function readPnLocalDecoded(int $offset): array
     {
-        $first = $this->pnLocalUnitLength($offset, true);
-        if ($first === 0) {
-            return 0;
+        $result = '';
+        $first  = true;
+
+        while (true) {
+            $unit = $this->readPnLocalUnit($offset, $first);
+            if ($unit === null) {
+                break;
+            }
+
+            [$nextOffset, $fragment] = $unit;
+            if ($fragment === '.') {
+                if ($this->readPnLocalUnit($nextOffset, false) === null) {
+                    break;
+                }
+            }
+
+            $result .= $fragment;
+            $offset  = $nextOffset;
+            $first   = false;
         }
 
-        $len         = $first;
-        $pos         = $offset + $first;
-        $lastWasDot  = false;
-        $lastUnitLen = 0;
+        return [$offset, $result];
+    }
 
-        while (($unit = $this->pnLocalUnitLength($pos, false)) !== 0) {
-            $ch          = $this->stream->peek($pos);
-            $lastWasDot  = ($ch === '.');
-            $lastUnitLen = $unit;
-            $len        += $unit;
-            $pos        += $unit;
+    /**
+     * Reads one PN_LOCAL unit at $offset (one char or one PLX); returns decoded fragment.
+     *
+     * @return array{int, string}|null [new offset, decoded fragment] or null if no unit
+     */
+    private function readPnLocalUnit(int $offset, bool $first): array|null
+    {
+        $unitLen = $this->pnLocalUnitLength($offset, $first);
+        if ($unitLen === 0) {
+            return null;
         }
 
-        if ($lastWasDot) {
-            $len -= $lastUnitLen;
+        $ch = $this->stream->peek($offset);
+        if ($ch === '\\') {
+            $esc = $this->stream->peek($offset + strlen($ch));
+            assert($esc !== null && self::isPnLocalEscChar($esc), 'PLX backslash must be followed by PN_LOCAL_ESC char');
+
+            return [$offset + $unitLen, $esc];
         }
 
-        return $len;
+        $fragment = '';
+        $pos      = $offset;
+        $left     = $unitLen;
+        while ($left > 0) {
+            $c = $this->stream->peek($pos);
+            assert($c !== null, 'expected more chars in PN_LOCAL unit');
+            $fragment .= $c;
+            $pos      += strlen($c);
+            $left     -= strlen($c);
+        }
+
+        return [$pos, $fragment];
     }
 
     /**
@@ -947,35 +984,6 @@ final class TrigReader
         };
 
         assert($result !== '', 'invalid string escape \\' . $char);
-
-        return $result;
-    }
-
-    private function decodePnameValue(string $raw): string
-    {
-        $colonPos = strpos($raw, ':');
-        assert($colonPos !== false, 'PNAME must contain :');
-        $prefix = substr($raw, 0, $colonPos + 1);
-        $local  = substr($raw, $colonPos + 1);
-
-        return $prefix . $this->unescapePnameLocal($local);
-    }
-
-    private function unescapePnameLocal(string $local): string
-    {
-        $result = '';
-        $i      = 0;
-        $len    = strlen($local);
-        while ($i < $len) {
-            if ($local[$i] === '\\' && $i + 1 < $len) {
-                $result .= $local[$i + 1];
-                $i      += 2;
-                continue;
-            }
-
-            $result .= $local[$i];
-            $i++;
-        }
 
         return $result;
     }
