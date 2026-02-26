@@ -6,6 +6,7 @@ namespace FancyRDF\Formats\TrigReader;
 
 use FancyRDF\Streaming\StreamReader;
 
+use function array_key_exists;
 use function assert;
 use function hexdec;
 use function is_string;
@@ -95,6 +96,29 @@ final class TrigReader
         $this->stream->consume($offset);
     }
 
+    private const array PUNCTUATION_TOKENS = [
+        ';' => TrigToken::Semicolon,
+        ',' => TrigToken::Comma,
+        '[' => TrigToken::LSquare,
+        ']' => TrigToken::RSquare,
+        '(' => TrigToken::LParen,
+        ')' => TrigToken::RParen,
+        '{' => TrigToken::LCurly,
+        '}' => TrigToken::RCurly,
+    ];
+
+    private const array CASE_SENSITIVE_KEYWORDS = [
+        'a' => TrigToken::A,
+        'true' => TrigToken::True,
+        'false' => TrigToken::False,
+    ];
+
+    private const array CASE_INSENSITIVE_KEYWORDS = [
+        'GRAPH' => TrigToken::Graph,
+        'PREFIX' => TrigToken::Prefix,
+        'BASE' => TrigToken::Base,
+    ];
+
     /**
      * Consumes the next token from the stream.
      *
@@ -110,28 +134,12 @@ final class TrigReader
             return [TrigToken::EndOfInput, ''];
         }
 
-        // First look at unambiguous single character tokens.
+        // First look at unambiguous punctuation tokens.
         // Each of these can only start a single type of token.
-        // It is thus unambiguous to return them immediately.
-        foreach (
-            [
-                ';' => TrigToken::Semicolon,
-                ',' => TrigToken::Comma,
-                '[' => TrigToken::LSquare,
-                ']' => TrigToken::RSquare,
-                '(' => TrigToken::LParen,
-                ')' => TrigToken::RParen,
-                '{' => TrigToken::LCurly,
-                '}' => TrigToken::RCurly,
-            ] as $char => $tokenType
-        ) {
-            if ($ch !== $char) {
-                continue;
-            }
+        if (array_key_exists($ch, self::PUNCTUATION_TOKENS)) {
+            $this->stream->consume(strlen($ch));
 
-            $this->stream->consume(strlen($char));
-
-            return [$tokenType, $char];
+            return [self::PUNCTUATION_TOKENS[$ch], $ch];
         }
 
         $iriref = $this->processIriRef();
@@ -151,33 +159,29 @@ final class TrigReader
             return [TrigToken::HatHat, $hatHat];
         }
 
-        if ($ch === '"' || $ch === "'") {
-            $value = $this->processString();
-            if ($value !== null) {
-                return [TrigToken::String, $value];
-            }
+        // match string literals
+        $string = $this->processString();
+        if ($string !== null) {
+            return [TrigToken::String, $string];
         }
 
         // match @prefix, @base or a language tag
         $at = $this->processAtChar();
         if ($at !== null) {
-            return [$at[0], $at[1]];
+            return [TrigToken::AtKeyword, $at];
         }
 
         // try and match the PNAME_LN or PNAME_NS productions.
         $tok = $this->processPName();
         if ($tok !== null) {
-            return $tok;
+            return [
+                str_ends_with($tok, ':') ? TrigToken::PnameNs : TrigToken::PnameLn,
+                $tok,
+            ];
         }
 
-        // Check for fixed-character tokens.
-        foreach (
-            [
-                'a' => TrigToken::A,
-                'true' => TrigToken::True,
-                'false' => TrigToken::False,
-            ] as $word => $token
-        ) {
+        // first check for case-sensitive keywords.
+        foreach (self::CASE_SENSITIVE_KEYWORDS as $word => $token) {
             if (! $this->stream->peekPrefix($word)) {
                 continue;
             }
@@ -187,15 +191,8 @@ final class TrigReader
             return [$token, $value];
         }
 
-        // check for case-insensitive keywords.
-        // these are case-insensitive.
-        foreach (
-            [
-                'GRAPH' => TrigToken::Graph,
-                'PREFIX' => TrigToken::Prefix,
-                'BASE' => TrigToken::Base,
-            ] as $word => $token
-        ) {
+        // now check for case-insensitive keywords.
+        foreach (self::CASE_INSENSITIVE_KEYWORDS as $word => $token) {
             if (! $this->stream->peekPrefix($word, true)) {
                 continue;
             }
@@ -222,10 +219,8 @@ final class TrigReader
     /**
      * Matches @prefix, @base, or a language tag (@[a-zA-Z]+(-[a-zA-Z0-9]+)*).
      * Only uses peekChar($offset); does not consume.
-     *
-     * @return array{TrigToken, string}|null
      */
-    private function processAtChar(): array|null
+    private function processAtChar(): string|null
     {
         $offset = 0;
         $ch     = $this->stream->peek($offset);
@@ -241,6 +236,8 @@ final class TrigReader
 
         $offset += strlen($ch);
 
+        $hyphenPos       = null;
+        $charAfterHyphen = false;
         while (true) {
             $ch = $this->stream->peek($offset);
             if ($ch === null) {
@@ -248,39 +245,28 @@ final class TrigReader
             }
 
             if (self::isLangTagLetter($ch) || self::isDigit($ch)) {
-                $offset += strlen($ch);
+                $charAfterHyphen = $hyphenPos !== null;
+                $offset         += strlen($ch);
                 continue;
             }
 
-            if ($ch === '-') {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-                if ($ch === null || (! self::isLangTagLetter($ch) && ! self::isDigit($ch))) {
-                    break;
-                }
-
-                $offset += strlen($ch);
+            if ($hyphenPos === null && $ch === '-') {
+                $hyphenPos = $offset;
+                $offset   += strlen($ch);
                 continue;
             }
 
             break;
         }
 
-        $name = '';
-        $off  = 1;
-        while ($off < $offset) {
-            $c = $this->stream->peek($off);
-            if ($c === null) {
-                break;
-            }
-
-            $name .= $c;
-            $off  += strlen($c);
+        if ($hyphenPos !== null && ! $charAfterHyphen) {
+            $offset = $hyphenPos;
         }
 
-        $this->stream->consume(strlen('@' . $name));
+        $name = $this->stream->consume($offset);
+        $name = substr($name, 1);
 
-        return [TrigToken::AtKeyword, $name];
+        return $name;
     }
 
     /**
@@ -298,12 +284,17 @@ final class TrigReader
      */
     private function matchNumericLiteral(): array|null
     {
+        // INTEGER: [+-]?[0-9]+
+        // DECIMAL: [+-]?[0-9]*\.[0-9]+
+        // DOUBLE:  [+-]?([0-9]+\.[0-9]|\.[0-9]+|[0-9])[eE][+-]?[0-9]+
+
         $offset = 0;
         $ch     = $this->stream->peek($offset);
         if ($ch === null) {
             return null;
         }
 
+        // Optional leading "+" or "-"
         if ($ch === '+' || $ch === '-') {
             $offset += strlen($ch);
             $ch      = $this->stream->peek($offset);
@@ -313,6 +304,7 @@ final class TrigReader
             return null;
         }
 
+        // Case 1: ".digits" (decimal or double)
         if ($ch === '.') {
             $offset += strlen($ch);
             $ch      = $this->stream->peek($offset);
@@ -325,33 +317,17 @@ final class TrigReader
                 $ch      = $this->stream->peek($offset);
             }
 
-            if ($ch === 'e' || $ch === 'E') {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-                if ($ch === '+' || $ch === '-') {
-                    $offset += strlen($ch);
-                    $ch      = $this->stream->peek($offset);
-                }
+            $expOffset = $this->gobbleExponentAt($offset);
 
-                if ($ch === null || ! self::isDigit($ch)) {
-                    return null;
-                }
-
-                while ($ch !== null && self::isDigit($ch)) {
-                    $offset += strlen($ch);
-                    $ch      = $this->stream->peek($offset);
-                }
-
-                return [TrigToken::Double, $offset];
-            }
-
-            return [TrigToken::Decimal, $offset];
+            return $expOffset !== null ? [TrigToken::Double, $expOffset] : [TrigToken::Decimal, $offset];
         }
 
+        // From here on we must start with a digit.
         if (! self::isDigit($ch)) {
             return null;
         }
 
+        // Read integer part.
         while ($ch !== null && self::isDigit($ch)) {
             $offset += strlen($ch);
             $ch      = $this->stream->peek($offset);
@@ -361,26 +337,13 @@ final class TrigReader
             return [TrigToken::Integer, $offset];
         }
 
-        if ($ch === 'e' || $ch === 'E') {
-            $offset += strlen($ch);
-            $ch      = $this->stream->peek($offset);
-            if ($ch === '+' || $ch === '-') {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-            }
-
-            if ($ch === null || ! self::isDigit($ch)) {
-                return null;
-            }
-
-            while ($ch !== null && self::isDigit($ch)) {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-            }
-
-            return [TrigToken::Double, $offset];
+        // Possible exponent directly after integer.
+        $expOffset = $this->gobbleExponentAt($offset);
+        if ($expOffset !== null) {
+            return [TrigToken::Double, $expOffset];
         }
 
+        // Case 2: digits '.' [digits] [EXPONENT]
         if ($ch !== '.') {
             return [TrigToken::Integer, $offset];
         }
@@ -400,36 +363,54 @@ final class TrigReader
             $ch               = $this->stream->peek($offset);
         }
 
-        if ($ch === 'e' || $ch === 'E') {
-            $offset += strlen($ch);
-            $ch      = $this->stream->peek($offset);
-            if ($ch === '+' || $ch === '-') {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-            }
+        $expOffset = $this->gobbleExponentAt($offset);
 
-            if ($ch === null || ! self::isDigit($ch)) {
-                return null;
-            }
+        return match (true) {
+            $expOffset !== null => [TrigToken::Double, $expOffset],
+            $hasDigitAfterDot => [TrigToken::Decimal, $offset],
+            default => null,
+        };
+    }
 
-            while ($ch !== null && self::isDigit($ch)) {
-                $offset += strlen($ch);
-                $ch      = $this->stream->peek($offset);
-            }
-
-            return [TrigToken::Double, $offset];
+    /**
+     * Matches EXPONENT at $offset (starting at optional 'e'/'E').
+     *
+     * @return int|null New offset after the exponent, or null if no valid exponent at $offset.
+     */
+    private function gobbleExponentAt(int $offset): int|null
+    {
+        $ch = $this->stream->peek($offset);
+        if ($ch !== 'e' && $ch !== 'E') {
+            return null;
         }
 
-        return $hasDigitAfterDot ? [TrigToken::Decimal, $offset] : null;
+        $offset += strlen($ch);
+        $ch      = $this->stream->peek($offset);
+
+        if ($ch === '+' || $ch === '-') {
+            $offset += strlen($ch);
+            $ch      = $this->stream->peek($offset);
+        }
+
+        if ($ch === null || ! self::isDigit($ch)) {
+            return null;
+        }
+
+        while ($ch !== null && self::isDigit($ch)) {
+            $offset += strlen($ch);
+            $ch      = $this->stream->peek($offset);
+        }
+
+        return $offset;
     }
 
     /**
      * Attempts to match a PNAME_LN or PNAME_NS at the current position.
      * Builds the decoded value (prefix ':' local with local unescaped) as it goes.
      *
-     * @return array{TrigToken, string}|null [token type, decoded value] or null if no match
+     * @return string|null [token type, decoded value] or null if no match
      */
-    private function processPName(): array|null
+    private function processPName(): string|null
     {
         // [139s] PNAME_NS ::= PN_PREFIX? ':'
         // [140s] PNAME_LN ::= PNAME_NS PN_LOCAL
@@ -441,99 +422,63 @@ final class TrigReader
             return null;
         }
 
-        if ($ch === ':') {
-            $offset += strlen($ch);
-            $value   = ':';
-            if ($this->isPnLocalStart($offset)) {
-                [$offset, $localDecoded] = $this->readPnLocalDecoded($offset);
-                $value                  .= $localDecoded;
-                $type                    = TrigToken::PnameLn;
-            } else {
-                $type = TrigToken::PnameNs;
-            }
-
-            $this->stream->consume($offset);
-
-            return [$type, $value];
-        }
-
-        if (! self::isPnCharsBase($ch)) {
-            return null;
-        }
-
+        // Read the optional PN_PREFIX PRODUCTION.
         $value = '';
-        while (true) {
-            $ch = $this->stream->peek($offset);
-            if ($ch === null) {
+        if ($ch !== ':') {
+            if (! self::isPnCharsBase($ch)) {
                 return null;
             }
 
-            if ($ch === ':') {
-                if ($value !== '' && $value[strlen($value) - 1] === '.') {
-                    return null;
-                }
+            // Read valid characters until the colon.
+            $lastWasDot = false;
+            $ch         = $this->stream->peek($offset);
+            while (
+                $ch !== null &&
+                $ch !== ':' &&
+                ($ch === '.' || self::isPnChars($ch))
+            ) {
+                $value     .= $ch;
+                $lastWasDot = $ch === '.';
+                $offset    += strlen($ch);
 
-                $value  .= ':';
-                $offset += strlen($ch);
-                if ($this->isPnLocalStart($offset)) {
-                    [$offset, $localDecoded] = $this->readPnLocalDecoded($offset);
-                    $value                  .= $localDecoded;
-                    $type                    = TrigToken::PnameLn;
-                } else {
-                    $type = TrigToken::PnameNs;
-                }
-
-                $this->stream->consume($offset);
-
-                return [$type, $value];
+                $ch = $this->stream->peek($offset);
             }
 
-            if ($ch === '.') {
-                $value  .= $ch;
-                $offset += strlen($ch);
-                continue;
+            // If we exited the loop above because of an invalid character
+            // or the last character we saw was a dot, return null.
+            if ($ch !== ':' || $lastWasDot) {
+                return null;
             }
-
-            if (self::isPnChars($ch)) {
-                $value  .= $ch;
-                $offset += strlen($ch);
-                continue;
-            }
-
-            return null;
         }
-    }
 
-    /**
-     * Reads PN_LOCAL from $offset, building decoded string (backslash escapes resolved).
-     * PN_LOCAL cannot end with '.'; a trailing '.' is not included.
-     *
-     * @return array{int, string} [new offset after PN_LOCAL, decoded local part]
-     */
-    private function readPnLocalDecoded(int $offset): array
-    {
-        $result = '';
+        $offset += strlen($ch);
+
+        // Now read the PN_LOCAL production after the token.
+
+        $value .= ':';
         $first  = true;
 
+        $lastWasDot = false;
         while (true) {
             $unit = $this->readPnLocalUnit($offset, $first);
             if ($unit === null) {
                 break;
             }
 
-            [$nextOffset, $fragment] = $unit;
-            if ($fragment === '.') {
-                if ($this->readPnLocalUnit($nextOffset, false) === null) {
-                    break;
-                }
-            }
-
-            $result .= $fragment;
-            $offset  = $nextOffset;
-            $first   = false;
+            [$offset, $fragment] = $unit;
+            $value              .= $fragment;
+            $lastWasDot          = $fragment === '.';
+            $first               = false;
         }
 
-        return [$offset, $result];
+        if ($lastWasDot) {
+            $offset--;
+            $value = substr($value, 0, -1);
+        }
+
+        $this->stream->consume($offset);
+
+        return $value;
     }
 
     /**
@@ -543,95 +488,47 @@ final class TrigReader
      */
     private function readPnLocalUnit(int $offset, bool $first): array|null
     {
-        $unitLen = $this->pnLocalUnitLength($offset, $first);
-        if ($unitLen === 0) {
+        $ch = $this->stream->peek($offset);
+        if ($ch === null) {
             return null;
         }
 
-        $ch = $this->stream->peek($offset);
+        // PLX: backslash escape
         if ($ch === '\\') {
             $esc = $this->stream->peek($offset + strlen($ch));
-            assert($esc !== null && self::isPnLocalEscChar($esc), 'PLX backslash must be followed by PN_LOCAL_ESC char');
+            if ($esc === null || ! self::isPnLocalEscChar($esc)) {
+                return null;
+            }
 
-            return [$offset + $unitLen, $esc];
+            return [$offset + strlen($ch) + strlen($esc), $esc];
         }
 
-        $fragment = '';
-        $pos      = $offset;
-        $left     = $unitLen;
-        while ($left > 0) {
-            $c = $this->stream->peek($pos);
-            assert($c !== null, 'expected more chars in PN_LOCAL unit');
-            $fragment .= $c;
-            $pos      += strlen($c);
-            $left     -= strlen($c);
+        // PLX: percent encoding % HEX HEX
+        if ($ch === '%') {
+            $h1 = $this->stream->peek($offset + strlen($ch));
+            $h2 = $h1 === null ? null : $this->stream->peek($offset + strlen($ch) + strlen($h1));
+            if ($h1 === null || $h2 === null || ! self::isHex($h1) || ! self::isHex($h2)) {
+                return null;
+            }
+
+            $fragment = $ch . $h1 . $h2;
+            $newOff   = $offset + strlen($ch) + strlen($h1) + strlen($h2);
+
+            return [$newOff, $fragment];
         }
 
-        return [$pos, $fragment];
-    }
-
-    /**
-     * Byte length of one PN_LOCAL unit at $offset: one char (PN_CHARS, '.', ':') or one PLX.
-     * $first = true for the first unit (PN_CHARS_U | ':' | [0-9] | PLX), false for rest.
-     */
-    private function pnLocalUnitLength(int $offset, bool $first): int
-    {
-        $ch = $this->stream->peek($offset);
-        if ($ch === null) {
-            return 0;
-        }
-
+        // Non-PLX unit: one char depending on position (first vs rest).
         if ($first) {
-            if (self::isPnCharsU($ch) || $ch === ':' || self::isDigit($ch)) {
-                return strlen($ch);
+            if (! self::isPnCharsU($ch) && $ch !== ':' && ! self::isDigit($ch)) {
+                return null;
             }
         } else {
-            if (self::isPnChars($ch) || $ch === '.' || $ch === ':') {
-                return strlen($ch);
+            if (! self::isPnChars($ch) && $ch !== '.' && $ch !== ':') {
+                return null;
             }
         }
 
-        $plx = $this->tryPlxLength($offset);
-        if ($plx !== 0) {
-            return $plx;
-        }
-
-        return 0;
-    }
-
-    /** Returns byte length of PLX at $offset, or 0 if not PLX. */
-    private function tryPlxLength(int $offset): int
-    {
-        $ch = $this->stream->peek($offset);
-        if ($ch === null) {
-            return 0;
-        }
-
-        if ($ch === '%') {
-            $len = strlen($ch);
-            $h1  = $this->stream->peek($offset + $len);
-            if ($h1 === null || ! self::isHex($h1)) {
-                return 0;
-            }
-
-            $len += strlen($h1);
-            $h2   = $this->stream->peek($offset + $len);
-            if ($h2 === null || ! self::isHex($h2)) {
-                return 0;
-            }
-
-            return $len + strlen($h2);
-        }
-
-        if ($ch === '\\') {
-            $len = strlen($ch);
-            $esc = $this->stream->peek($offset + $len);
-            if ($esc !== null && self::isPnLocalEscChar($esc)) {
-                return $len + strlen($esc);
-            }
-        }
-
-        return 0;
+        return [$offset + strlen($ch), $ch];
     }
 
     /**
@@ -739,7 +636,8 @@ final class TrigReader
      * Matches a string literal at the current position; returns decoded content only.
      * Builds the decoded string as it goes. Does not consume on failure.
      *
-     * @return string|null Decoded string content, or null if no match (nothing consumed)
+     * @return string|null
+     *     Decoded string content, or null if there isn't a string literal.
      */
     private function processString(): string|null
     {
@@ -752,114 +650,39 @@ final class TrigReader
         $delim   = $ch;
         $offset += strlen($ch);
 
-        $next   = $this->stream->peek($offset);
+        // Check if we have a long string with ''' or """ characters.
         $isLong = false;
-        if ($next === $delim) {
-            $offset += strlen($next);
-            $next2   = $this->stream->peek($offset);
-            if ($next2 === $delim) {
-                $offset += strlen($next2);
-                $isLong  = true;
-            }
+        if ($this->stream->peek($offset) === $delim && $this->stream->peek($offset + 1) === $delim) {
+            $offset += 2;
+            $isLong  = true;
         }
 
-        if (! $isLong && $offset === 2) {
-            $this->stream->consume($offset);
-
-            return '';
-        }
-
-        if ($isLong) {
-            return $this->processLongString($offset, $delim);
-        }
-
-        $result = '';
-        while (true) {
-            $ch = $this->stream->peek($offset);
-            if ($ch === null) {
-                return null;
-            }
-
-            if ($ch === $delim) {
-                $offset += strlen($ch);
-                break;
-            }
-
-            if ($ch === '\\') {
-                $offset += strlen($ch);
-                $next    = $this->stream->peek($offset);
-                if ($next === null) {
-                    return null;
-                }
-
-                if ($next === 'u' || $next === 'U') {
-                    $offset            += strlen($next);
-                    $hexLen             = $next === 'u' ? 4 : 8;
-                    [$offset, $decoded] = $this->decodeUcharAtOffset($offset, $hexLen);
-                    $result            .= $decoded;
-                } else {
-                    $result .= $this->decodeEchar($next);
-                    $offset += strlen($next);
-                }
-
-                continue;
-            }
-
-            $result .= $ch;
-            $offset += strlen($ch);
-        }
-
-        $this->stream->consume($offset);
-
-        return $result;
+        return $this->decodeStringBody($offset, $delim, $isLong);
     }
 
     /**
-     * Processes a long string ('''...'''); builds decoded content as it goes.
+     * Decodes the body of a string literal starting at $offset (after opening quotes).
      *
-     * @return string|null Decoded content, or null on failure
+     * @return string Decoded string content
      */
-    private function processLongString(int $offset, string $delim): string|null
+    private function decodeStringBody(int $offset, string $delim, bool $isLong): string
     {
         $result = '';
 
+        $unexpectedEOF = false;
         while (true) {
             $ch = $this->stream->peek($offset);
             if ($ch === null) {
-                return null;
-            }
-
-            if ($ch === $delim) {
-                $offset += strlen($ch);
-                $ch2     = $this->stream->peek($offset);
-                $offset += $ch2 !== null ? strlen($ch2) : 0;
-                $ch3     = $this->stream->peek($offset);
-                if ($ch2 === $delim && $ch3 === $delim) {
-                    $offset       += strlen($ch3);
-                    $firstDelimPos = $offset - 3;
-                    $backslashes   = $this->countBackslashesBefore($firstDelimPos);
-                    if ($backslashes % 2 === 0) {
-                        break;
-                    }
-
-                    $result .= $delim;
-                    $offset -= 2 * strlen($delim);
-                    continue;
-                }
-
-                $result .= $ch;
-                if ($ch2 !== null) {
-                    $result .= $ch2;
-                }
-
-                continue;
+                $unexpectedEOF = true;
+                break;
             }
 
             if ($ch === '\\') {
                 $offset += strlen($ch);
                 $next    = $this->stream->peek($offset);
                 if ($next === null) {
-                    return null;
+                    $unexpectedEOF = true;
+                    break;
                 }
 
                 if ($next === 'u' || $next === 'U') {
@@ -875,33 +698,31 @@ final class TrigReader
                 continue;
             }
 
+            if ($ch === $delim) {
+                // Short string: stop at single delimiter.
+                if (! $isLong) {
+                    $offset += 1;
+                    break;
+                }
+
+                // Long string: '''...''' or """...""" end only on triple delimiter.
+                if (
+                    $this->stream->peek($offset + 1) === $delim &&
+                    $this->stream->peek($offset + 2) === $delim
+                ) {
+                    $offset += 3;
+                    break;
+                }
+            }
+
             $result .= $ch;
             $offset += strlen($ch);
         }
 
+        assert(! $unexpectedEOF, 'unexpected end of string');
         $this->stream->consume($offset);
 
         return $result;
-    }
-
-    /**
-     * Counts consecutive backslashes immediately before stream position $offset (using peek backwards).
-     */
-    private function countBackslashesBefore(int $offset): int
-    {
-        $n   = 0;
-        $pos = $offset - 1;
-        while ($pos >= 0) {
-            $c = $this->stream->peek($pos);
-            if ($c !== '\\') {
-                break;
-            }
-
-            $n++;
-            $pos -= strlen($c);
-        }
-
-        return $n;
     }
 
     /**
@@ -925,9 +746,8 @@ final class TrigReader
             return null;
         }
 
-        $offset        += strlen($ch);
-        $lastWasPnChar  = true;
-        $lastDotByteLen = 0;
+        $offset     += strlen($ch);
+        $trailingDot = null;
 
         while (true) {
             $ch = $this->stream->peek($offset);
@@ -936,27 +756,27 @@ final class TrigReader
             }
 
             if (self::isPnChars($ch)) {
-                $lastWasPnChar = true;
-                $offset       += strlen($ch);
+                $trailingDot = false;
+                $offset     += strlen($ch);
                 continue;
             }
 
             if ($ch === '.') {
-                $lastWasPnChar  = false;
-                $lastDotByteLen = strlen($ch);
-                $offset        += $lastDotByteLen;
+                $trailingDot = true;
+                $offset     += strlen($ch);
                 continue;
             }
 
             break;
         }
 
-        if (! $lastWasPnChar) {
-            $offset -= $lastDotByteLen;
+        if ($trailingDot) {
+            $offset--;
         }
 
         $raw   = $this->stream->consume($offset);
         $label = substr($raw, 2);
+
         if (str_ends_with($label, '.')) {
             $label = substr($label, 0, -1);
         }
@@ -1010,28 +830,12 @@ final class TrigReader
         return ($o >= 0x41 && $o <= 0x5A) || ($o >= 0x61 && $o <= 0x7A);
     }
 
-    /** Whether there is a PN_LOCAL at $offset (first char of local part). */
-    private function isPnLocalStart(int $offset): bool
-    {
-        $ch = $this->stream->peek($offset);
-        if ($ch === null) {
-            return false;
-        }
-
-        if (self::isPnCharsU($ch) || $ch === ':' || self::isDigit($ch)) {
-            return true;
-        }
-
-        return $this->tryPlxLength($offset) !== 0;
-    }
-
     private static function isPnCharsBase(string $ch): bool
     {
         if ($ch === '') {
             return false;
         }
 
-        // [163s]   PN_CHARS_BASE   ::= [A-Z] | [a-z] | [#00C0-#00D6] | [#00D8-#00F6] | [#00F8-#02FF] | [#0370-#037D] | [#037F-#1FFF] | [#200C-#200D] | [#2070-#218F] | [#2C00-#2FEF] | [#3001-#D7FF] | [#F900-#FDCF] | [#FDF0-#FFFD] | [#10000-#EFFFF]
         $cp = mb_ord($ch, 'UTF-8');
 
         if ($cp <= 0x7F) {
@@ -1072,8 +876,6 @@ final class TrigReader
             return false;
         }
 
-        // [166s]   PN_CHARS    ::= PN_CHARS_U | '-' | [0-9] | #00B7 | [#0300-#036F] | [#203F-#2040]
-
         if (self::isPnCharsU($ch) || $ch === '-' || self::isDigit($ch)) {
             return true;
         }
@@ -1087,7 +889,7 @@ final class TrigReader
 
     private static function isHex(string $ch): bool
     {
-        if ($ch === '' || strlen($ch) !== 1) {
+        if (strlen($ch) !== 1) {
             return false;
         }
 

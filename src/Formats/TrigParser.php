@@ -170,7 +170,7 @@ final class TrigParser extends FiberIterator
     /** Graph label allows only [] (empty blank node property list), not [ p o ]. */
     private function parseGraphLabelEmptyBnodePropertyList(): BlankNode
     {
-        $label = $this->generateBlankNode(null);
+        $label = $this->blankNode(null);
         $this->reader->next();
         assert($this->reader->getTokenType() === TrigToken::RSquare, 'expected ] after [');
 
@@ -191,7 +191,8 @@ final class TrigParser extends FiberIterator
 
     private function parseTriplesOrGraphBlock(TrigToken $type): void
     {
-        $this->curGraph = null;
+        $maybeGraphBlock = $this->canStartGraphBlock($type);
+        $this->curGraph  = null;
 
         $subject          = $this->parseSubject($type);
         $this->curSubject = $subject;
@@ -206,9 +207,12 @@ final class TrigParser extends FiberIterator
             return;
         }
 
-        $mayBeGraphBlock = $this->canStartGraphBlock($type);
-        assert($mayBeGraphBlock || $allowSoleSubject, 'expected verb');
-        assert($mayBeGraphBlock || $this->lastBlankNodePropertyListWasEmpty, 'blank node property list not allowed as graph label');
+        assert(
+            $maybeGraphBlock || (
+                $allowSoleSubject && $this->lastBlankNodePropertyListWasEmpty
+            ),
+            'blank node property list not allowed as graph label',
+        );
         $this->curGraph = $subject;
 
         $this->parseTriplesBlock();
@@ -387,7 +391,7 @@ final class TrigParser extends FiberIterator
         if ($type === TrigToken::BlankNodeLabel) {
             assert($value !== '', 'BLANK_NODE_LABEL is empty');
 
-            return $this->generateBlankNode($value);
+            return $this->blankNode($value);
         }
 
         $resolved = $this->expandPname($type, $value);
@@ -434,22 +438,22 @@ final class TrigParser extends FiberIterator
         $label = $this->reader->getTokenValue();
         assert($label !== '', 'BLANK_NODE_LABEL is empty');
 
-        return $this->generateBlankNode($label);
+        return $this->blankNode($label);
     }
 
     /**
      * Parse a blank node property list: [ predicateObjectList ].
      */
-    private function parseBlankNodePropertyList(): BlankNode
+    private function parseBlankNodePropertyList(bool $mayBeEmpty = true): BlankNode
     {
-        $bnode            = $this->generateBlankNode(null);
+        $bnode            = $this->blankNode(null);
         $savedSubject     = $this->curSubject;
         $savedPredicate   = $this->curPredicate;
         $this->curSubject = $bnode;
 
-        $hasNext = $this->reader->next();
-        assert($hasNext, 'expected predicateObjectList or ]');
+        $this->reader->next();
         $type = $this->reader->getTokenType();
+        assert($type !== TrigToken::EndOfInput, 'expected predicateObjectList or ]');
 
         $this->lastBlankNodePropertyListWasEmpty = $type === TrigToken::RSquare;
         if ($type !== TrigToken::RSquare) {
@@ -489,7 +493,7 @@ final class TrigParser extends FiberIterator
         $headNode    = null;
         $currentNode = null;
         foreach ($objects as $item) {
-            $listNode = $this->generateBlankNode(null);
+            $listNode = $this->blankNode(null);
             if ($headNode === null) {
                 $headNode = $listNode;
             }

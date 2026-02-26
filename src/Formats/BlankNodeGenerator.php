@@ -31,7 +31,7 @@ trait BlankNodeGenerator
      *   Passing the same name multiple times will return the same blank node.
      *   If null, a fresh blank with a new unique identifier is returned.
      */
-    final protected function generateBlankNode(string|null $name): BlankNode
+    final protected function blankNode(string|null $name): BlankNode
     {
         // Pick the existing blank node label, or create a new one.
         $id   = is_string($name) ? $this->blankNodes[$name] ?? null : null;
