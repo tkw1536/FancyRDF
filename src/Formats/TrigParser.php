@@ -15,7 +15,6 @@ use Override;
 
 use function assert;
 use function in_array;
-use function is_string;
 use function preg_match;
 use function strpos;
 use function substr;
@@ -34,6 +33,8 @@ use function substr;
  */
 final class TrigParser extends FiberIterator
 {
+    use BlankNodeGenerator;
+
     private const string RDF_NAMESPACE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
     private const string XSD_NAMESPACE = 'http://www.w3.org/2001/XMLSchema#';
 
@@ -169,7 +170,7 @@ final class TrigParser extends FiberIterator
     /** Graph label allows only [] (empty blank node property list), not [ p o ]. */
     private function parseGraphLabelEmptyBnodePropertyList(): BlankNode
     {
-        $label = $this->makeBlankNode(null);
+        $label = $this->generateBlankNode(null);
         $this->reader->next();
         assert($this->reader->getTokenType() === TrigToken::RSquare, 'expected ] after [');
 
@@ -185,6 +186,8 @@ final class TrigParser extends FiberIterator
             TrigToken::BlankNodeLabel,
         ], true);
     }
+
+    private bool $lastBlankNodePropertyListWasEmpty = true;
 
     private function parseTriplesOrGraphBlock(TrigToken $type): void
     {
@@ -384,7 +387,7 @@ final class TrigParser extends FiberIterator
         if ($type === TrigToken::BlankNodeLabel) {
             assert($value !== '', 'BLANK_NODE_LABEL is empty');
 
-            return $this->makeBlankNode($value);
+            return $this->generateBlankNode($value);
         }
 
         $resolved = $this->expandPname($type, $value);
@@ -431,7 +434,7 @@ final class TrigParser extends FiberIterator
         $label = $this->reader->getTokenValue();
         assert($label !== '', 'BLANK_NODE_LABEL is empty');
 
-        return $this->makeBlankNode($label);
+        return $this->generateBlankNode($label);
     }
 
     /**
@@ -439,7 +442,7 @@ final class TrigParser extends FiberIterator
      */
     private function parseBlankNodePropertyList(): BlankNode
     {
-        $bnode            = $this->makeBlankNode(null);
+        $bnode            = $this->generateBlankNode(null);
         $savedSubject     = $this->curSubject;
         $savedPredicate   = $this->curPredicate;
         $this->curSubject = $bnode;
@@ -486,7 +489,7 @@ final class TrigParser extends FiberIterator
         $headNode    = null;
         $currentNode = null;
         foreach ($objects as $item) {
-            $listNode = $this->makeBlankNode(null);
+            $listNode = $this->generateBlankNode(null);
             if ($headNode === null) {
                 $headNode = $listNode;
             }
@@ -558,38 +561,5 @@ final class TrigParser extends FiberIterator
             null,
             self::XSD_NAMESPACE . 'boolean',
         );
-    }
-
-    // ===========================
-    // Blank node handling
-    // ===========================
-
-    private int $blankNodeCounter = 0;
-
-    private bool $lastBlankNodePropertyListWasEmpty = true;
-
-    /** @var array<string, non-empty-string> */
-    private array $blankNodeMap = [];
-
-    /**
-     * Makes a blank node resource.
-     *
-     * @param string|null $name
-     *   If non-null, a string that uniquely identifies this blank node
-     *   within the current document.
-     *   If null, a fresh blank node label is returned.
-     */
-    private function makeBlankNode(string|null $name): BlankNode
-    {
-        // Pick the existing blank node label, or create a new one.
-        $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
-        $id ??= 'b' . ($this->blankNodeCounter++);
-
-        // Store the mapping if we were given a name.
-        if (is_string($name)) {
-            $this->blankNodeMap[$name] = $id;
-        }
-
-        return new BlankNode($id);
     }
 }

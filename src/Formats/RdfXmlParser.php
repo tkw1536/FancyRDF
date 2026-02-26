@@ -17,7 +17,6 @@ use XMLReader;
 use function assert;
 use function count;
 use function in_array;
-use function is_string;
 use function mb_substr;
 use function preg_match;
 use function str_contains;
@@ -30,6 +29,8 @@ use function str_contains;
  */
 class RdfXmlParser extends FiberIterator
 {
+    use BlankNodeGenerator;
+
     public const string RDF_NAMESPACE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 
     /** @param XMLReader $reader The XMLReader instance to parse from */
@@ -68,37 +69,6 @@ class RdfXmlParser extends FiberIterator
         $ref = UriReference::parse($iri);
 
         return ! $ref->isRelativeReference() && $ref->isRFC3987IriReference();
-    }
-
-    // ===========================
-    // Blank node handling
-    // ===========================
-
-    private int $blankNodeCounter = 0;
-
-    /** @var array<string, non-empty-string> */
-    private array $blankNodeMap = [];
-
-    /**
-     * Makes a blank node resource.
-     *
-     * @param string|null $name
-     *   If non-null, a string that uniquely identifies this blank node
-     *   within the current document.
-     *   If null, a fresh blank node label is returned.
-     */
-    private function makeBlankNode(string|null $name): BlankNode
-    {
-        // Pick the existing blank node label, or create a new one.
-        $id   = is_string($name) ? $this->blankNodeMap[$name] ?? null : null;
-        $id ??= 'b' . ($this->blankNodeCounter++);
-
-        // Store the mapping if we were given a name.
-        if (is_string($name)) {
-            $this->blankNodeMap[$name] = $id;
-        }
-
-        return new BlankNode($id);
     }
 
     // ===========================
@@ -226,11 +196,11 @@ class RdfXmlParser extends FiberIterator
             assert(self::isValidXmlName($nodeId), 'rdf:nodeID value must match XML Name production: ' . $nodeId);
 
             // rdf:nodeID creates a blank node with the given ID
-            return $this->makeBlankNode($nodeId);
+            return $this->generateBlankNode($nodeId);
         }
 
         // No identifying attributes - create blank node
-        return $this->makeBlankNode(null);
+        return $this->generateBlankNode(null);
     }
 
     /**
@@ -242,7 +212,7 @@ class RdfXmlParser extends FiberIterator
      */
     private function handleParseTypeCollection(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI): void
     {
-        $listHead = $this->makeBlankNode(null);
+        $listHead = $this->generateBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $listHead, $reificationURI);
 
         // Process collection items
@@ -294,7 +264,7 @@ class RdfXmlParser extends FiberIterator
 
             // If not the last item, create next list node
             if ($index < count($items) - 1) {
-                $nextList = $this->makeBlankNode(null);
+                $nextList = $this->generateBlankNode(null);
                 $this->emit([
                     $currentList,
                     new Iri(self::RDF_NAMESPACE . 'rest'),
@@ -335,7 +305,7 @@ class RdfXmlParser extends FiberIterator
      */
     private function handleParseTypeResource(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI): void
     {
-        $resourceObject = $this->makeBlankNode(null);
+        $resourceObject = $this->generateBlankNode(null);
         $this->emitTripleWithReification($subject, $predicate, $resourceObject, $reificationURI);
 
         // Push current subject and set the resource object as new subject
@@ -663,7 +633,7 @@ class RdfXmlParser extends FiberIterator
                 }
 
                 if ($nodeIdAttr !== null) {
-                    $object = $this->makeBlankNode($nodeIdAttr);
+                    $object = $this->generateBlankNode($nodeIdAttr);
                     $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                     continue;
@@ -694,7 +664,7 @@ class RdfXmlParser extends FiberIterator
 
                 // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
                 if ($hasNonRdfAttributes) {
-                    $object = $this->makeBlankNode(null);
+                    $object = $this->generateBlankNode(null);
                     $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                     // Process non-RDF attributes as properties of the object
@@ -904,7 +874,7 @@ class RdfXmlParser extends FiberIterator
 
             if ($nodeIdAttr !== null) {
                 assert($this->subject !== null, 'subject must be set');
-                $object = $this->makeBlankNode($nodeIdAttr);
+                $object = $this->generateBlankNode($nodeIdAttr);
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                 continue;
@@ -936,7 +906,7 @@ class RdfXmlParser extends FiberIterator
             // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
             if ($hasNonRdfAttributes) {
                 assert($this->subject !== null, 'subject must be set');
-                $object = $this->makeBlankNode(null);
+                $object = $this->generateBlankNode(null);
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                 // Process non-RDF attributes as properties of the object
