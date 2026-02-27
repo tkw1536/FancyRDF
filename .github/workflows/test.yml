@@ -15,12 +15,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-
       - name: Install cspell
         run: npm install -g cspell
-
       - name: cspell
-        run: make cspell
+        run: npx cspell .
 
   test:
     runs-on: ubuntu-latest
