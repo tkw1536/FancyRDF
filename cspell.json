@@ -9,7 +9,8 @@
     ".git/**",
     "composer.lock",
     "composer.json",
-    "tests/W3CRdf11Tests/testdata/rdf11/**"
+    "tests/W3CRdf11Tests/testdata/rdf11/**",
+    "tests/W3CRdf11Tests/testdata/rdf-canon/**"
   ],
   "dictionaryDefinitions": [
     { "name": "project-words", "path": "./cspell.txt" }

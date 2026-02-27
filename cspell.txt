@@ -6,6 +6,7 @@ analyser
 autoload
 BFFFD
 bnode
+canonicalizer
 canonicalizes
 Castable
 CFFFD
@@ -50,6 +51,7 @@ phpcodesniffer
 phpcs
 phpstan
 phpunit
+rdfc
 RDFS
 rdft
 rdfxml
