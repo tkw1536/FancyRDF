@@ -4,7 +4,7 @@
 > This library is still a work in progress.
 > It is neither feature complete, nor ready for production use.
 
-[![Tests](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/test.yml)
+[![Tests](https://github.com/tkw1536/FancyRDF/actions/workflows/php.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/php.yml)
 
 A streaming PHP 8.4+ Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
 When run with [PHP Assertions](https://www.php.net/manual/en/function.assert.php) enabled, any non-compliant document may produce an assertion.

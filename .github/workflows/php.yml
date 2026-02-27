@@ -1,25 +1,10 @@
-name: Tests
+name: PHP Linting & Testing 
 
 on:
   push:
   pull_request:
 
 jobs:
-  spell:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-      - name: Install cspell
-        run: npm install -g cspell
-      - name: cspell
-        run: npx cspell .
-
   test:
     runs-on: ubuntu-latest
     strategy:
