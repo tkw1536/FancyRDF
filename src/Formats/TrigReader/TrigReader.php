@@ -624,8 +624,12 @@ final class TrigReader
     {
         assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
         $ord = (int) @hexdec($hex);
-        assert($ord <= 0x10FFFF, 'code point out of range');
-        assert($ord < 0xD800 || $ord > 0xDFFF, 'surrogate code point in escape');
+        assert(
+            $ord <= 0x10FFFF &&
+            ($ord < 0xD800 || $ord > 0xDFFF),
+            'code point out of range',
+        );
+
         $res = mb_chr($ord, 'UTF-8');
 
         /* @phpstan-ignore function.alreadyNarrowedType (if the assertions do not hold this is wrong) */

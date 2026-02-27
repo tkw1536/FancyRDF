@@ -41,7 +41,7 @@ final class NTriplesTest extends TestBase
     #[Group('manifest')]
     public function testCaseCounts(): void
     {
-        self::assertEquals(
+        self::assertArraysAreIdenticalIgnoringOrder(
             self::caseCount(),
             [
                 'http://www.w3.org/ns/rdftest#TestNTriplesNegativeSyntax' => 29,
@@ -82,7 +82,7 @@ final class NTriplesTest extends TestBase
             $parser = NFormatParser::parseStream($source);
 
             foreach ($parser as $statement) {
-                self::assertEquals(Quad::size($statement), 3);
+                self::assertSame(3, Quad::size($statement));
             }
         } finally {
             if (is_resource($source)) {
@@ -105,7 +105,7 @@ final class NTriplesTest extends TestBase
             $parser = NFormatParser::parseStream($source);
 
             foreach ($parser as $statement) {
-                self::assertEquals(Quad::size($statement), 3);
+                self::assertSame(4, Quad::size($statement));
             }
         } finally {
             if (is_resource($source)) {

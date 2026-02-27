@@ -40,7 +40,7 @@ final class NQuadsTest extends TestBase
     #[Group('manifest')]
     public function testCaseCounts(): void
     {
-        self::assertEquals(
+        self::assertArraysAreIdenticalIgnoringOrder(
             self::caseCount(),
             [
                 'http://www.w3.org/ns/rdftest#TestNQuadsNegativeSyntax' => 34,

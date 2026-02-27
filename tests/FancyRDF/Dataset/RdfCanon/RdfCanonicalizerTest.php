@@ -16,7 +16,6 @@ use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
 use function explode;
-use function sort;
 use function trim;
 
 final class RdfCanonicalizerTest extends TestCase
@@ -149,13 +148,10 @@ final class RdfCanonicalizerTest extends TestCase
         $canonicalizer = new RdfCanonicalizer();
         $result        = $canonicalizer->canonicalize($dataset);
 
-        $gotLines  = explode("\n", trim($result->toCanonicalNQuads()));
-        $wantLines = $expectedNQuadsLines;
-        sort($gotLines);
-        sort($wantLines);
+        $lines = explode("\n", trim($result->toCanonicalNQuads()));
 
-        self::assertSame($expectedBlankNodeMap, $result->blankNodeMap);
-        self::assertSame($wantLines, $gotLines);
+        self::assertArraysAreIdenticalIgnoringOrder($expectedBlankNodeMap, $result->blankNodeMap);
+        self::assertArraysHaveIdenticalValuesIgnoringOrder($expectedNQuadsLines, $lines);
     }
 
     #[TestDox('aborts when permutation exploration limit is exceeded')]

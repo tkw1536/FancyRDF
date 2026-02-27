@@ -12,8 +12,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
-use function ksort;
-
 final class DatasetTest extends TestCase
 {
     /** @return iterable<string, array{Dataset, Dataset, array<string, string>, array<string, string>, bool, bool}> */
@@ -115,13 +113,6 @@ final class DatasetTest extends TestCase
             return;
         }
 
-        // sort expected output by keys
-        // because the order of keys is not guaranteed.
-        $expectedSorted = $expectedPartial;
-        $partialSorted  = $partial;
-        ksort($expectedSorted);
-        ksort($partialSorted);
-
-        self::assertSame($expectedSorted, $partialSorted);
+        self::assertArraysAreIdenticalIgnoringOrder($expectedPartial, $partial);
     }
 }

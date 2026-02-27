@@ -44,7 +44,7 @@ final class TurtleTest extends TestBase
     #[Group('manifest')]
     public function testCaseCounts(): void
     {
-        self::assertEquals(
+        self::assertArraysAreIdenticalIgnoringOrder(
             self::caseCount(),
             [
                 'http://www.w3.org/ns/rdftest#TestTurtleEval' => 145,
@@ -114,7 +114,7 @@ final class TurtleTest extends TestBase
             $parser = new TrigParser($reader, false);
 
             foreach ($parser as $statement) {
-                self::assertEquals(Quad::size($statement), 3);
+                self::assertSame(3, Quad::size($statement));
             }
         } finally {
             if (is_resource($source)) {

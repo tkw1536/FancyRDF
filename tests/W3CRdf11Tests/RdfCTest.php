@@ -20,7 +20,6 @@ use function fclose;
 use function is_resource;
 use function iterator_to_array;
 use function json_decode;
-use function ksort;
 use function stream_get_contents;
 
 /**
@@ -52,7 +51,7 @@ final class RdfCTest extends TestBase
     #[Group('manifest')]
     public function testCaseCounts(): void
     {
-        self::assertEquals(
+        self::assertArraysAreIdenticalIgnoringOrder(
             self::caseCount(),
             [
                 'https://w3c.github.io/rdf-canon/tests/vocab#RDFC10EvalTest' => 64,
@@ -208,11 +207,6 @@ final class RdfCTest extends TestBase
         $canonicalizer = new RdfCanonicalizer(new RdfCanonicalizationOptions($algorithm));
         $result        = $canonicalizer->canonicalize($input);
 
-        // need to compare without order of keys!
-        $got = $result->blankNodeMap;
-        ksort($got);
-        ksort($expected);
-
-        self::assertSame($expected, $got);
+        self::assertArraysAreIdenticalIgnoringOrder($expected, $result->blankNodeMap);
     }
 }
