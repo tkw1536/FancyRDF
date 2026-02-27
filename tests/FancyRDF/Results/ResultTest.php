@@ -12,6 +12,7 @@ use FancyRDF\Term\Literal;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -77,15 +78,6 @@ final class ResultTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{bool}> */
-    public static function allowMissingProvider(): array
-    {
-        return [
-            'with allow_missing' => [true],
-            'without allow_missing' => [false],
-        ];
-    }
-
     // ==================================================
     // get
     // ==================================================
@@ -142,7 +134,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getResource('missing'));
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetResourceInvalidLiteral(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -185,7 +177,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getIri('missing'));
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetIriInvalidLiteral(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -198,7 +190,7 @@ final class ResultTest extends TestCase
         $result->getIri('literal', $allowMissing);
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetIriInvalidBNode(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -241,7 +233,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getLiteral('missing'));
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetLiteralInvalidIri(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -254,7 +246,7 @@ final class ResultTest extends TestCase
         $result->getLiteral('iri', $allowMissing);
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetLiteralInvalidBNode(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -297,7 +289,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getBlankNode('missing'));
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetBlankNodeInvalidIri(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -310,7 +302,7 @@ final class ResultTest extends TestCase
         $result->getBlankNode('iri', $allowMissing);
     }
 
-    #[DataProvider('allowMissingProvider')]
+    #[TestWith([true, false])]
     public function testGetBlankNodeInvalidLiteral(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');

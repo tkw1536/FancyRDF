@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Streaming;
+namespace FancyRDF\Http;
 
 use CurlHandle;
-use Exception;
 use Fiber;
 use LogicException;
+use RuntimeException;
 use Throwable;
 
 use function count;
@@ -28,7 +28,7 @@ use const CURLOPT_WRITEFUNCTION;
 use const E_USER_WARNING;
 
 /**
- * A class that allows reading html response data by yielding it.
+ * A class that allows reading the body of a HTTP response from a CurlHandle using php's stream interface.
  */
 final class CurlStream
 {
@@ -44,15 +44,40 @@ final class CurlStream
      *
      * @return void
      *
-     * @throws Exception If the curl handle returns an error.
+     * @throws RuntimeException If the curl handle returns an error.
      */
     public function __construct(private readonly CurlHandle $handle)
     {
+        // The key idea is to have a generator which "yields" individual chunks of data received in the response handle.
+        // This can then be feed to the IteratorStream class to create the actual stream.
+        //
+        // Streaming data from curl is achieved using CURLOPT_WRITEFUNCTION [1].
+        // As this is a callback, and we cannot directly "yield" from it, and make use of a Fiber [2].
+        // The fiber suspends with each chunk's value as a string.
+        // We need to additionally handle storing the response code and headers.
+        // Headers are processed using the CURLOPT_HEADERFUNCTION [3] callback.
+        //
+        // In a regular curl request, these callbacks happen in order:
+        //
+        // curl_exec() -> CURLOPT_HEADERFUNCTION -> CURLOPT_WRITEFUNCTION
+        //
+        // Note that it is perfectly legitimate for curl to never call either callback,
+        // in particular if the response contains no headers, or if no body data (HTTP 204) is present.
+        //
+        // We introduce an additional fiber suspension the first time CURLOPT_WRITEFUNCTION is called.
+        // This is intended to indicate to the caller that headers have now been fully processed and are safe for user access.
+        // If this never gets called, then the fiber terminates immediately after the call to curl_exec().
+        // We keep track of this with an additional boolean.
+        //
+        //
+        // [1]: https://www.php.net/manual/en/curl.constants.php#constant.curlopt-writefunction
+        // [2]: https://www.php.net/manual/en/language.fibers.php
+        // [3]: https://www.php.net/manual/en/curl.constants.php#constant.curlopt-headerfunction
+
         $headers       = [];
         $didFirstChunk = false;
 
         $this->curl = new Fiber(function () use (&$headers, &$didFirstChunk): void {
-            // setup a callback to record headers and status code
             curl_setopt(
                 $this->handle,
                 CURLOPT_HEADERFUNCTION,
@@ -88,13 +113,24 @@ final class CurlStream
         });
 
         $this->curl->start();
+
+        // Fiber has returned, either because CURLOPT_WRITEFUNCTION was called, or because curl_exec() returned an error.
+        // Determine if there was an error.
         if (! $didFirstChunk) {
             $error = curl_error($this->handle);
             if ($error !== '') {
-                throw new Exception($error);
+                throw new RuntimeException('Curl request failed: ' . $error);
             }
         }
 
+        // It is now safe to access meta data from the response, as all header data has been processed at this point.
+        $this->statusCode = curl_getinfo($this->handle, CURLINFO_RESPONSE_CODE);
+
+        $length              = (int) curl_getinfo($this->handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+        $this->contentLength = $length > 0 ? $length : null;
+
+        // Process and group the headers into a proper map.
+        // We need to split "key: value" pairs and group them together.
         $headersMap = [];
         foreach ($headers as $header) {
             $parts = explode(':', $header, 2);
@@ -113,11 +149,6 @@ final class CurlStream
         }
 
         $this->headers = $headersMap;
-
-        $this->statusCode = curl_getinfo($this->handle, CURLINFO_RESPONSE_CODE);
-
-        $length              = (int) curl_getinfo($this->handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
-        $this->contentLength = $length > 0 ? $length : null;
     }
 
     private readonly int $statusCode;

@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\FancyRDF\Uri;
 use FancyRDF\Uri\UriReference;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 
 final class UriReferenceTest extends TestCase
@@ -277,6 +278,7 @@ final class UriReferenceTest extends TestCase
                 true,  // valid RFC 3987 IRI
             ],
 
+            // === Custom Examples ===
             // Invalid: space not allowed in URI or IRI
             'http://example.com/foo bar' => [
                 new UriReference('http', 'example.com', '/foo bar', null, null),
@@ -624,6 +626,93 @@ final class UriReferenceTest extends TestCase
         return $examples;
     }
 
+    /**
+     * Case normalization per RFC 3986 §6.2.2.1.
+     */
+    #[TestDox('Normalize case: $input => $expected')]
+    #[TestWith(['HTTP://example.com/', 'http://example.com/'])]
+    #[TestWith(['http://Example.COM/path', 'http://example.com/path'])]
+    #[TestWith(['HTTPS://WWW.IETF.ORG/rfc/rfc2396.txt', 'https://www.ietf.org/rfc/rfc2396.txt'])]
+    #[TestWith(['http://example.com/%3apath', 'http://example.com/%3Apath'])]
+    #[TestWith(['http://user@Host.EXAMPLE.com:80/', 'http://user@host.example.com:80/'])]
+    #[TestWith(['http://[2001:DB8::7]/c=GB', 'http://[2001:db8::7]/c=GB'])]
+    #[TestWith(['http://example.com/#%7b', 'http://example.com/#%7B'])]
+    public function testNormalizeCase(string $input, string $expected): void
+    {
+        $ref        = UriReference::parse($input);
+        $normalized = $ref->normalize(case: true, percentEncoding: false, pathSegment: false);
+        self::assertSame($expected, $normalized->toString());
+    }
+
+    /**
+     * Percent-encoding normalization per RFC 3986 §6.2.2.2.
+     */
+    #[TestDox('Normalize percent-encoding: $input => $expected')]
+    #[TestWith(['http://example.com/%61bc', 'http://example.com/abc'])]
+    #[TestWith(['http://example.com/foo%7Ebar', 'http://example.com/foo~bar'])]
+    #[TestWith(['http://example.com/foo%2Ebar', 'http://example.com/foo.bar'])]
+    #[TestWith(['http://example.com/%2d%5f%2d', 'http://example.com/-_-'])]
+    #[TestWith(['http://example.com/%31%32%33', 'http://example.com/123'])]
+    #[TestWith(['http://example.com/%2Fpath', 'http://example.com/%2Fpath'])]
+    #[TestWith(['http://example.com?%71=value', 'http://example.com?q=value'])]
+    #[TestWith(['http://example.com#%73ection', 'http://example.com#section'])]
+    public function testNormalizePercentEncoding(string $input, string $expected): void
+    {
+        $ref        = UriReference::parse($input);
+        $normalized = $ref->normalize(case: false, percentEncoding: true, pathSegment: false);
+        self::assertSame($expected, $normalized->toString());
+    }
+
+    /**
+     * Path segment normalization per RFC 3986 §6.2.2.3.
+     */
+    #[TestDox('Normalize path segment: $input => $expected')]
+    #[TestWith(['http://a/b/c/./../../g', 'http://a/g'])]
+    #[TestWith(['http://a/./b/../b/c', 'http://a/b/c'])]
+    #[TestWith(['http://example.com/./path', 'http://example.com/path'])]
+    #[TestWith(['http://example.com/../path', 'http://example.com/path'])]
+    #[TestWith(['http://example.com/.', 'http://example.com/'])]
+    #[TestWith(['http://example.com/./', 'http://example.com/'])]
+    #[TestWith(['http://a/./g', 'http://a/g'])]
+    #[TestWith(['http://a/../g', 'http://a/g'])]
+    #[TestWith(['g/./h', 'g/h'])]
+    public function testNormalizePathSegment(string $input, string $expected): void
+    {
+        $ref        = UriReference::parse($input);
+        $normalized = $ref->normalize(case: false, percentEncoding: false, pathSegment: true);
+        self::assertSame($expected, $normalized->toString());
+    }
+
+    /**
+     * fromString() parses into scheme, authority, path, query, fragment per RFC 3986 §3.
+     */
+    #[DataProvider('rfc3986SpecParseProvider')]
+    #[TestDox('Parse parses components for $uri')]
+    public function testParseParsesComponents(string $uri, UriReference $expected): void
+    {
+        $parsed = UriReference::parse($uri);
+        self::assertSame($expected->scheme, $parsed->scheme, 'correct scheme');
+        self::assertSame($expected->authority, $parsed->authority, 'correct authority');
+        self::assertSame($expected->path, $parsed->path, 'correct path');
+        self::assertSame($expected->query, $parsed->query, 'correct query');
+        self::assertSame($expected->fragment, $parsed->fragment, 'correct fragment');
+    }
+
+    #[DataProvider('rfc3986SpecParseProvider')]
+    #[TestDox('To string for $uri')]
+    public function testToString(string $uri, UriReference $expected): void
+    {
+        self::assertSame($uri, $expected->toString());
+    }
+
+    #[DataProvider('rfc3986SpecParseProvider')]
+    #[TestDox('Parse round trip for $uri')]
+    public function testParseRoundTrip(string $uri, UriReference $expected): void
+    {
+        $parsed = UriReference::parse($uri);
+        self::assertSame($uri, $parsed->toString());
+    }
+
     /** @return array<string, array{string, string, string}> */
     public static function customUrlResolveProvider(): array
     {
@@ -674,204 +763,6 @@ final class UriReferenceTest extends TestCase
                 'http://example.org/dir/relfile',
             ],
         ];
-    }
-
-    /**
-     * Data provider for case normalization (RFC 3986 §6.2.2.1): input URI => expected output.
-     * Only case normalization is applied (scheme/host lowercase, percent-encoding hex uppercase).
-     *
-     * @return array<string, array{string, string}>
-     */
-    public static function normalizeCaseProvider(): array
-    {
-        return [
-            'scheme lowercased' => [
-                'HTTP://example.com/',
-                'http://example.com/',
-            ],
-            'host lowercased' => [
-                'http://Example.COM/path',
-                'http://example.com/path',
-            ],
-            'scheme and host lowercased' => [
-                'HTTPS://WWW.IETF.ORG/rfc/rfc2396.txt',
-                'https://www.ietf.org/rfc/rfc2396.txt',
-            ],
-            'percent-encoding hex uppercased' => [
-                'http://example.com/%3apath',
-                'http://example.com/%3Apath',
-            ],
-            'authority host lowercased with userinfo' => [
-                'http://user@Host.EXAMPLE.com:80/',
-                'http://user@host.example.com:80/',
-            ],
-            'IPv6 host lowercased' => [
-                'http://[2001:DB8::7]/c=GB',
-                'http://[2001:db8::7]/c=GB',
-            ],
-            'fragment percent-encoding hex uppercased' => [
-                'http://example.com/#%7b',
-                'http://example.com/#%7B',
-            ],
-        ];
-    }
-
-    /**
-     * Data provider for percent-encoding normalization (RFC 3986 §6.2.2.2): input URI => expected output.
-     * Only percent-encoding normalization is applied (decode unreserved characters).
-     *
-     * @return array<string, array{string, string}>
-     */
-    public static function normalizePercentEncodingProvider(): array
-    {
-        return [
-            'decode percent-encoded letter' => [
-                'http://example.com/%61bc',
-                'http://example.com/abc',
-            ],
-            'decode percent-encoded tilde' => [
-                'http://example.com/foo%7Ebar',
-                'http://example.com/foo~bar',
-            ],
-            'decode percent-encoded period in path' => [
-                'http://example.com/foo%2Ebar',
-                'http://example.com/foo.bar',
-            ],
-            'decode percent-encoded hyphen and underscore' => [
-                'http://example.com/%2d%5f%2d',
-                'http://example.com/-_-',
-            ],
-            'decode percent-encoded digit' => [
-                'http://example.com/%31%32%33',
-                'http://example.com/123',
-            ],
-            'reserved character not decoded' => [
-                'http://example.com/%2Fpath',
-                'http://example.com/%2Fpath',
-            ],
-            'decode in query' => [
-                'http://example.com?%71=value',
-                'http://example.com?q=value',
-            ],
-            'decode in fragment' => [
-                'http://example.com#%73ection',
-                'http://example.com#section',
-            ],
-        ];
-    }
-
-    /**
-     * Data provider for path segment normalization (RFC 3986 §6.2.2.3): input URI => expected output.
-     * Only path segment normalization is applied (remove_dot_segments).
-     *
-     * @return array<string, array{string, string}>
-     */
-    public static function normalizePathSegmentProvider(): array
-    {
-        return [
-            'remove . segment' => [
-                'http://a/b/c/./../../g',
-                'http://a/g',
-            ],
-            'remove . and .. segments' => [
-                'http://a/./b/../b/c',
-                'http://a/b/c',
-            ],
-            'leading ./ in path' => [
-                'http://example.com/./path',
-                'http://example.com/path',
-            ],
-            'leading ../ in path' => [
-                'http://example.com/../path',
-                'http://example.com/path',
-            ],
-            'single . segment' => [
-                'http://example.com/.',
-                'http://example.com/',
-            ],
-            'trailing /.' => [
-                'http://example.com/./',
-                'http://example.com/',
-            ],
-            'path /./g' => [
-                'http://a/./g',
-                'http://a/g',
-            ],
-            'path /../g' => [
-                'http://a/../g',
-                'http://a/g',
-            ],
-            'relative path with dot segments' => [
-                'g/./h',
-                'g/h',
-            ],
-        ];
-    }
-
-    /**
-     * Case normalization per RFC 3986 §6.2.2.1.
-     */
-    #[DataProvider('normalizeCaseProvider')]
-    #[TestDox('Normalize case: $input => $expected')]
-    public function testNormalizeCase(string $input, string $expected): void
-    {
-        $ref        = UriReference::parse($input);
-        $normalized = $ref->normalize(case: true, percentEncoding: false, pathSegment: false);
-        self::assertSame($expected, $normalized->toString());
-    }
-
-    /**
-     * Percent-encoding normalization per RFC 3986 §6.2.2.2.
-     */
-    #[DataProvider('normalizePercentEncodingProvider')]
-    #[TestDox('Normalize percent-encoding: $input => $expected')]
-    public function testNormalizePercentEncoding(string $input, string $expected): void
-    {
-        $ref        = UriReference::parse($input);
-        $normalized = $ref->normalize(case: false, percentEncoding: true, pathSegment: false);
-        self::assertSame($expected, $normalized->toString());
-    }
-
-    /**
-     * Path segment normalization per RFC 3986 §6.2.2.3.
-     */
-    #[DataProvider('normalizePathSegmentProvider')]
-    #[TestDox('Normalize path segment: $input => $expected')]
-    public function testNormalizePathSegment(string $input, string $expected): void
-    {
-        $ref        = UriReference::parse($input);
-        $normalized = $ref->normalize(case: false, percentEncoding: false, pathSegment: true);
-        self::assertSame($expected, $normalized->toString());
-    }
-
-    /**
-     * fromString() parses into scheme, authority, path, query, fragment per RFC 3986 §3.
-     */
-    #[DataProvider('rfc3986SpecParseProvider')]
-    #[TestDox('Parse parses components for $uri')]
-    public function testParseParsesComponents(string $uri, UriReference $expected): void
-    {
-        $parsed = UriReference::parse($uri);
-        self::assertSame($expected->scheme, $parsed->scheme, 'correct scheme');
-        self::assertSame($expected->authority, $parsed->authority, 'correct authority');
-        self::assertSame($expected->path, $parsed->path, 'correct path');
-        self::assertSame($expected->query, $parsed->query, 'correct query');
-        self::assertSame($expected->fragment, $parsed->fragment, 'correct fragment');
-    }
-
-    #[DataProvider('rfc3986SpecParseProvider')]
-    #[TestDox('To string for $uri')]
-    public function testToString(string $uri, UriReference $expected): void
-    {
-        self::assertSame($uri, $expected->toString());
-    }
-
-    #[DataProvider('rfc3986SpecParseProvider')]
-    #[TestDox('Parse round trip for $uri')]
-    public function testParseRoundTrip(string $uri, UriReference $expected): void
-    {
-        $parsed = UriReference::parse($uri);
-        self::assertSame($uri, $parsed->toString());
     }
 
     #[DataProvider('customUrlResolveProvider')]

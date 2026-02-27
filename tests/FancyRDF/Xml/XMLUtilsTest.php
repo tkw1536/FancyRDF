@@ -7,39 +7,38 @@ namespace FancyRDF\Tests\FancyRDF\Xml;
 use DOMDocument;
 use FancyRDF\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class XMLUtilsTest extends TestCase
 {
-    /** @return array<string, array{string, string|null}> */
-    public static function parseAndGetRootNodeProvider(): array
+    #[TestWith(['<root/>' . "\n"])]
+    #[TestWith(['<foo>bar</foo>' . "\n"])]
+    #[TestWith(['<ns:item xmlns:ns="http://example.com/ns"/>' . "\n"])]
+    public function testParseAndGetRootNode(string $source): void
     {
-        return [
-            'root only' => [XMLUtils::XML_DECLARATION . '<root/>' . "\n", null],
-            'tag with content' => [XMLUtils::XML_DECLARATION . '<foo>bar</foo>' . "\n", null],
-            'prefixed element' => [XMLUtils::XML_DECLARATION . '<ns:item xmlns:ns="http://example.com/ns"/>' . "\n", null],
-            'invalid XML' => ['<unclosed>', 'Failed to parse XML'],
-        ];
-    }
+        $source = XMLUtils::XML_DECLARATION . $source;
+        $root   = XMLUtils::parseAndGetRootNode($source);
 
-    #[DataProvider('parseAndGetRootNodeProvider')]
-    public function testParseAndGetRootNode(string $source, string|null $expectedExceptionMessage): void
-    {
-        if ($expectedExceptionMessage !== null) {
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage($expectedExceptionMessage);
-            @XMLUtils::parseAndGetRootNode($source);
-
-            return;
-        }
-
-        $root = XMLUtils::parseAndGetRootNode($source);
-        $doc  = $root->ownerDocument;
+        $doc = $root->ownerDocument;
         self::assertNotNull($doc);
+
         $restringified = $doc->saveXML();
         self::assertNotFalse($restringified);
         self::assertSame($source, $restringified);
+    }
+
+    #[TestWith(['<unclosed>', 'Failed to parse XML'])]
+    #[TestWith(['<invalid:namespace>', 'Failed to parse XML'])]
+    public function testParseAndGetRootNodeFailure(string $source, string $expectedMessage): void
+    {
+        $source = XMLUtils::XML_DECLARATION . $source;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        @XMLUtils::parseAndGetRootNode($source);
     }
 
     public function testFormatXMLWithSingleDocumentMultipleNodes(): void

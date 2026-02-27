@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Tests\FancyRDF\Streaming;
+namespace FancyRDF\Tests\FancyRDF\Http;
 
-use FancyRDF\Streaming\IteratorStream;
+use FancyRDF\Http\IteratorStream;
 use Fiber;
 use Generator;
 use PHPUnit\Framework\Attributes\TestDox;

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Tests\FancyRDF\Streaming;
+namespace FancyRDF\Tests\FancyRDF\Http;
 
-use FancyRDF\Streaming\CurlStream;
+use FancyRDF\Http\CurlStream;
 use FancyRDF\Tests\Support\TestServer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;

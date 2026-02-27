@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Streaming;
+namespace FancyRDF\Http;
 
 use Generator;
 

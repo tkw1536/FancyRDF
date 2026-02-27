@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Streaming;
+namespace FancyRDF\Http;
 
 use Fiber;
 use Generator;
@@ -25,6 +25,8 @@ use const E_USER_WARNING;
 
 /**
  * A class that allows using a generator as a stream.
+ *
+ * @internal
  */
 final class IteratorStream
 {
