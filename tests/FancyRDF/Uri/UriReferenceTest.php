@@ -688,7 +688,7 @@ final class UriReferenceTest extends TestCase
      */
     #[DataProvider('rfc3986SpecParseProvider')]
     #[TestDox('Parse parses components for $uri')]
-    public function testParseParsesComponents(string $uri, UriReference $expected): void
+    public function testParseParsesComponents(string $uri, UriReference $expected, bool $expectedIsRFC3986, bool $expectedIsRFC3987, bool $expectedIsRelativeReference, bool $expectedIsAbsoluteURI, bool $expectedIsSuffixReference): void
     {
         $parsed = UriReference::parse($uri);
         self::assertSame($expected->scheme, $parsed->scheme, 'correct scheme');
@@ -700,14 +700,14 @@ final class UriReferenceTest extends TestCase
 
     #[DataProvider('rfc3986SpecParseProvider')]
     #[TestDox('To string for $uri')]
-    public function testToString(string $uri, UriReference $expected): void
+    public function testToString(string $uri, UriReference $expected, bool $expectedIsRFC3986, bool $expectedIsRFC3987, bool $expectedIsRelativeReference, bool $expectedIsAbsoluteURI, bool $expectedIsSuffixReference): void
     {
         self::assertSame($uri, $expected->toString());
     }
 
     #[DataProvider('rfc3986SpecParseProvider')]
     #[TestDox('Parse round trip for $uri')]
-    public function testParseRoundTrip(string $uri, UriReference $expected): void
+    public function testParseRoundTrip(string $uri, UriReference $expected, bool $expectedIsRFC3986, bool $expectedIsRFC3987, bool $expectedIsRelativeReference, bool $expectedIsAbsoluteURI, bool $expectedIsSuffixReference): void
     {
         $parsed = UriReference::parse($uri);
         self::assertSame($uri, $parsed->toString());

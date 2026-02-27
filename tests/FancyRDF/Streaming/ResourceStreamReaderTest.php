@@ -43,7 +43,15 @@ final class ResourceStreamReaderTest extends TestCase
         return $stream;
     }
 
-    #[TestWith([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])]
+    #[TestWith([1])]
+    #[TestWith([2])]
+    #[TestWith([3])]
+    #[TestWith([4])]
+    #[TestWith([5])]
+    #[TestWith([6])]
+    #[TestWith([7])]
+    #[TestWith([8])]
+    #[TestWith([9])]
     #[TestDox('peek, peekPrefix and consume behave correctly over a memory stream with chunk size $size')]
     public function testPeekPeekPrefixAndConsume(int $size): void
     {

@@ -134,7 +134,8 @@ final class ResultTest extends TestCase
         self::assertNull($result->getResource('missing'));
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetResourceInvalidLiteral(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -177,7 +178,8 @@ final class ResultTest extends TestCase
         self::assertNull($result->getIri('missing'));
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetIriInvalidLiteral(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -190,7 +192,8 @@ final class ResultTest extends TestCase
         $result->getIri('literal', $allowMissing);
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetIriInvalidBNode(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -233,7 +236,8 @@ final class ResultTest extends TestCase
         self::assertNull($result->getLiteral('missing'));
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetLiteralInvalidIri(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -246,7 +250,8 @@ final class ResultTest extends TestCase
         $result->getLiteral('iri', $allowMissing);
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetLiteralInvalidBNode(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -289,7 +294,8 @@ final class ResultTest extends TestCase
         self::assertNull($result->getBlankNode('missing'));
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetBlankNodeInvalidIri(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -302,7 +308,8 @@ final class ResultTest extends TestCase
         $result->getBlankNode('iri', $allowMissing);
     }
 
-    #[TestWith([true, false])]
+    #[TestWith([true])]
+    #[TestWith([false])]
     public function testGetBlankNodeInvalidLiteral(bool $allowMissing): void
     {
         $iri       = new Iri('https://example.com/s');
