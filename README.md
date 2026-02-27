@@ -25,6 +25,7 @@ This library provides data structures for the following:
 - ✅ [RDF 1.1 Datasets](https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple)s in [Dataset](src/Dataset/Dataset.php) class
     - consist only of a set of triples
     - can be checked for equivalence, taking into account blank nodes
+    - support for [RDF Dataset Canonicalization](https://www.w3.org/TR/rdf-canon/) passing the [RDFC-1.0 Test Suite](https://w3c.github.io/rdf-canon/tests)
 - ✅ [RFC 3986 URI References](https://www.rfc-editor.org/rfc/rfc3986) and [RFC 3987 IRI References](https://www.rfc-editor.org/rfc/rfc3987) in [UriReference](src/Uri/UriReference.php) class
     - can parse from / serialize to a string
     - can resolve a reference against a base URI
@@ -60,7 +61,7 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all negative tests do not produce errors in production mode.
 
 ## TODO List
-- clean up TrigParser and TrigReader
+- cleanup the test suite for RDFC
 - add missing Serializers
 - consider moving from assertions to an explicit "strict" flag
 

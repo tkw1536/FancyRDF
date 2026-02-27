@@ -19,6 +19,8 @@ use function fclose;
 use function is_resource;
 use function iterator_to_array;
 
+use const DIRECTORY_SEPARATOR;
+
 /**
  * Implements the RDF/XML W3C test suite.
  *
@@ -26,10 +28,14 @@ use function iterator_to_array;
  */
 final class RDFXMLTest extends TestBase
 {
+    /** @return array{string, string} */
     #[Override]
-    protected static function getTestSuiteName(): string
+    protected static function getSuiteNameAndBaseUri(): array
     {
-        return 'rdf-xml';
+        return [
+            'rdf11' . DIRECTORY_SEPARATOR . 'rdf-xml',
+            'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-xml/',
+        ];
     }
 
     #[TestDox('manifest loaded correct case counts')]

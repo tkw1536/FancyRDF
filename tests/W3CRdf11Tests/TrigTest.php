@@ -20,6 +20,8 @@ use function fclose;
 use function is_resource;
 use function iterator_to_array;
 
+use const DIRECTORY_SEPARATOR;
+
 /**
  * Implements the Trig W3C test suite.
  *
@@ -27,10 +29,14 @@ use function iterator_to_array;
  */
 final class TrigTest extends TestBase
 {
+    /** @return array{string, string} */
     #[Override]
-    protected static function getTestSuiteName(): string
+    protected static function getSuiteNameAndBaseUri(): array
     {
-        return 'rdf-trig';
+        return [
+            'rdf11' . DIRECTORY_SEPARATOR . 'rdf-trig',
+            'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-trig/',
+        ];
     }
 
     #[TestDox('manifest loaded correct case counts')]

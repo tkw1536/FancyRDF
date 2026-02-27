@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 
 use function dirname;
 use function fclose;
+use function file_get_contents;
 use function fopen;
 use function implode;
 use function is_resource;
@@ -44,12 +45,23 @@ abstract class TestBase extends TestCase
     /** @var array<string, Rdf11TestCases> */
     private static array $casesBySuite = [];
 
-    abstract protected static function getTestSuiteName(): string;
+    /**
+     * @return array{string, string}
+     *   The local path (e.g. "rdf11/rdf-turtle") and URI (e.g. "https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-turtle/").
+     */
+    abstract protected static function getSuiteNameAndBaseUri(): array;
+
+    protected static function getManifestUri(): string
+    {
+        $testSuiteBaseUri = static::getSuiteNameAndBaseUri()[1];
+
+        return $testSuiteBaseUri . 'manifest.ttl';
+    }
 
     #[BeforeClass()]
     public static function ensureManifestLoaded(): void
     {
-        $testSuiteName = static::getTestSuiteName();
+        [$testSuiteName] = static::getSuiteNameAndBaseUri();
 
         if (isset(self::$casesBySuite[$testSuiteName])) {
             return;
@@ -61,19 +73,18 @@ abstract class TestBase extends TestCase
                 [
                     dirname(__FILE__),
                     'testdata',
-                    'rdf11',
                     $testSuiteName,
                     'manifest.ttl',
                 ],
             ),
-            'https://w3c.github.io/rdf-tests/rdf/rdf11/' . $testSuiteName . '/manifest.ttl',
+            static::getManifestUri(),
         );
     }
 
     private static function casesInstance(): Rdf11TestCases
     {
         self::ensureManifestLoaded();
-        $testSuiteName = static::getTestSuiteName();
+        $testSuiteName = static::getSuiteNameAndBaseUri()[0];
 
         return self::$casesBySuite[$testSuiteName];
     }
@@ -81,14 +92,16 @@ abstract class TestBase extends TestCase
     /**
      * Yields test cases for the given type.
      *
-     * @param non-empty-string $typ
+     * @param non-empty-string       $typ
      *   The IRI of the type of the test cases to load.
+     * @param list<non-empty-string> $extraProps
+     *   Extra properties to add to the entry.
      *
-     * @return Generator<int, array{iri: string, name: string, comment: string|null, action: string, result: string|null}, mixed, void>
+     * @return Generator<int, array{iri: string, name: string, comment: string|null, action: string, result: string|null, extra: array<non-empty-string, string|null>}, mixed, void>
      */
-    protected static function cases(string $typ): Generator
+    protected static function cases(string $typ, array $extraProps = []): Generator
     {
-        yield from self::casesInstance()->loadEntries(new Iri($typ));
+        yield from self::casesInstance()->loadEntries(new Iri($typ), $extraProps);
     }
 
     /**
@@ -105,6 +118,20 @@ abstract class TestBase extends TestCase
         self::assertNotFalse($source, 'failed to open file for iri: ' . $filePath);
 
         return $source;
+    }
+
+    /**
+     * Reads a file for the given iri and asserts that it can be read correctly.
+     */
+    protected static function assertRead(string $iri): string
+    {
+        $filePath = self::casesInstance()->resolve($iri);
+        self::assertNotNull($filePath, 'file for iri not found: ' . $iri);
+
+        $contents = file_get_contents($filePath);
+        self::assertNotFalse($contents, 'failed to read file for iri: ' . $filePath);
+
+        return $contents;
     }
 
     /**

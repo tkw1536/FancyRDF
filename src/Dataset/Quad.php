@@ -27,6 +27,38 @@ final class Quad
     }
 
     /**
+     * Applies a renaming to a quad.
+     *
+     * @param TripleOrQuadArray                            $quad
+     * @param callable(non-empty-string): non-empty-string $mapper
+     *
+     * @return TripleOrQuadArray
+     */
+    public static function rename(array $quad, callable $mapper): array
+    {
+        return [
+            self::renameTerm($quad[0], $mapper),
+            $quad[1],
+            self::renameTerm($quad[2], $mapper),
+            $quad[3] === null ? null : self::renameTerm($quad[3], $mapper),
+        ];
+    }
+
+    /**
+     * @param callable(non-empty-string): non-empty-string $mapper
+     *
+     * @return ($term is Iri ? Iri : ($term is Literal ? Literal : BlankNode))
+     */
+    private static function renameTerm(Iri|Literal|BlankNode $term, callable $mapper): Iri|Literal|BlankNode
+    {
+        return match (true) {
+            $term instanceof Iri => $term,
+            $term instanceof Literal => $term,
+            $term instanceof BlankNode => new BlankNode($mapper($term->identifier)),
+        };
+    }
+
+    /**
      * Returns the size of a quad or triple.
      *
      * @param TripleOrQuadArray $quad

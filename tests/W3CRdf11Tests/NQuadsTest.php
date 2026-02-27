@@ -17,6 +17,8 @@ use function fclose;
 use function is_resource;
 use function iterator_to_array;
 
+use const DIRECTORY_SEPARATOR;
+
 /**
  * Implements the N-Quads W3C test suite.
  *
@@ -24,10 +26,14 @@ use function iterator_to_array;
  */
 final class NQuadsTest extends TestBase
 {
+    /** @return array{string, string} */
     #[Override]
-    protected static function getTestSuiteName(): string
+    protected static function getSuiteNameAndBaseUri(): array
     {
-        return 'rdf-n-quads';
+        return [
+            'rdf11' . DIRECTORY_SEPARATOR . 'rdf-n-quads',
+            'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-n-quads/',
+        ];
     }
 
     #[TestDox('manifest loaded correct case counts')]

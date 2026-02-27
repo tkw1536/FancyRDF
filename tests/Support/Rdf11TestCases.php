@@ -112,12 +112,14 @@ class Rdf11TestCases
     /**
      * Loads a list of entries from the manifest.
      *
-     * @param Iri $typ
+     * @param Iri                    $typ
      *   The IRI of the type of entries to load.
+     * @param list<non-empty-string> $extraProps
+     *   Extra properties to add to the entry.
      *
-     * @return Generator<int, array{iri: string, name: string, comment: string|null, action: string, result: string|null}, mixed, void>
+     * @return Generator<int, array{iri: string, name: string, comment: string|null, action: string, result: string|null, extra: array<non-empty-string, string|null>}, mixed, void>
      */
-    public function loadEntries(Iri $typ): Generator
+    public function loadEntries(Iri $typ, array $extraProps): Generator
     {
         foreach ($this->getAllEntries() as $entry) {
             $type = $this->getType($entry);
@@ -125,7 +127,7 @@ class Rdf11TestCases
                 continue;
             }
 
-            $info = $this->getEntry($entry);
+            $info = $this->getEntry($entry, $extraProps);
             if ($info === null) {
                 continue;
             }
@@ -166,9 +168,13 @@ class Rdf11TestCases
     /**
      * Gets an entry from the manifest.
      *
-     * @return array{iri: string, name: string, comment: string|null, action: string, result: string|null}|null
+     * @param list<non-empty-string> $extraProps
+     *   Extra properties to add to the entry.
+     *   They are expected to have string literal values.
+     *
+     * @return array{iri: string, name: string, comment: string|null, action: string, result: string|null, extra: array<non-empty-string, string|null>}|null
      */
-    public function getEntry(Iri $iri): array|null
+    public function getEntry(Iri $iri, array $extraProps): array|null
     {
         $name    = $this->getFirstProperty($iri, new Iri(self::TEST_MANIFEST_NAME_IRI));
         $comment = $this->getFirstProperty($iri, new Iri(self::RDFS_COMMENT_IRI));
@@ -184,12 +190,23 @@ class Rdf11TestCases
             return null;
         }
 
+        $extra = [];
+        foreach ($extraProps as $key) {
+            $value = $this->getFirstProperty($iri, new Iri($key));
+            if ($value === null) {
+                continue;
+            }
+
+            $extra[$key] = $value instanceof Literal ? $value->lexical : null;
+        }
+
         return [
             'iri' => $iri->iri,
             'name' => $nameStr,
             'comment' => $commentStr,
             'action' => $actionStr,
             'result' => $resultStr,
+            'extra' => $extra,
         ];
     }
 

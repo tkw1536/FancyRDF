@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Dataset;
 
+use Generator;
 use IteratorAggregate;
 use Override;
 use Traversable;
@@ -52,6 +53,34 @@ final class Dataset implements IteratorAggregate
     }
 
     /**
+     * Yields unique quads found within this dataset.
+     * They may be returned in any order.
+     *
+     * @see Quad::equals()
+     *
+     * @param bool $literal
+     *   If true, compare only using literal term equality.
+     *
+     * @return Generator<TripleOrQuadArray>
+     */
+    public function unique(bool $literal = true): Generator
+    {
+        $all = $this->quads;
+        usort($all, [Quad::class, 'compare']);
+
+        $prev = null;
+        foreach ($all as $quad) {
+            if ($prev !== null && Quad::equals($prev, $quad, $literal)) {
+                continue;
+            }
+
+            yield $quad;
+
+            $prev = $quad;
+        }
+    }
+
+    /**
      * Splits the quads into grounded and non-grounded quads.
      *
      * @return array<list<TripleOrQuadArray>, list<TripleOrQuadArray>>
@@ -59,26 +88,10 @@ final class Dataset implements IteratorAggregate
      */
     private function splitQuads(bool $literal): array
     {
-        $all = $this->quads;
-        usort($all, [Quad::class, 'compare']);
-
-        $unique = [];
-        $prev   = null;
-        foreach ($all as $quad) {
-            if ($prev !== null && Quad::equals($prev, $quad, $literal)) {
-                continue;
-            }
-
-            $unique[] = $quad;
-            $prev     = $quad;
-        }
-
-        $all = $unique;
-
         $grounded    = [];
         $nonGrounded = [];
 
-        foreach ($all as $quad) {
+        foreach ($this->unique($literal) as $quad) {
             if (Quad::isGrounded($quad)) {
                 $grounded[] = $quad;
             } else {

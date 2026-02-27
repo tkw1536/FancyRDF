@@ -21,6 +21,8 @@ use function fclose;
 use function is_resource;
 use function iterator_to_array;
 
+use const DIRECTORY_SEPARATOR;
+
 /**
  * Implements the Turtle W3C test suite.
  *
@@ -28,10 +30,14 @@ use function iterator_to_array;
  */
 final class TurtleTest extends TestBase
 {
+    /** @return array{string, string} */
     #[Override]
-    protected static function getTestSuiteName(): string
+    protected static function getSuiteNameAndBaseUri(): array
     {
-        return 'rdf-turtle';
+        return [
+            'rdf11' . DIRECTORY_SEPARATOR . 'rdf-turtle',
+            'https://w3c.github.io/rdf-tests/rdf/rdf11/rdf-turtle/',
+        ];
     }
 
     #[TestDox('manifest loaded correct case counts')]

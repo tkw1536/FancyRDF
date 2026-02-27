@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats;
 
+use FancyRDF\Dataset\Quad;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Datatype\XSDString;
 use FancyRDF\Term\Iri;
@@ -35,6 +36,8 @@ use const PREG_SPLIT_NO_EMPTY;
  * @see https://www.w3.org/TR/n-triples/
  * @see https://www.w3.org/TR/n-quads/
  * @see https://www.w3.org/TR/rdf11-testcases/
+ *
+ * @phpstan-import-type TripleOrQuadArray from Quad
  */
 final class NFormatSerializer
 {
@@ -62,6 +65,21 @@ final class NFormatSerializer
         $out .= ' .';
 
         return $out;
+    }
+
+    /**
+     * Serializes a quad to an N-Quads string.
+     *
+     * @param TripleOrQuadArray $quad
+     *   The quad to serialize.
+     *
+     * @return string
+     *   The serialized quad.
+     */
+    public static function serializeQuad(array $quad): string
+    {
+        // TODO: Update this to be the only entry point.
+        return self::serialize($quad[0], $quad[1], $quad[2], $quad[3]);
     }
 
     public static function serializeTerm(Iri|Literal|BlankNode $term): string
