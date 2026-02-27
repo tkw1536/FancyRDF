@@ -7,7 +7,7 @@ https://github.com/w3c/rdf-canon/tree/main/tests
 Several files that were not needed have been removed, but the test suites were otherwise not modified.
 
 The original sources are available under multiple licenses.
-Here we pick the BSD license:
+For redistribution here we pick the BSD-style-license:
 
 ```
 Copyright © 2004-2023 World Wide Web Consortium. W3C® liability, trademark and permissive document license rules apply.

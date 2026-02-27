@@ -127,6 +127,5 @@ The compliance falls into several categories, which map to PHPUnit groups.
 
 There is no license for the library and testing code, as the code is still in development.
 
-One exception to this is the RDF 1.1 testdata.
-It contains official testdata from the W3C RDF 1.1 Working Group, and is licensed separately. 
+One exception to this is some of the testdata, which is licensed separately.
 See [the appropriate README](tests/W3CRdf11Tests/testdata/README.md) for more information.
