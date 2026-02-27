@@ -44,19 +44,19 @@ jobs:
         run: composer install --prefer-dist
 
       - name: composer-dependency-analyser
-        run: make composer-dependency-analyser
+        run: composer -v dev-composer-dependency-analyser
 
       - name: parallel-lint
-        run: make parallel-lint
+        run: composer -v dev-parallel-lint
 
       - name: phpcs
-        run: make phpcs
+        run: composer -v dev-phpcs
 
       - name: phpstan
-        run: make phpstan
+        run: composer -v dev-phpstan
 
       - name: PHPUnit (with assertions)
-        run: make phpunit-assertions
+        run: composer -v dev-phpunit-assertions
 
       - name: PHPUnit (without assertions)
-        run: make phpunit-noassertions
+        run: composer -v dev-phpunit-noassertions

@@ -81,7 +81,7 @@ To run the tests and develop the module further dependencies and extensions may 
 See [composer.json](composer.json) for details.
 
 The composer dependencies are verified with [composer-dependency-analyser](https://github.com/shipmonk-rnd/composer-dependency-analyser).
-The `make composer-dependency-analyser` target runs this automatically.
+The `composer -v dev-composer-dependency-analyser` target runs this automatically.
 
 ## Coding Standard & Typing
 
@@ -90,15 +90,15 @@ This is enforced using [phpcs](https://github.com/squizlabs/PHP_CodeSniffer).
 
 The code should also pass [phpstan](https://phpstan.org) on strictest settings.
 
-The Makefile target `make lint` runs both phpcs and phpstan (and other checks).
-The Makefile target `make fmt` runs the autoformatter.
+The composer script `composer -v dev-lint` runs both phpcs and phpstan (and other checks).
+The composer target `composer -v dev-fmt` runs the autoformatter.
 
 ## Spell checking
 
 Spell checking is done with [cspell](https://cspell.org/).
 Configuration is in [cspell.json](cspell.json) (custom words and ignore patterns).
 
-The Makefile target `make cspell` runs the spell checker.
+The composer script `composer -v dev-cspell` runs the spell checker.
 This requires `cspell` to be installed and available on your `PATH`.
 
 ## Testing

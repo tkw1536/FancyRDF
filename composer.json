@@ -9,6 +9,50 @@
             "homepage": "https://tkw01536.de/"
         }
     ],
+    "scripts": {
+        "dev": [
+            "@dev-cspell",
+            "@dev-lint",
+            "@dev-test"
+        ],
+        "dev-lint": [
+            "@dev-composer-dependency-analyser",
+            "@dev-parallel-lint",
+            "@dev-phpcs",
+            "@dev-phpstan"
+        ],
+        "dev-parallel-lint": [
+            "vendor/bin/parallel-lint src tests"
+        ],
+        "dev-phpcs": [
+            "vendor/bin/phpcs"
+        ],
+        "dev-phpstan": [
+            "vendor/bin/phpstan analyse --memory-limit=1G -v"
+        ],
+        "dev-composer-dependency-analyser": [
+            "vendor/bin/composer-dependency-analyser --verbose"
+        ],
+        "dev-fmt": [
+            "@dev-phpcbf"
+        ],
+        "dev-phpcbf": [
+            "vendor/bin/phpcbf"
+        ],
+        "dev-test": [
+            "@dev-phpunit-assertions",
+            "@dev-phpunit-noassertions"
+        ],
+        "dev-phpunit-assertions": [
+            "php -dzend.assertions=1 vendor/bin/phpunit --display-deprecations --display-warnings"
+        ],
+        "dev-phpunit-noassertions": [
+            "php -dzend.assertions=0 vendor/bin/phpunit --display-deprecations --display-warnings"
+        ],
+        "dev-cspell": [
+            "cspell ."
+        ]
+    },
     "require": {
         "php": ">=8.4",
         "ext-curl": "*",
