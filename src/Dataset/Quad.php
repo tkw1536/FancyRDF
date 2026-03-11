@@ -30,7 +30,9 @@ final class Quad
      * Applies a renaming to a quad.
      *
      * @param TripleOrQuadArray                            $quad
+     *   The quad to apply the renaming to.
      * @param callable(non-empty-string): non-empty-string $mapper
+     *   A renaming of blank node identifiers.
      *
      * @return TripleOrQuadArray
      */
@@ -45,17 +47,25 @@ final class Quad
     }
 
     /**
+     * Renames a single term according to the given mapper.
+     *
      * @param callable(non-empty-string): non-empty-string $mapper
+     *   A renaming of blank node identifiers.
      *
      * @return ($term is Iri ? Iri : ($term is Literal ? Literal : BlankNode))
      */
-    private static function renameTerm(Iri|Literal|BlankNode $term, callable $mapper): Iri|Literal|BlankNode
+    public static function renameTerm(Iri|Literal|BlankNode $term, callable $mapper): Iri|Literal|BlankNode
     {
-        return match (true) {
-            $term instanceof Iri => $term,
-            $term instanceof Literal => $term,
-            $term instanceof BlankNode => new BlankNode($mapper($term->identifier)),
-        };
+        if (! $term instanceof BlankNode) {
+            return $term;
+        }
+
+        $identifier = $mapper($term->identifier);
+        if ($identifier === $term->identifier) {
+            return $term;
+        }
+
+        return new BlankNode($identifier);
     }
 
     /**

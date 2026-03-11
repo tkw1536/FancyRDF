@@ -67,7 +67,7 @@ final class NFormatTest extends TestCase
         Iri|BlankNode|null $graph,
         string $expected,
     ): void {
-        self::assertSame($expected, NFormatSerializer::serialize($subject, $predicate, $object, $graph));
+        self::assertSame($expected, NFormatSerializer::serialize([$subject, $predicate, $object, $graph], false));
     }
 
     #[DataProvider('statementProvider')]

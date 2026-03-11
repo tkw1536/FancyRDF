@@ -90,9 +90,9 @@ final class NFormatSerializerTest extends TestCase
                 new Literal("a\rb"),
                 '"a\\rb"',
             ],
-            'literal with single quote' => [
+            'literal with single quote (canonical: no escape)' => [
                 new Literal("it's"),
-                "\"it\\'s\"",
+                '"it\'s"',
             ],
             'literal with form feed' => [
                 new Literal("a\fb"),
@@ -107,14 +107,24 @@ final class NFormatSerializerTest extends TestCase
                 '"\\\\\\"\\n\\t"',
             ],
 
-            // Unicode: 4-digit \u (BMP) and 8-digit \U (astral)
-            'literal with BMP character' => [
+            // Canonical: native Unicode for valid chars (no \u/\U for BMP/astral)
+            'literal with BMP character (canonical: native)' => [
                 new Literal('café'),
-                '"caf\u00E9"',
+                '"café"',
             ],
-            'literal with astral character' => [
+            'literal with astral character (canonical: native)' => [
                 new Literal('😀'),
-                '"\\U0001F600"',
+                '"😀"',
+            ],
+
+            // RDF Canon Appendix A: chars that MUST be UCHAR (control / non-XML11)
+            'literal with NUL (canonical UCHAR)' => [
+                new Literal("a\x00b"),
+                '"a\u0000b"',
+            ],
+            'literal with vertical tab (canonical UCHAR)' => [
+                new Literal("a\x0Bb"),
+                '"a\u000Bb"',
             ],
         ];
     }

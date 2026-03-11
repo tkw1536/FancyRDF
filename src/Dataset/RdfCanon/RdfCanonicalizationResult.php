@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Dataset\RdfCanon;
 
 use FancyRDF\Dataset\Dataset;
+use FancyRDF\Formats\NFormatSerializer;
 
 use function implode;
 use function usort;
@@ -34,7 +35,7 @@ final class RdfCanonicalizationResult
     {
         $lines = [];
         foreach ($this->dataset as $quad) {
-            $lines[] = CanonicalNQuadsSerializer::serialize($quad, null, true);
+            $lines[] = NFormatSerializer::serialize($quad);
         }
 
         usort($lines, 'strcmp');

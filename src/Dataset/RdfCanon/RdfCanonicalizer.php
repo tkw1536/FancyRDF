@@ -6,6 +6,7 @@ namespace FancyRDF\Dataset\RdfCanon;
 
 use FancyRDF\Dataset\Dataset;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\NFormatSerializer;
 use FancyRDF\Term\BlankNode;
 use RuntimeException;
 
@@ -194,7 +195,7 @@ final class RdfCanonicalizer
         };
 
         foreach ($quads as $quad) {
-            $nquads[] = CanonicalNQuadsSerializer::serialize($quad, $mapper, true);
+            $nquads[] = NFormatSerializer::serialize(Quad::rename($quad, $mapper));
         }
 
         usort($nquads, 'strcmp');
@@ -220,7 +221,7 @@ final class RdfCanonicalizer
 
         $input = $position;
         if ($position !== 'g') {
-            $input .= CanonicalNQuadsSerializer::serializeTerm($quad[1]);
+            $input .= NFormatSerializer::serializeTerm($quad[1]);
         }
 
         $canonical = $this->canonicalIssuer->get($related);

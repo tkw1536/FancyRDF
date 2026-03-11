@@ -22,7 +22,7 @@ use function strlen;
 use const PREG_SPLIT_NO_EMPTY;
 
 /**
- * Serializes a triple or quad into an N-Triples or N-Quads file.
+ * Serializes a triple or quad into canonical N-Triples or N-Quads format.
  *
  * The implementation guarantees that it serializes valid Sparql 1.1 triples and quads. If the underlying
  * Literal and Resources only contain valid data, it is guaranteed that the serialized string is also
@@ -36,6 +36,8 @@ use const PREG_SPLIT_NO_EMPTY;
  * @see https://www.w3.org/TR/n-triples/
  * @see https://www.w3.org/TR/n-quads/
  * @see https://www.w3.org/TR/rdf11-testcases/
+ * @see https://www.w3.org/TR/rdf-canon/#canonical-quads
+ * @see https://www.w3.org/TR/n-triples/#canonical-ntriples
  *
  * @phpstan-import-type TripleOrQuadArray from Quad
  */
@@ -46,9 +48,28 @@ final class NFormatSerializer
     {
     }
 
-    /** @throws RuntimeException */
-    public static function serialize(Iri|BlankNode $subject, Iri $predicate, Iri|Literal|BlankNode $object, Iri|BlankNode|null $graph = null): string
+    /**
+     * Serializes a triple or quad to a canonical N-Triples or N-Quads string.
+     *
+     * @see https://www.w3.org/TR/n-triples/#canonical-ntriples
+     * @see https://www.w3.org/TR/rdf-canon/#canonical-quads
+     *
+     * @param TripleOrQuadArray $quad
+     *   The quad (or triple) to serialize.
+     * @param bool              $finalEOL
+     *   Per the canonical N-Quads specification, the final EOL MUST be provided.
+     *   Sometimes this is not desirable, e.g. when a later implode("\n") is used.
+     *   This parameter can be set to FALSE to skip the final EOL.
+     *
+     * @return string
+     *   The serialized quad.
+     *
+     * @throws RuntimeException
+     */
+    public static function serialize(array $quad, bool $finalEOL = true): string
     {
+        [$subject, $predicate, $object, $graph] = $quad;
+
         $out = self::serializeTerm($subject);
 
         $out .= ' ';
@@ -64,22 +85,11 @@ final class NFormatSerializer
 
         $out .= ' .';
 
-        return $out;
-    }
+        if ($finalEOL) {
+            $out .= "\n";
+        }
 
-    /**
-     * Serializes a quad to an N-Quads string.
-     *
-     * @param TripleOrQuadArray $quad
-     *   The quad to serialize.
-     *
-     * @return string
-     *   The serialized quad.
-     */
-    public static function serializeQuad(array $quad): string
-    {
-        // TODO: Update this to be the only entry point.
-        return self::serialize($quad[0], $quad[1], $quad[2], $quad[3]);
+        return $out;
     }
 
     public static function serializeTerm(Iri|Literal|BlankNode $term): string
@@ -103,6 +113,10 @@ final class NFormatSerializer
 
     /**
      * Serializes a Literal as STRING_LITERAL_QUOTE with optional @lang or ^^IRI.
+     *
+     * Per the canonical N-Quads specification:
+     *
+     *   - Literals with the datatype http://www.w3.org/2001/XMLSchema#string MUST NOT use the datatype IRI part of the literal, and are represented using only STRING_LITERAL_QUOTE.
      */
     private static function serializeLiteral(Literal $term): string
     {
@@ -119,13 +133,13 @@ final class NFormatSerializer
     /**
      * Escapes a string for use inside IRIREF (between < and >).
      *
-     * N-Triples IRIREF excludes #x00-#x20, <, >, ", {, }, |, ^, `, \.
-     * Those are encoded as \uXXXX or \UXXXXXXXX per the grammar.
+     * N-Quads IRIREF excludes #x00-#x20, <, >, ", {, }, |, ^, `, \.
+     * Those are encoded as \uXXXX or \UXXXXXXXX.
      */
-    private static function escapeIri(string $uri): string
+    private static function escapeIri(string $iri): string
     {
         $result = '';
-        $chars  = preg_split('//u', $uri, -1, PREG_SPLIT_NO_EMPTY);
+        $chars  = preg_split('//u', $iri, -1, PREG_SPLIT_NO_EMPTY);
         if ($chars === false) {
             throw new RuntimeException(sprintf(
                 'PCRE error in preg_split: %s (error code: %d)',
@@ -135,18 +149,20 @@ final class NFormatSerializer
         }
 
         foreach ($chars as $char) {
-            if (strlen($char) !== 1) {
-                $result .= $char;
-                continue;
-            }
-
-            $ord = ord($char);
+            $codePoint = strlen($char) === 1 ? ord($char) : mb_ord($char, 'UTF-8');
             if (
-                $ord <= 0x20 || $char === '<' || $char === '>' || $char === '"' ||
-                $char === '{' || $char === '}' || $char === '|' || $char === '^' ||
-                $char === '`' || $char === '\\'
+                $codePoint <= 0x20 ||
+                $char === '<' ||
+                $char === '>' ||
+                $char === '"' ||
+                $char === '{' ||
+                $char === '}' ||
+                $char === '|' ||
+                $char === '^' ||
+                $char === '`' ||
+                $char === '\\'
             ) {
-                $result .= self::uchar($ord);
+                $result .= self::uchar($codePoint);
             } else {
                 $result .= $char;
             }
@@ -155,11 +171,14 @@ final class NFormatSerializer
         return $result;
     }
 
-    /**
-     * Escapes a string for use inside STRING_LITERAL_QUOTE (between " and ").
-     *
-     * ECHAR for \ " ' \t \n \r \b \f; UCHAR for other control and non-ASCII.
-     */
+     /**
+      * Escapes a string for use inside STRING_LITERAL_QUOTE.
+      *
+      * Per the canonical N-Quads specification:
+      *   - Characters BS (backspace, code point U+0008), HT (horizontal tab, code point U+0009), LF (line feed, code point U+000A), FF (form feed, code point U+000C), CR (carriage return, code point U+000D), " (quotation mark, code point U+0022), and \ (backslash, code point U+005C) MUST be encoded using ECHAR.
+      *   - Characters in the range from U+0000 to U+0007, VT (vertical tab, code point U+000B), characters in the range from U+000E to U+001F, DEL (delete, code point U+007F), and characters not matching the Char production from [XML11] MUST be represented by UCHAR using a lowercase \u with 4 HEXes.
+      *   - All characters not required to be represented by ECHAR or UCHAR MUST be represented by their native [UNICODE] representation.
+      */
     private static function escapeLiteralString(string $value): string
     {
         $result = '';
@@ -173,59 +192,77 @@ final class NFormatSerializer
         }
 
         foreach ($chars as $char) {
-            if (strlen($char) !== 1) {
-                $ord     = mb_ord($char, 'UTF-8');
-                $result .= self::uchar($ord);
+            if ($char === '\\') {
+                $result .= '\\\\';
                 continue;
             }
 
-            switch ($char) {
-                case '\\':
-                    $result .= '\\\\';
-                    break;
-                case '"':
-                    $result .= '\\"';
-                    break;
-                case "\t":
-                    $result .= '\\t';
-                    break;
-                case "\n":
-                    $result .= '\\n';
-                    break;
-                case "\r":
-                    $result .= '\\r';
-                    break;
-                case "\x08":
-                    $result .= '\\b';
-                    break;
-                case "\f":
-                    $result .= '\\f';
-                    break;
-                case "'":
-                    $result .= "\\'";
-                    break;
-                default:
-                    $ord = ord($char);
-                    if ($ord < 0x20) {
-                        $result .= self::uchar($ord);
-                    } else {
-                        $result .= $char;
-                    }
+            if ($char === '"') {
+                $result .= '\\"';
+                continue;
             }
+
+            if ($char === "\t") {
+                $result .= '\\t';
+                continue;
+            }
+
+            if ($char === "\n") {
+                $result .= '\\n';
+                continue;
+            }
+
+            if ($char === "\r") {
+                $result .= '\\r';
+                continue;
+            }
+
+            if ($char === "\x08") {
+                $result .= '\\b';
+                continue;
+            }
+
+            if ($char === "\f") {
+                $result .= '\\f';
+                continue;
+            }
+
+            $codePoint = strlen($char) === 1 ? ord($char) : mb_ord($char, 'UTF-8');
+            if (
+                $codePoint <= 0x1F ||
+                $codePoint === 0x7F ||
+                ! self::isXml11Char($codePoint)
+            ) {
+                $result .= self::uchar($codePoint);
+                continue;
+            }
+
+            $result .= $char;
         }
 
         return $result;
     }
 
-    /**
-     * Formats a code point as N-Triples UCHAR (\uXXXX or \UXXXXXXXX).
-     */
-    private static function uchar(int $ord): string
+    private static function isXml11Char(int $codePoint): bool
     {
-        if ($ord <= 0xFFFF) {
-            return sprintf('\\u%04X', $ord);
+        return ($codePoint >= 0x1 && $codePoint <= 0xD7FF) ||
+            ($codePoint >= 0xE000 && $codePoint <= 0xFFFD) ||
+            ($codePoint >= 0x10000 && $codePoint <= 0x10FFFF);
+    }
+
+    /**
+     * Escapes a character for use inside STRING_LITERAL_QUOTE.
+     *
+     * Per the canonical N-Quads specification:
+     *
+     *  - HEX MUST use only digits ([0-9]) and uppercase letters ([A-F]).
+     */
+    private static function uchar(int $codePoint): string
+    {
+        if ($codePoint <= 0xFFFF) {
+            return sprintf('\\u%04X', $codePoint);
         }
 
-        return sprintf('\\U%08X', $ord);
+        return sprintf('\\U%08X', $codePoint);
     }
 }

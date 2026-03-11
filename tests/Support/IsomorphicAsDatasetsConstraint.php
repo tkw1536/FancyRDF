@@ -88,12 +88,12 @@ final class IsomorphicAsDatasetsConstraint extends Constraint
     private function renderTriples(array $quads): string
     {
         $ntriples = array_map(
-            static fn (array $triple): string => NFormatSerializer::serialize($triple[0], $triple[1], $triple[2], $triple[3]),
+            static fn (array $triple): string => NFormatSerializer::serialize($triple),
             $quads,
         );
 
         sort($ntriples);
 
-        return implode("\n", $ntriples);
+        return implode('', $ntriples);
     }
 }
