@@ -29,8 +29,9 @@ use Stringable;
  * @see \FancyRDF\Term\Iri
  * @see \FancyRDF\Term\BlankNode
  *
- * This class should not be used directly, instead only the subclasses should be used.
+ * @phpstan-sealed Literal|Iri|BlankNode
  *
+ * This class should not be used directly, instead only the subclasses should be used.
  * @phpstan-import-type IRIArray from Iri
  * @phpstan-import-type LiteralArray from Literal
  * @phpstan-import-type BlankNodeArray from BlankNode
