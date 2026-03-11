@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
-use FancyRDF\Formats\NFormatSerializer;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
@@ -33,6 +32,10 @@ final class NFormatSerializerTest extends TestCase
             'URI with query' => [
                 new Iri('https://example.com/search?q=hello'),
                 '<https://example.com/search?q=hello>',
+            ],
+            'IRI with character requiring escape' => [
+                new Iri('http://example.com/a>b'),
+                '<http://example.com/a\u003Eb>',
             ],
 
             // Blank nodes
@@ -132,6 +135,6 @@ final class NFormatSerializerTest extends TestCase
     #[DataProvider('serializeTermProvider')]
     public function testSerializeTerm(Iri|Literal|BlankNode $term, string $expected): void
     {
-        self::assertSame($expected, NFormatSerializer::serializeTerm($term));
+        self::assertSame($expected, $term->__toString());
     }
 }

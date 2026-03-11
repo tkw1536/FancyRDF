@@ -221,7 +221,7 @@ final class RdfCanonicalizer
 
         $input = $position;
         if ($position !== 'g') {
-            $input .= NFormatSerializer::serializeTerm($quad[1]);
+            $input .= $quad[1]->__toString();
         }
 
         $canonical = $this->canonicalIssuer->get($related);

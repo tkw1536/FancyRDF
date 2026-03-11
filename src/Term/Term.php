@@ -11,6 +11,7 @@ use FancyRDF\Xml\XMLSerializable;
 use InvalidArgumentException;
 use JsonSerializable;
 use Override;
+use Stringable;
 
 /**
  * Represents a RDF 1.1 Term.
@@ -34,7 +35,7 @@ use Override;
  * @phpstan-import-type LiteralArray from Literal
  * @phpstan-import-type BlankNodeArray from BlankNode
  */
-abstract class Term implements JsonSerializable, XMLSerializable
+abstract class Term implements JsonSerializable, XMLSerializable, Stringable
 {
     /**
      * Encodes this term as a JSON object.
@@ -156,4 +157,13 @@ abstract class Term implements JsonSerializable, XMLSerializable
      * Checks if this term is grounded, meaning if it is not a blank node.
      */
     abstract public function isGrounded(): bool;
+
+    /**
+     * Turns this term into it's canonical representation as a part of the Canonical N-Triples or N-Quads specification.
+     *
+     * @see https://www.w3.org/TR/n-triples/#canonical-ntriples
+     * @see https://www.w3.org/TR/rdf-canon/#canonical-quads
+     */
+    #[Override]
+    abstract public function __toString(): string;
 }

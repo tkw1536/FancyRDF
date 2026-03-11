@@ -16,7 +16,14 @@ use Override;
 
 use function assert;
 use function is_string;
+use function mb_ord;
+use function mb_str_split;
+use function mb_strlen;
+use function ord;
+use function preg_match;
+use function sprintf;
 use function strcmp;
+use function strlen;
 
 /**
  * Represents an RDF1.1 Literal.
@@ -241,5 +248,121 @@ final class Literal extends Term
         }
 
         return $element;
+    }
+
+    /**
+     * Serializes this Literal as STRING_LITERAL_QUOTE with optional @lang or ^^IRI.
+     *
+     * Per the canonical N-Quads specification:
+     */
+    #[Override]
+    public function __toString(): string
+    {
+        $out = '"' . self::escapeLiteralString($this->lexical) . '"';
+        if ($this->language !== null) {
+            $out .= '@' . $this->language;
+        } elseif ($this->datatype !== XSDString::IRI) {
+            // Per the canonical N-Quads specification:
+            // Literals with the datatype http://www.w3.org/2001/XMLSchema#string MUST NOT use the datatype IRI part of the literal, and are represented using only STRING_LITERAL_QUOTE.
+            $out .= '^^' . (new Iri($this->datatype))->__toString();
+        }
+
+        return $out;
+    }
+
+     /**
+      * Escapes a string for use inside STRING_LITERAL_QUOTE.
+      *
+      * Per the canonical N-Quads specification:
+      *   - Characters BS (backspace, code point U+0008), HT (horizontal tab, code point U+0009), LF (line feed, code point U+000A), FF (form feed, code point U+000C), CR (carriage return, code point U+000D), " (quotation mark, code point U+0022), and \ (backslash, code point U+005C) MUST be encoded using ECHAR.
+      *   - Characters in the range from U+0000 to U+0007, VT (vertical tab, code point U+000B), characters in the range from U+000E to U+001F, DEL (delete, code point U+007F), and characters not matching the Char production from [XML11] MUST be represented by UCHAR using a lowercase \u with 4 HEXes.
+      *   - All characters not required to be represented by ECHAR or UCHAR MUST be represented by their native [UNICODE] representation.
+      */
+    private static function escapeLiteralString(string $value): string
+    {
+        // Fast path: If we have only ascii characters and no special characters to escape
+        // We can return the string as-is and don't need to do any escaping.
+        if (
+            strlen($value) === mb_strlen($value, 'UTF-8') &&
+            ! preg_match('/[\x00-\x1F\x7F\\\\\x22]/', $value)
+        ) {
+            return $value;
+        }
+
+        $result = '';
+        $chars  = mb_str_split($value, 1, 'UTF-8');
+        foreach ($chars as $char) {
+            if ($char === '\\') {
+                $result .= '\\\\';
+                continue;
+            }
+
+            if ($char === '"') {
+                $result .= '\\"';
+                continue;
+            }
+
+            if ($char === "\t") {
+                $result .= '\\t';
+                continue;
+            }
+
+            if ($char === "\n") {
+                $result .= '\\n';
+                continue;
+            }
+
+            if ($char === "\r") {
+                $result .= '\\r';
+                continue;
+            }
+
+            if ($char === "\x08") {
+                $result .= '\\b';
+                continue;
+            }
+
+            if ($char === "\f") {
+                $result .= '\\f';
+                continue;
+            }
+
+            $codePoint = strlen($char) === 1 ? ord($char) : mb_ord($char, 'UTF-8');
+            if (
+                $codePoint <= 0x1F ||
+                $codePoint === 0x7F ||
+                ! self::isXml11Char($codePoint)
+            ) {
+                $result .= self::uchar($codePoint);
+                continue;
+            }
+
+            $result .= $char;
+        }
+
+        return $result;
+    }
+
+    private static function isXml11Char(int $codePoint): bool
+    {
+        return ($codePoint >= 0x1 && $codePoint <= 0xD7FF) ||
+            ($codePoint >= 0xE000 && $codePoint <= 0xFFFD) ||
+            ($codePoint >= 0x10000 && $codePoint <= 0x10FFFF);
+    }
+
+    /**
+     * Escapes a character for use inside STRING_LITERAL_QUOTE.
+     *
+     * Per the canonical N-Quads specification:
+     *
+     *  - HEX MUST use only digits ([0-9]) and uppercase letters ([A-F]).
+     */
+    private static function uchar(int $codePoint): string
+    {
+        if ($codePoint <= 0xFFFF) {
+            return sprintf('\\u%04X', $codePoint);
+        }
+
+        return sprintf('\\U%08X', $codePoint);
     }
 }

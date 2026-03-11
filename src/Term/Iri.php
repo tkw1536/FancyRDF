@@ -12,6 +12,10 @@ use InvalidArgumentException;
 use Override;
 
 use function is_string;
+use function mb_ord;
+use function mb_str_split;
+use function preg_match;
+use function sprintf;
 use function strcmp;
 
 /**
@@ -129,5 +133,55 @@ final class Iri extends Term
     public function xmlSerialize(DOMDocument $document): DOMNode
     {
         return XMLUtils::createElement($document, 'uri', $this->iri);
+    }
+
+    #[Override]
+    public function __toString(): string
+    {
+        // Fast path: If the IRI doesn't actually require any characters to be escaped
+        // then we can return it as is and don't have to split and re-encode it.
+        if (! preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $this->iri)) {
+            return '<' . $this->iri . '>';
+        }
+
+        $result = '';
+        $chars  = mb_str_split($this->iri, 1, 'UTF-8');
+        foreach ($chars as $char) {
+            $codePoint = mb_ord($char, 'UTF-8');
+            if (
+                $codePoint <= 0x20 ||
+                $char === '<' ||
+                $char === '>' ||
+                $char === '"' ||
+                $char === '{' ||
+                $char === '}' ||
+                $char === '|' ||
+                $char === '^' ||
+                $char === '`' ||
+                $char === '\\'
+            ) {
+                $result .= self::uchar($codePoint);
+            } else {
+                $result .= $char;
+            }
+        }
+
+        return '<' . $result . '>';
+    }
+
+    /**
+     * Escapes a character for use inside STRING_LITERAL_QUOTE.
+     *
+     * Per the canonical N-Quads specification:
+     *
+     *  - HEX MUST use only digits ([0-9]) and uppercase letters ([A-F]).
+     */
+    private static function uchar(int $codePoint): string
+    {
+        if ($codePoint <= 0xFFFF) {
+            return sprintf('\\u%04X', $codePoint);
+        }
+
+        return sprintf('\\U%08X', $codePoint);
     }
 }

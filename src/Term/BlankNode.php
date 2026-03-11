@@ -144,4 +144,10 @@ final class BlankNode extends Term
     {
         return XMLUtils::createElement($document, 'bnode', $this->identifier);
     }
+
+    #[Override]
+    public function __toString(): string
+    {
+        return '_:' . $this->identifier;
+    }
 }
