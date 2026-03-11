@@ -83,7 +83,7 @@ final class RDFXMLTest extends TestBase
         string $action,
         string $result,
     ): void {
-        $evaluation = $this->makeEvaluationConstraint($result);
+        $evaluation = self::makeEvaluationConstraint($result);
 
         $source = self::assertOpen($action);
 

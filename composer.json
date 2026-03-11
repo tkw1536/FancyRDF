@@ -72,7 +72,8 @@
         "ext-sockets": "*",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-phpunit": "^2.0",
-        "sirbrillig/phpcs-variable-analysis": "^2.13"
+        "sirbrillig/phpcs-variable-analysis": "^2.13",
+        "phpstan/phpstan-strict-rules": "^2.0"
     },
     "autoload": {
         "psr-4": {

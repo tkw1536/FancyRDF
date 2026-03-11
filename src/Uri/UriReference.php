@@ -921,7 +921,7 @@ final class UriReference
         // [1] https://www.rfc-editor.org/rfc/rfc3986#appendix-B
 
         // We use ~ as a delimiter for the regexp so we don't have to do more escaping!
-        if (! preg_match('~^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$~s', $uri, $matches, PREG_UNMATCHED_AS_NULL)) {
+        if (preg_match('~^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$~s', $uri, $matches, PREG_UNMATCHED_AS_NULL) !== 1) {
             return new self(null, null, $uri, null, null);
         }
 

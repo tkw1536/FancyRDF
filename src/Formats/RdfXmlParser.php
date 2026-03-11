@@ -500,7 +500,8 @@ class RdfXmlParser extends FiberIterator
 
                 $this->subject = $this->resolveSubject($about, $nodeId, $idAttr, true);
 
-                $descriptionLang = $this->reader->xmlLang ?: null;
+                $descriptionLang = $this->reader->xmlLang;
+                $descriptionLang = $descriptionLang !== '' ? $descriptionLang : null;
 
                 // Check for rdf:li used as an attribute on Description (only allowed as element)
                 assert($this->reader->getAttribute('rdf:li') === null, 'rdf:li cannot be used as an attribute');
@@ -584,7 +585,8 @@ class RdfXmlParser extends FiberIterator
                 $parseType    = $this->reader->getAttribute('rdf:parseType');
                 $idAttr       = $this->reader->getAttribute('rdf:ID');
                 $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
-                $propertyLang = $this->reader->xmlLang ?: null;
+                $propertyLang = $this->reader->xmlLang;
+                $propertyLang = $propertyLang !== '' ? $propertyLang : null;
 
                 // Error: rdf:nodeID and rdf:resource cannot be used together
                 assert($nodeIdAttr === null || $resourceAttr === null, 'rdf:nodeID and rdf:resource cannot be used together');
@@ -769,7 +771,8 @@ class RdfXmlParser extends FiberIterator
 
                 // Process attributes on typed node element as property-value pairs
                 // This handles attributes like rdf:_3, rdf:value on container elements
-                $typedNodeLang = $this->reader->xmlLang ?: null;
+                $typedNodeLang = $this->reader->xmlLang;
+                $typedNodeLang = $typedNodeLang !== '' ? $typedNodeLang : null;
                 if ($this->reader->hasAttributes) {
                     $this->reader->moveToFirstAttribute();
                     do {
@@ -827,7 +830,9 @@ class RdfXmlParser extends FiberIterator
             $parseType    = $this->reader->getAttribute('rdf:parseType');
             $idAttr       = $this->reader->getAttribute('rdf:ID');
             $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
-            $elementLang  = $this->reader->xmlLang ?: null;
+
+            $elementLang = $this->reader->xmlLang;
+            $elementLang = $elementLang !== '' ? $elementLang : null;
 
             // Handle rdf:ID on property element (reification)
             $reificationURI = null;

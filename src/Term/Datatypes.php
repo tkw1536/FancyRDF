@@ -36,7 +36,7 @@ final class Datatypes
 
     private static function registerAll(): void
     {
-        if (! empty(self::$dataClasses)) {
+        if (self::$dataClasses !== []) {
             return;
         }
 

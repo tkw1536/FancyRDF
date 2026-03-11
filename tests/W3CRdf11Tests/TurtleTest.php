@@ -104,7 +104,7 @@ final class TurtleTest extends TestBase
     #[DataProvider('turtlePositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
-    public static function testTurtlePositiveSyntax(
+    public function testTurtlePositiveSyntax(
         string $action,
     ): void {
         $source = self::assertOpen($action);
@@ -130,7 +130,7 @@ final class TurtleTest extends TestBase
         string $action,
         string $result,
     ): void {
-        $evaluation = $this->makeEvaluationConstraint($result);
+        $evaluation = self::makeEvaluationConstraint($result);
 
         $source = self::assertOpen($action);
 

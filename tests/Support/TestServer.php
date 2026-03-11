@@ -81,7 +81,7 @@ final class TestServer
         if (
             file_put_contents(
                 $this->scriptPath,
-                $this->makeScript($code, $headers, $body),
+                self::makeScript($code, $headers, $body),
             ) === false
         ) {
             unlink($this->scriptPath);

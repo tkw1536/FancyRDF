@@ -615,11 +615,11 @@ final class UriReferenceTest extends TestCase
         ];
 
         $examples = [];
-        foreach ($cases as $relative => $cases) {
+        foreach ($cases as $relative => $result) {
             $examples['RFC 3986 example ' . $relative] = [
                 'http://a/b/c/d;p?q',
                 $relative,
-                $cases,
+                $result,
             ];
         }
 

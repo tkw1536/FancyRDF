@@ -751,7 +751,7 @@ final class TrigReader
         }
 
         $offset     += strlen($ch);
-        $trailingDot = null;
+        $trailingDot = false;
 
         while (true) {
             $ch = $this->stream->peek($offset);

@@ -88,7 +88,7 @@ The `composer -v dev-composer-dependency-analyser` target runs this automaticall
 The code should be formatted using the [Doctrine Coding Standard](https://www.doctrine-project.org/projects/doctrine-coding-standard/en/14.0/reference/index.html#introduction) with the exception of line length.
 This is enforced using [phpcs](https://github.com/squizlabs/PHP_CodeSniffer).
 
-The code should also pass [phpstan](https://phpstan.org) on strictest settings.
+The code should also pass [phpstan](https://phpstan.org) on strictest settings, with [phpstan-strict-rules](https://github.com/phpstan/phpstan-strict-rules) enabled.
 
 The composer script `composer -v dev-lint` runs both phpcs and phpstan (and other checks).
 The composer target `composer -v dev-fmt` runs the autoformatter.

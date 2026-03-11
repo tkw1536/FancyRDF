@@ -286,7 +286,7 @@ final class Literal extends Term
         // We can return the string as-is and don't need to do any escaping.
         if (
             strlen($value) === mb_strlen($value, 'UTF-8') &&
-            ! preg_match('/[\x00-\x1F\x7F\\\\\x22]/', $value)
+            preg_match('/[\x00-\x1F\x7F\\\\\x22]/', $value) !== 1
         ) {
             return $value;
         }

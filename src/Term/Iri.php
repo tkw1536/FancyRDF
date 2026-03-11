@@ -140,7 +140,7 @@ final class Iri extends Term
     {
         // Fast path: If the IRI doesn't actually require any characters to be escaped
         // then we can return it as is and don't have to split and re-encode it.
-        if (! preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $this->iri)) {
+        if (preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $this->iri) !== 1) {
             return '<' . $this->iri . '>';
         }
 
