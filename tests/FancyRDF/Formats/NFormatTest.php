@@ -26,35 +26,35 @@ final class NFormatTest extends TestCase
                 new Iri('https://example.com/p'),
                 new Iri('https://example.com/o'),
                 null,
-                '<https://example.com/s> <https://example.com/p> <https://example.com/o> .',
+                '<https://example.com/s> <https://example.com/p> <https://example.com/o> .' . "\n",
             ],
             'triple with literal object' => [
                 new Iri('https://example.com/s'),
                 new Iri('https://example.com/p'),
                 new Literal('hello'),
                 null,
-                '<https://example.com/s> <https://example.com/p> "hello" .',
+                '<https://example.com/s> <https://example.com/p> "hello" .' . "\n",
             ],
             'quad with graph (URI)' => [
                 new Iri('https://example.com/s'),
                 new Iri('https://example.com/p'),
                 new Iri('https://example.com/o'),
                 new Iri('https://example.com/g'),
-                '<https://example.com/s> <https://example.com/p> <https://example.com/o> <https://example.com/g> .',
+                '<https://example.com/s> <https://example.com/p> <https://example.com/o> <https://example.com/g> .' . "\n",
             ],
             'quad with graph (blank node)' => [
                 new BlankNode('s'),
                 new Iri('https://example.com/p'),
                 new Literal('x'),
                 new BlankNode('g'),
-                '_:s <https://example.com/p> "x" _:g .',
+                '_:s <https://example.com/p> "x" _:g .' . "\n",
             ],
             'triple with blank subject' => [
                 new BlankNode('b0'),
                 new Iri('https://example.com/p'),
                 new Literal('lit'),
                 null,
-                '_:b0 <https://example.com/p> "lit" .',
+                '_:b0 <https://example.com/p> "lit" .' . "\n",
             ],
         ];
     }
@@ -67,7 +67,7 @@ final class NFormatTest extends TestCase
         Iri|BlankNode|null $graph,
         string $expected,
     ): void {
-        self::assertSame($expected, NFormatSerializer::serialize([$subject, $predicate, $object, $graph], false));
+        self::assertSame($expected, NFormatSerializer::serialize([$subject, $predicate, $object, $graph]));
     }
 
     #[DataProvider('statementProvider')]
