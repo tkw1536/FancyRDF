@@ -12,14 +12,10 @@ use FancyRDF\Term\Literal;
 use RuntimeException;
 
 use function mb_ord;
+use function mb_str_split;
 use function ord;
-use function preg_last_error;
-use function preg_last_error_msg;
-use function preg_split;
 use function sprintf;
 use function strlen;
-
-use const PREG_SPLIT_NO_EMPTY;
 
 /**
  * Serializes a triple or quad into canonical N-Triples or N-Quads format.
@@ -139,17 +135,9 @@ final class NFormatSerializer
     private static function escapeIri(string $iri): string
     {
         $result = '';
-        $chars  = preg_split('//u', $iri, -1, PREG_SPLIT_NO_EMPTY);
-        if ($chars === false) {
-            throw new RuntimeException(sprintf(
-                'PCRE error in preg_split: %s (error code: %d)',
-                preg_last_error_msg(),
-                preg_last_error(),
-            ));
-        }
-
+        $chars  = mb_str_split($iri, 1, 'UTF-8');
         foreach ($chars as $char) {
-            $codePoint = strlen($char) === 1 ? ord($char) : mb_ord($char, 'UTF-8');
+            $codePoint =  mb_ord($char, 'UTF-8');
             if (
                 $codePoint <= 0x20 ||
                 $char === '<' ||
@@ -182,15 +170,7 @@ final class NFormatSerializer
     private static function escapeLiteralString(string $value): string
     {
         $result = '';
-        $chars  = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
-        if ($chars === false) {
-            throw new RuntimeException(sprintf(
-                'PCRE error in preg_split: %s (error code: %d)',
-                preg_last_error_msg(),
-                preg_last_error(),
-            ));
-        }
-
+        $chars  = mb_str_split($value, 1, 'UTF-8');
         foreach ($chars as $char) {
             if ($char === '\\') {
                 $result .= '\\\\';
