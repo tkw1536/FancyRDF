@@ -38,16 +38,32 @@ final class RdfCanonicalizer
 {
     private readonly RdfCanonicalizationOptions $options;
 
-    private int $permutationsExplored = 0;
-    private int $startTimeNs          = 0;
+    private int $permutationsExplored;
+    private int $startTimeNs;
 
-    /** @var array<non-empty-string, list<TripleOrQuadArray>> */
-    private array $blankNodeToQuads = [];
+    /**
+     * Hash to blank nodes map, representing part of the canonicalization state.
+     *
+     * @see https://www.w3.org/TR/rdf-canon/#dfn-hash-to-blank-nodes-map
+     *
+     * @var array<non-empty-string, list<TripleOrQuadArray>>
+     * */
+    private array $blankNodeToQuads;
 
     /** @var array<non-empty-string, non-empty-string> */
-    private array $firstDegreeHashCache = [];
+    private array $firstDegreeHashCache;
 
     private IdentifierIssuer $canonicalIssuer;
+
+    private function reset(): void
+    {
+        $this->startTimeNs          = (int) hrtime(true);
+        $this->permutationsExplored = 0;
+
+        $this->blankNodeToQuads     = [];
+        $this->firstDegreeHashCache = [];
+        $this->canonicalIssuer      = new IdentifierIssuer('c14n');
+    }
 
     public function __construct(RdfCanonicalizationOptions|null $options = null)
     {
@@ -57,20 +73,15 @@ final class RdfCanonicalizer
             throw new RuntimeException('Unsupported hash algorithm: ' . $this->options->hashAlgorithm);
         }
 
-        $this->canonicalIssuer = new IdentifierIssuer('c14n');
+        $this->reset();
     }
 
-    public function canonicalize(Dataset $dataset): RdfCanonicalizationResult
+    public function canonicalize(Dataset $input): RdfCanonicalizationResult
     {
-        $this->startTimeNs          = (int) hrtime(true);
-        $this->permutationsExplored = 0;
-
-        $this->blankNodeToQuads     = [];
-        $this->firstDegreeHashCache = [];
-        $this->canonicalIssuer      = new IdentifierIssuer('c14n');
+        $this->reset();
 
         /** @var list<TripleOrQuadArray> $uniqueQuads */
-        $uniqueQuads = iterator_to_array($dataset->unique(true));
+        $uniqueQuads = iterator_to_array($input->unique(true));
 
         $this->buildBlankNodeToQuadsMap($uniqueQuads);
         $blankNodes = array_keys($this->blankNodeToQuads);
@@ -124,13 +135,13 @@ final class RdfCanonicalizer
 
             foreach ($hashPathList as $result) {
                 $issuer = $result['issuer'];
-                foreach ($issuer->getIssuedIdentifiers() as $existingIdentifier => $_issuedIdentifier) {
+                foreach ($issuer as $existingIdentifier => $_issuedIdentifier) {
                     $this->canonicalIssuer->issue($existingIdentifier);
                 }
             }
         }
 
-        $blankNodeMap = $this->canonicalIssuer->getIssuedIdentifiers();
+        $blankNodeMap = iterator_to_array($this->canonicalIssuer);
 
         // Rewrite dataset, replacing all blank nodes with their canonical identifiers.
         $rewritten = [];
@@ -311,7 +322,7 @@ final class RdfCanonicalizer
                     );
                 }
 
-                $issuerCopy    = $issuer->copy();
+                $issuerCopy    = clone $issuer;
                 $path          = '';
                 $recursionList = [];
 
