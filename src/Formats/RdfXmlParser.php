@@ -362,7 +362,7 @@ class RdfXmlParser extends FiberIterator
         $outerXml = $this->reader->readOuterXml();
 
         $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
-        $object       = new Literal($canonicalXml, null, self::RDF_NAMESPACE . 'XMLLiteral');
+        $object       = new Literal($canonicalXml, null, new Iri(self::RDF_NAMESPACE . 'XMLLiteral'));
 
         $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
 
@@ -710,7 +710,7 @@ class RdfXmlParser extends FiberIterator
                 }
 
                 $object = $datatypeAttr !== null
-                    ? new Literal($this->reader->value, null, $this->resolveURI($datatypeAttr))
+                    ? new Literal($this->reader->value, null, new Iri($this->resolveURI($datatypeAttr)))
                     : new Literal($this->reader->value, $propertyLang);
 
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
@@ -957,7 +957,7 @@ class RdfXmlParser extends FiberIterator
 
             assert($this->subject !== null, 'subject must be set');
             $object = $datatypeAttr !== null
-                ? new Literal($this->reader->value, null, $this->resolveURI($datatypeAttr))
+                ? new Literal($this->reader->value, null, new Iri($this->resolveURI($datatypeAttr)))
                 : new Literal($this->reader->value, $elementLang);
 
             $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);

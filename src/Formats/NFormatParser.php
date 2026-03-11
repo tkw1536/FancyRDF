@@ -194,7 +194,7 @@ final class NFormatParser
     {
         assert(self::$pos < self::$len && self::$line[self::$pos] === '<', 'expected "<" at position ' . self::$pos);
 
-        return new Iri(self::parseIriRef());
+        return self::parseIriRef();
     }
 
     /**
@@ -209,11 +209,8 @@ final class NFormatParser
 
     /**
      * Parses an IRI reference <...>, with \u and \U unescaping.
-     *
-     * @return non-empty-string
-     *   The IRI string.
      */
-    private static function parseIriRef(): string
+    private static function parseIriRef(): Iri
     {
         assert(self::$line[self::$pos] === '<', 'expected "<" at position ' . self::$pos);
         self::$pos++;
@@ -231,7 +228,7 @@ final class NFormatParser
                 $buf .= substr(self::$line, $start, $end - $start);
                 assert($buf !== '' && self::isValidRDFIri($buf), 'IRI reference must be a valid absolute IRI: ' . $buf);
 
-                return $buf;
+                return new Iri($buf);
             }
 
             // parse an escape sequence.
@@ -251,7 +248,7 @@ final class NFormatParser
 
         // GIGO: Return a random blank node.
         // This branch can only be triggered if assertions are disabled.
-        return '_:gigo';
+        return new Iri('invalid://');
     }
 
     private static function isValidRDFIri(string $iri): bool

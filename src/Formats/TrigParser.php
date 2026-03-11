@@ -504,7 +504,7 @@ final class TrigParser extends FiberIterator
             };
             $this->reader->next();
 
-            return new Literal($lexical, null, $datatype);
+            return new Literal($lexical, null, new Iri($datatype));
         }
 
         return new Literal($lexical);
@@ -523,7 +523,7 @@ final class TrigParser extends FiberIterator
 
         $this->reader->next();
 
-        return new Literal($value, null, $datatype);
+        return new Literal($value, null, new Iri($datatype));
     }
 
     private function parseBooleanLiteral(): Literal
@@ -534,7 +534,7 @@ final class TrigParser extends FiberIterator
         return new Literal(
             $value,
             null,
-            self::XSD_NAMESPACE . 'boolean',
+            new Iri(self::XSD_NAMESPACE . 'boolean'),
         );
     }
 }

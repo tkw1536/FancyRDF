@@ -55,7 +55,7 @@ final class Literal extends Term
     public function getDatatypeInstance(): Datatype
     {
         if ($this->datatypeInstance === null) {
-            $this->datatypeInstance = Datatypes::getDatatype($this->datatype, $this->lexical, $this->language);
+            $this->datatypeInstance = Datatypes::getDatatype($this->datatype->iri, $this->lexical, $this->language);
         }
 
         return $this->datatypeInstance;
@@ -66,9 +66,9 @@ final class Literal extends Term
      *
      * @see https://www.w3.org/TR/rdf11-concepts/#dfn-datatype-iri
      *
-     * @var non-empty-string
+     * @var Iri
      */
-    public readonly string $datatype;
+    public readonly Iri $datatype;
 
     /**
      * Constructs a new Literal.
@@ -80,7 +80,7 @@ final class Literal extends Term
      * @param string                $lexical
      *   The lexical form of the literal.
      *   The constructor makes no attempt to validate or parse the lexical form.
-     * @param non-empty-string|null $datatype
+     * @param Iri|null              $datatype
      *   A datatype IRI as per RFC3987 that determins how the lexical form maps to the literal value.
      *   If omitted, the datatype IRI defaults to be either {@see self::DATATYPE_STRING} or {@see self::DATATYPE_LANG_STRING}, depending on if the language tag is set or not.
      *   The constructor makes no attempt to validate the IRI, or matching lexical form to the iri.
@@ -89,11 +89,11 @@ final class Literal extends Term
      *   A valid non-empty BCP47 language tag, if and only if the datatype iri is {@see self::DATATYPE_LANG_STRING} or NULL.
      *   The constructor makes no attempt to validate the language tag, and passing an invalid language tag may lead to undefined behavior.
      */
-    public function __construct(public readonly string $lexical, public readonly string|null $language = null, string|null $datatype = null)
+    public function __construct(public readonly string $lexical, public readonly string|null $language = null, Iri|null $datatype = null)
     {
-        $this->datatype = $datatype ?? ($language === null ? XSDString::IRI : LangString::IRI);
+        $this->datatype = $datatype ?? ($language === null ? new Iri(XSDString::IRI) : new Iri(LangString::IRI));
 
-        if (($this->datatype === LangString::IRI) !== ($language !== null)) {
+        if (($this->datatype->iri === LangString::IRI) !== ($language !== null)) {
             // Per the RDF 1.1. Standard: "if and only if the datatype IRI is [self::DATATYPE_LANG_STRING]
             // a non-empty language tag as defined by [BCP47]."
             throw new InvalidArgumentException('Literal must have a language tag if and only if the datatype IRI is ' . LangString::IRI);
@@ -104,7 +104,7 @@ final class Literal extends Term
     public function equals(Iri|Literal|BlankNode $other, bool $literal = true): bool
     {
         // first check for exact equality of language and datatype
-        if (! $other instanceof Literal || $this->language !== $other->language || $this->datatype !== $other->datatype) {
+        if (! $other instanceof Literal || $this->language !== $other->language || ! $this->datatype->equals($other->datatype)) {
             return false;
         }
 
@@ -140,8 +140,8 @@ final class Literal extends Term
             return strcmp($ourLanguage, $theirLanguage);
         }
 
-        $ourDatatype   = $this->datatype;
-        $theirDatatype = $other->datatype;
+        $ourDatatype   = $this->datatype->iri;
+        $theirDatatype = $other->datatype->iri;
         if ($ourDatatype !== $theirDatatype) {
             return strcmp($ourDatatype, $theirDatatype);
         }
@@ -164,7 +164,7 @@ final class Literal extends Term
 
     private function getTypeForCompare(): int
     {
-        switch ($this->datatype) {
+        switch ($this->datatype->iri) {
             case XSDString::IRI:
                 return 0;
 
@@ -199,6 +199,8 @@ final class Literal extends Term
             throw new InvalidArgumentException('Datatype must be a non-empty string');
         }
 
+        $datatype = $datatype !== null ? new Iri($datatype) : null;
+
         return new Literal($value, $language, $datatype);
     }
 
@@ -215,7 +217,7 @@ final class Literal extends Term
         $language = $language !== '' ? $language : null;
 
         $datatype = $element->getAttribute('datatype');
-        $datatype = $datatype !== '' ? $datatype : null;
+        $datatype = $datatype !== '' ? new Iri($datatype) : null;
 
         return new Literal($element->textContent, $language, $datatype);
     }
@@ -225,11 +227,11 @@ final class Literal extends Term
     public function jsonSerialize(): array
     {
         $data = ['type' => 'literal', 'value' => $this->lexical];
-        if ($this->datatype === LangString::IRI) {
+        if ($this->datatype->iri === LangString::IRI) {
             assert($this->language !== null, 'Datatype indicates a language string');
             $data['language'] = $this->language;
-        } elseif ($this->datatype !== XSDString::IRI) {
-            $data['datatype'] = $this->datatype;
+        } elseif ($this->datatype->iri !== XSDString::IRI) {
+            $data['datatype'] = $this->datatype->iri;
         }
 
         return $data;
@@ -240,11 +242,11 @@ final class Literal extends Term
     {
         $element = XMLUtils::createElement($document, 'literal', $this->lexical);
 
-        if ($this->datatype === LangString::IRI) {
+        if ($this->datatype->iri === LangString::IRI) {
             assert($this->language !== null, 'Datatype indicates a language string');
             $element->setAttributeNS(XMLUtils::XML_NAMESPACE, 'xml:lang', $this->language);
-        } elseif ($this->datatype !== XSDString::IRI) {
-            $element->setAttribute('datatype', $this->datatype);
+        } elseif ($this->datatype->iri !== XSDString::IRI) {
+            $element->setAttribute('datatype', $this->datatype->iri);
         }
 
         return $element;
@@ -261,10 +263,10 @@ final class Literal extends Term
         $out = '"' . self::escapeLiteralString($this->lexical) . '"';
         if ($this->language !== null) {
             $out .= '@' . $this->language;
-        } elseif ($this->datatype !== XSDString::IRI) {
+        } elseif ($this->datatype->iri !== XSDString::IRI) {
             // Per the canonical N-Quads specification:
             // Literals with the datatype http://www.w3.org/2001/XMLSchema#string MUST NOT use the datatype IRI part of the literal, and are represented using only STRING_LITERAL_QUOTE.
-            $out .= '^^' . (new Iri($this->datatype))->__toString();
+            $out .= '^^' . $this->datatype->__toString();
         }
 
         return $out;

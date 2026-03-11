@@ -56,7 +56,7 @@ final class TermTest extends TestCase
                 '<literal xml:lang="en">hello</literal>',
             ],
             'literal with datatype' => [
-                new Literal('42', null, 'http://www.w3.org/2001/XMLSchema#integer'),
+                new Literal('42', null, new Iri('http://www.w3.org/2001/XMLSchema#integer')),
                 [
                     'type' => 'literal',
                     'value' => '42',
@@ -125,10 +125,10 @@ final class TermTest extends TestCase
             new Literal('hello', 'en'),
 
             // Typed literals
-            new Literal('abc', null, 'https://example.com/datatype_a'),
-            new Literal('hello', null, 'https://example.com/datatype_a'),
-            new Literal('abc', null, 'https://example.com/datatype_b'),
-            new Literal('hello', null, 'https://example.com/datatype_b'),
+            new Literal('abc', null, new Iri('https://example.com/datatype_a')),
+            new Literal('hello', null, new Iri('https://example.com/datatype_a')),
+            new Literal('abc', null, new Iri('https://example.com/datatype_b')),
+            new Literal('hello', null, new Iri('https://example.com/datatype_b')),
 
             // Blank nodes
             new BlankNode('b1'),

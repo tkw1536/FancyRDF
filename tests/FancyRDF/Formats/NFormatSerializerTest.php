@@ -54,11 +54,11 @@ final class NFormatSerializerTest extends TestCase
                 '"hello"',
             ],
             'literal with datatype' => [
-                new Literal('42', null, 'http://www.w3.org/2001/XMLSchema#integer'),
+                new Literal('42', null, new Iri('http://www.w3.org/2001/XMLSchema#integer')),
                 '"42"^^<http://www.w3.org/2001/XMLSchema#integer>',
             ],
             'literal with datatype containing special chars' => [
-                new Literal('x', null, 'http://example.com/a>b'),
+                new Literal('x', null, new Iri('http://example.com/a>b')),
                 '"x"^^<http://example.com/a\u003Eb>',
             ],
 

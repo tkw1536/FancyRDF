@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\FancyRDF\Term;
 use DOMDocument;
 use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Datatype\XSDString;
+use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
@@ -76,14 +77,14 @@ final class LiteralTest extends TestCase
             $this->expectException(InvalidArgumentException::class);
         }
 
-        $literal = new Literal($value, $language, $datatype);
+        $literal = new Literal($value, $language, $datatype !== null ? new Iri($datatype) : null);
         if (! $expectValid) {
             return;
         }
 
         self::assertSame($value, $literal->lexical);
         self::assertSame($language, $literal->language);
-        self::assertSame($expectDatatype, $literal->datatype);
+        self::assertSame($expectDatatype, $literal->datatype->iri);
     }
 
     /** @param LiteralArray $expectedJson */
