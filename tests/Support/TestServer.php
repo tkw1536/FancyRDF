@@ -188,7 +188,7 @@ PHP;
     {
         // This function waits for the server to start up and be ready to accept connections.
         // To do this we first set a deadline, and then repeatedly try to connect to the server.
-        // If the server fails to start up within this deadline, we kill it and throw an exeception.
+        // If the server fails to start up within this deadline, we kill it and throw an exception.
         // We use a do { } while loop to ensure that we check at least once,
         // even if for some reason the deadline already exceeded.
         //
