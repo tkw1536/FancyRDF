@@ -181,17 +181,26 @@ PHP;
         $this->stop();
     }
 
-    private const int WAIT_UNTIL_READY_TIMEOUT_NS = 60_000_000; // 60s
-    private const int SLEEP_INTERVAL_NS           = 500_000; // .5s
+    private const int WAIT_UNTIL_READY_TIMEOUT_NS = 60_000_000_000; // 60s
+    private const int SLEEP_INTERVAL_NS           = 100_000_000; // .1s
 
     private function wait(): void
     {
+        // This function waits for the server to start up and be ready to accept connections.
+        // To do this we first set a deadline, and then repeatedly try to connect to the server.
+        // If the server fails to start up within this deadline, we kill it and throw an exeception.
+        // We use a do { } while loop to ensure that we check at least once,
+        // even if for some reason the deadline already exceeded.
+        //
+        // Also if we timeout, we make sure to stop the server.
+        // Even if an exception is thrown.
+
         $success = false;
 
         try {
             $deadline = hrtime(true) + self::WAIT_UNTIL_READY_TIMEOUT_NS;
 
-            while (hrtime(true) < $deadline) {
+            do {
                 if ($this->process === null) {
                     throw new RuntimeException('PHP server process not started.');
                 }
@@ -220,7 +229,7 @@ PHP;
                 }
 
                 time_nanosleep(0, self::SLEEP_INTERVAL_NS);
-            }
+            } while (hrtime(true) < $deadline);
 
             throw new RuntimeException('Timed out waiting for PHP server to start on ' . $this->getBaseUrl() . '.');
         } finally {
