@@ -6,6 +6,8 @@ analyser
 autoload
 BFFFD
 bnode
+Canonicalization
+canonicalized
 canonicalizer
 canonicalizes
 Castable
