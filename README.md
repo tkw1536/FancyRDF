@@ -61,7 +61,6 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all negative tests do not produce errors in production mode.
 
 ## TODO List
-- cleanup the test suite for RDFC
 - add missing Serializers
 - consider moving from assertions to an explicit "strict" flag
 
