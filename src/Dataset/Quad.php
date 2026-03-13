@@ -81,6 +81,18 @@ final class Quad
     }
 
     /**
+     * Checks if the given quad is a triple.
+     *
+     * @param TripleOrQuadArray $quad
+     *
+     * @phpstan-assert-if-true TripleArray $quad
+     */
+    public static function isTriple(array $quad): bool
+    {
+        return $quad[3] === null;
+    }
+
+    /**
      * Checks if the given quad is grounded.
      *
      * @param TripleOrQuadArray $quad

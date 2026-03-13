@@ -75,6 +75,7 @@ A production installation of this library requires [PHP 8.4+](https://www.php.ne
 - [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
 - [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
 - [ext-xmlreader](https://www.php.net/manual/en/book.xmlreader.php)
+- [ext-xmlwriter](https://www.php.net/manual/en/book.xmlwriter.php)
 
 To run the tests and develop the module further dependencies and extensions may be required.
 See [composer.json](composer.json) for details.
