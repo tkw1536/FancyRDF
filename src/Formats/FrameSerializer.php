@@ -61,6 +61,8 @@ abstract class FrameSerializer
 
     private bool $closed = false;
 
+    private Iri|BlankNode|null $currentGraph = null;
+
     /**
      * @param array<string, non-empty-string> $prefixes
      *   A mapping of prefixes to namespace URIs that should be declared on the root element.
@@ -101,26 +103,33 @@ abstract class FrameSerializer
 
         [$subject, $predicate, $object, $graph] = $quad;
 
-        $graphIndex = null;
-        if ($graph !== null) {
-            $graphIndex = $this->findGraphFrameIndex($graph);
-            if ($graphIndex === null) {
-                $this->closeUntilRoot();
+        // Graphs are treated as top-level, non-nestable frames directly under the root.
+        // At most one graph frame is open at a time.
+        $graphChanged = false;
+        if ($graph === null && $this->currentGraph !== null) {
+            $graphChanged = true;
+        } elseif ($graph !== null && $this->currentGraph === null) {
+            $graphChanged = true;
+        } elseif ($graph !== null && $this->currentGraph !== null && ! $this->currentGraph->equals($graph, true)) {
+            $graphChanged = true;
+        }
+
+        if ($graphChanged) {
+            // Close any open subject/property (and previous graph, if any) down to the root.
+            $this->closeUntilRoot();
+
+            $this->currentGraph = $graph;
+            if ($graph !== null) {
                 $this->openGraphFrame($graph);
-                $graphIndex = count($this->frameStack) - 1;
-            } else {
-                $this->closeFramesAbove($graphIndex);
             }
         }
 
         $subjectIndex = $this->findSubjectFrameIndex($subject);
         if ($subjectIndex === null) {
-            if ($graphIndex !== null) {
-                $this->closeFramesAbove($graphIndex);
-            } else {
-                $this->closeUntilRoot();
-            }
-
+            // No reusable subject in the current graph (or default graph) – close down
+            // to the current graph frame (or root) and open a new subject frame.
+            $graphIndex = $this->currentGraph === null ? 0 : 1; // [root] or [root, graph]
+            $this->closeFramesAbove($graphIndex);
             $this->openSubjectFrame($subject);
         } else {
             $this->closeFramesAbove($subjectIndex);
@@ -147,6 +156,8 @@ abstract class FrameSerializer
         while (count($this->frameStack) > 0) {
             $this->closeTopFrame();
         }
+
+        $this->currentGraph = null;
 
         $this->doEndDocument();
     }
@@ -333,23 +344,6 @@ abstract class FrameSerializer
 
             $candidate = $frame['subject'];
             if ($candidate->equals($subject, true)) {
-                return $i;
-            }
-        }
-
-        return null;
-    }
-
-    private function findGraphFrameIndex(Iri|BlankNode $graph): int|null
-    {
-        for ($i = count($this->frameStack) - 1; $i >= 0; $i--) {
-            $frame = $this->frameStack[$i];
-            if ($frame['type'] !== self::FRAME_GRAPH) {
-                continue;
-            }
-
-            $candidate = $frame['graph'];
-            if ($candidate->equals($graph, true)) {
                 return $i;
             }
         }

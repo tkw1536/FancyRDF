@@ -1,0 +1,4 @@
+<http://example.org/s1> <http://example.org/p> "plain" .
+<http://example.org/s2> <http://example.org/p> "with-lang"@en .
+<http://example.org/s3> <http://example.org/p> "typed"^^<http://www.w3.org/2001/XMLSchema#integer> .
+
