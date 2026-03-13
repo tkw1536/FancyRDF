@@ -10,15 +10,12 @@ use FancyRDF\Term\Datatype\XSDString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Xml\XMLUtils;
+use InvalidArgumentException;
+use Override;
 use RuntimeException;
 use XMLWriter;
 
-use function array_key_exists;
-use function array_pop;
-use function count;
-use function strlen;
-use function strrpos;
-use function substr;
+use function array_search;
 
 /**
  * Serializes triples into readable, nested RDF/XML.
@@ -30,33 +27,8 @@ use function substr;
  *
  * @phpstan-import-type TripleArray from Quad
  */
-final class RdfXmlSerializer
+final class RdfXmlSerializer extends FrameSerializer
 {
-    private const string FRAME_ROOT     = 'root';
-    private const string FRAME_SUBJECT  = 'subject';
-    private const string FRAME_PROPERTY = 'property';
-
-    /** @var list<array{type: 'root'}|array{type: 'subject', subject: Iri|BlankNode}|array{type: 'property'}> */
-    private array $frameStack = [];
-
-    /** @var array<string, string> prefix => namespace URI */
-    private array $prefixToNamespace = [];
-
-    /** @var array<string, non-empty-string> namespace URI => prefix */
-    private array $namespaceToPrefix = [];
-
-    /** @var array<string, bool> namespace URIs that are declared on the root element */
-    private array $rootDeclaredNamespaces = [];
-
-    /** @var array<string, bool> namespace URIs that still require a local xmlns declaration */
-    private array $needsLocalDeclaration = [];
-
-    private int $nextAutoPrefixId = 1;
-
-    private bool $started = false;
-
-    private bool $closed = false;
-
     /**
      * @param array<string, non-empty-string> $prefixes
      *   A mapping of XML prefixes to namespace URIs that should be declared on the root element.
@@ -65,11 +37,9 @@ final class RdfXmlSerializer
         private XMLWriter $writer,
         array $prefixes = [],
     ) {
-        // Reserve the rdf: prefix for the RDF namespace.
-        $rdfNamespace                                = RdfXmlParser::RDF_NAMESPACE;
-        $this->prefixToNamespace['rdf']              = $rdfNamespace;
-        $this->namespaceToPrefix[$rdfNamespace]      = 'rdf';
-        $this->rootDeclaredNamespaces[$rdfNamespace] = true;
+        $rdfNamespace = RdfXmlParser::RDF_NAMESPACE;
+
+        $allPrefixes = ['rdf' => $rdfNamespace];
 
         foreach ($prefixes as $prefix => $namespace) {
             if ($prefix === '') {
@@ -85,18 +55,19 @@ final class RdfXmlSerializer
                 continue;
             }
 
-            if (isset($this->prefixToNamespace[$prefix]) && $this->prefixToNamespace[$prefix] !== $namespace) {
+            if (isset($allPrefixes[$prefix]) && $allPrefixes[$prefix] !== $namespace) {
                 throw new RuntimeException('Prefix "' . $prefix . '" already mapped to a different namespace');
             }
 
-            if (isset($this->namespaceToPrefix[$namespace]) && $this->namespaceToPrefix[$namespace] !== $prefix) {
+            $existingPrefix = array_search($namespace, $allPrefixes, true);
+            if ($existingPrefix !== false && $existingPrefix !== $prefix) {
                 throw new RuntimeException('Namespace "' . $namespace . '" already mapped to a different prefix');
             }
 
-            $this->prefixToNamespace[$prefix]         = $namespace;
-            $this->namespaceToPrefix[$namespace]      = $prefix;
-            $this->rootDeclaredNamespaces[$namespace] = true;
+            $allPrefixes[$prefix] = $namespace;
         }
+
+        parent::__construct($allPrefixes);
     }
 
     /**
@@ -106,225 +77,105 @@ final class RdfXmlSerializer
      */
     public function write(array $triple): void
     {
-        if ($this->closed) {
-            throw new RuntimeException('Cannot write after serializer has been closed');
-        }
-
-        $this->ensureStarted();
-
         [$subject, $predicate, $object] = $triple;
 
-        $subjectIndex = $this->findSubjectFrameIndex($subject);
-        if ($subjectIndex === null) {
-            $this->closeUntilRoot();
-            $this->openSubjectElement($subject);
-        } else {
-            $this->closeFramesAbove($subjectIndex);
-        }
-
-        $this->writePredicateAndObject($predicate, $object);
+        $this->writeQuad([$subject, $predicate, $object, null]);
     }
 
-    /**
-     * Closes any remaining open elements and finishes the document.
-     */
-    public function close(): void
+    #[Override]
+    protected function doStartDocument(): void
     {
-        if ($this->closed) {
-            return;
-        }
-
-        $this->closed = true;
-
-        if (! $this->started) {
-            $this->ensureStarted();
-        }
-
-        while (count($this->frameStack) > 0) {
-            $this->writer->endElement();
-            array_pop($this->frameStack);
-        }
-
-        $this->writer->endDocument();
-    }
-
-    private function ensureStarted(): void
-    {
-        if ($this->started) {
-            return;
-        }
-
-        $this->started = true;
-
         $this->writer->setIndent(true);
         $this->writer->setIndentString('  ');
 
         $this->writer->startDocument('1.0', 'UTF-8');
+    }
 
-        $rdfNamespace = RdfXmlParser::RDF_NAMESPACE;
-        $this->writer->startElementNs('rdf', 'RDF', $rdfNamespace);
+    #[Override]
+    protected function doEndDocument(): void
+    {
+        $this->writer->endDocument();
+    }
 
-        foreach ($this->rootDeclaredNamespaces as $namespace => $unused) {
-            $prefix = $this->namespaceToPrefix[$namespace];
+    /** @param array<string, non-empty-string> $namespaces */
+    #[Override]
+    protected function doOpenRoot(array $namespaces): void
+    {
+        $this->writer->startElementNs('rdf', 'RDF', RdfXmlParser::RDF_NAMESPACE);
+
+        foreach ($namespaces as $namespace => $prefix) {
             if ($prefix === 'rdf') {
                 continue;
             }
 
             $this->writer->writeAttribute('xmlns:' . $prefix, $namespace);
         }
-
-        $this->frameStack[] = ['type' => self::FRAME_ROOT];
     }
 
-    /** @return int|null Index in $frameStack of the nearest subject frame that matches $subject. */
-    private function findSubjectFrameIndex(Iri|BlankNode $subject): int|null
+    #[Override]
+    protected function doCloseRoot(): void
     {
-        for ($i = count($this->frameStack) - 1; $i >= 0; $i--) {
-            $frame = $this->frameStack[$i];
-            if ($frame['type'] !== self::FRAME_SUBJECT) {
-                continue;
-            }
-
-            $candidate = $frame['subject'];
-            if ($candidate->equals($subject, true)) {
-                return $i;
-            }
-        }
-
-        return null;
+        $this->writer->endElement();
     }
 
-    /**
-     * Closes all frames above the given index, leaving the frame at $index open.
-     */
-    private function closeFramesAbove(int $index): void
+    #[Override]
+    protected function doOpenGraph(Iri|BlankNode $graph): void
     {
-        for ($i = count($this->frameStack) - 1; $i > $index; $i--) {
-            $this->writer->endElement();
-            array_pop($this->frameStack);
-        }
+        throw new InvalidArgumentException('RDF/XML cannot serialize quads, only triples are supported. ');
     }
 
-    /**
-     * Closes all frames down to the root frame, but not including it.
-     */
-    private function closeUntilRoot(): void
+    #[Override]
+    protected function doCloseGraph(Iri|BlankNode $graph): void
     {
-        for ($i = count($this->frameStack) - 1; $i >= 0; $i--) {
-            $frame = $this->frameStack[$i];
-            if ($frame['type'] === self::FRAME_ROOT) {
-                break;
-            }
-
-            $this->writer->endElement();
-            array_pop($this->frameStack);
-        }
+        throw new InvalidArgumentException('RDF/XML cannot serialize quads, only triples are supported. ');
     }
 
-    private function openSubjectElement(Iri|BlankNode $subject): void
+    #[Override]
+    protected function doOpenSubject(Iri|BlankNode $subject): void
     {
-        $rdfNamespace = RdfXmlParser::RDF_NAMESPACE;
-
-        $this->writer->startElementNs('rdf', 'Description', $rdfNamespace);
+        $this->writer->startElementNs('rdf', 'Description', RdfXmlParser::RDF_NAMESPACE);
 
         if ($subject instanceof Iri) {
-            $this->writer->writeAttributeNs('rdf', 'about', $rdfNamespace, $subject->iri);
+            $this->writer->writeAttributeNs('rdf', 'about', RdfXmlParser::RDF_NAMESPACE, $subject->iri);
         } else {
-            $this->writer->writeAttributeNs('rdf', 'nodeID', $rdfNamespace, $subject->identifier);
+            $this->writer->writeAttributeNs('rdf', 'nodeID', RdfXmlParser::RDF_NAMESPACE, $subject->identifier);
         }
-
-        $this->frameStack[] = [
-            'type' => self::FRAME_SUBJECT,
-            'subject' => $subject,
-        ];
     }
 
-    private function writePredicateAndObject(Iri $predicate, Iri|Literal|BlankNode $object): void
+    #[Override]
+    protected function doCloseSubject(Iri|BlankNode $subject): void
     {
-        [$namespace, $localName] = $this->splitNamespaceAndLocalName($predicate->iri);
-        $prefix                  = $this->ensurePrefixForNamespace($namespace);
+        $this->writer->endElement();
+    }
 
+    #[Override]
+    protected function doOpenProperty(Iri $predicate, string $namespace, string $localName, string $prefix): void
+    {
         $this->writer->startElementNs($prefix, $localName, $namespace);
 
-        if (array_key_exists($namespace, $this->needsLocalDeclaration)) {
-            $this->writer->writeAttribute('xmlns:' . $prefix, $namespace);
-            unset($this->needsLocalDeclaration[$namespace]);
-        }
-
-        $this->frameStack[] = ['type' => self::FRAME_PROPERTY];
-
-        if ($object instanceof Literal) {
-            $this->writeLiteralObject($object);
-
-            $this->writer->endElement();
-            array_pop($this->frameStack);
-
+        if (! $this->namespaceNeedsLocalDeclaration($namespace)) {
             return;
         }
 
-        $this->openSubjectElement($object);
+        $this->writer->writeAttribute('xmlns:' . $prefix, $namespace);
+        $this->markNamespaceDeclaredLocally($namespace);
     }
 
-    private function writeLiteralObject(Literal $literal): void
+    #[Override]
+    protected function doCloseProperty(Iri $predicate): void
     {
-        $rdfNamespace = RdfXmlParser::RDF_NAMESPACE;
+        $this->writer->endElement();
+    }
 
+    #[Override]
+    protected function doLiteral(Literal $literal): void
+    {
         if ($literal->language !== null) {
             $this->writer->writeAttributeNs('xml', 'lang', XMLUtils::XML_NAMESPACE, $literal->language);
         } elseif ($literal->datatype->iri !== XSDString::IRI) {
-            $this->writer->writeAttributeNs('rdf', 'datatype', $rdfNamespace, $literal->datatype->iri);
+            $this->writer->writeAttributeNs('rdf', 'datatype', RdfXmlParser::RDF_NAMESPACE, $literal->datatype->iri);
         }
 
         $this->writer->text($literal->lexical);
-    }
-
-    /**
-     * @param non-empty-string $iri
-     *
-     * @return array{0: non-empty-string, 1: non-empty-string} [namespace, localName]
-     */
-    private function splitNamespaceAndLocalName(string $iri): array
-    {
-        $pos = strrpos($iri, '#');
-        if ($pos === false) {
-            $pos = strrpos($iri, '/');
-        }
-
-        if ($pos === false || $pos === strlen($iri) - 1) {
-            throw new RuntimeException('Cannot split IRI into namespace and local name: ' . $iri);
-        }
-
-        $namespace = substr($iri, 0, $pos + 1);
-        $localName = substr($iri, $pos + 1);
-        if ($namespace === '' || $localName === '') {
-            throw new RuntimeException('Cannot split IRI into namespace and local name: ' . $iri);
-        }
-
-        return [$namespace, $localName];
-    }
-
-    /**
-     * Ensures that there is a prefix for the given namespace URI and returns it.
-     *
-     * @param non-empty-string $namespace
-     *
-     * @return non-empty-string
-     */
-    private function ensurePrefixForNamespace(string $namespace): string
-    {
-        if (isset($this->namespaceToPrefix[$namespace])) {
-            return $this->namespaceToPrefix[$namespace];
-        }
-
-        do {
-            $prefix = 'ns' . $this->nextAutoPrefixId;
-            $this->nextAutoPrefixId++;
-        } while (isset($this->prefixToNamespace[$prefix]));
-
-        $this->prefixToNamespace[$prefix]        = $namespace;
-        $this->namespaceToPrefix[$namespace]     = $prefix;
-        $this->needsLocalDeclaration[$namespace] = true;
-
-        return $prefix;
     }
 }

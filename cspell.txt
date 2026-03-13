@@ -88,5 +88,6 @@ WissKI
 WRITEFUNCTION
 xmlreader
 XMLW
+xmlwriter
 паук
 Человек
