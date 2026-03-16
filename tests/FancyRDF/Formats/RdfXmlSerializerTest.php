@@ -32,7 +32,7 @@ final class RdfXmlSerializerTest extends TestCase
     /** @return array<string, array{string, string}> */
     public static function serializeProvider(): array
     {
-        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdfxml';
+        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
 
         $cases = [];
 
@@ -52,7 +52,7 @@ final class RdfXmlSerializerTest extends TestCase
             }
 
             $rdfFile        = $caseDir . DIRECTORY_SEPARATOR . $entry . '.rdf';
-            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.xml';
+            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.rdf';
 
             if (! is_file($rdfFile) || ! is_file($serializedFile)) {
                 continue;

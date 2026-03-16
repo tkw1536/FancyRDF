@@ -56,7 +56,7 @@ final class RdfXmlParserTest extends TestCase
     /** @return array<string, array{rdf: string, nt: string, serialized?: string}> */
     public static function rdfxmlTestCases(): array
     {
-        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdfxml';
+        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
 
         /** @var array<string, array{rdf: string, nt: string, serialized?: string}> $cases */
         $cases = [];
@@ -83,7 +83,7 @@ final class RdfXmlParserTest extends TestCase
                 continue;
             }
 
-            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.xml';
+            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.rdf';
 
             $cases[$entry] = [
                 'rdf' => $rdfFile,
