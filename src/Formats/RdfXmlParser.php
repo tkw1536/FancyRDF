@@ -36,7 +36,8 @@ class RdfXmlParser extends FiberIterator
     /** @param XMLReader $reader The XMLReader instance to parse from */
     public function __construct(private XMLReader $reader)
     {
-        $this->subjectStack = new SplStack();
+        $this->subjectStack      = new SplStack();
+        $this->pendingProperties = new SplStack();
     }
 
     // =================================
@@ -119,8 +120,12 @@ class RdfXmlParser extends FiberIterator
     /** @var SplStack<array{subject: Iri|BlankNode|null, depth: int}> a stack of subjects within the current nesting level */
     private SplStack $subjectStack;
 
-    /** @var array{subject: Iri|BlankNode, predicate: Iri, depth: int, reificationURI: non-empty-string|null}|null pending property waiting for nested object */
-    private array|null $pendingProperty = null;
+    /**
+     * Pending properties waiting for nested object resources to close.
+     *
+     * @var SplStack<array{subject: Iri|BlankNode, predicate: Iri, depth: int, reificationURI: non-empty-string|null}>
+     */
+    private SplStack $pendingProperties;
 
     /**
      * Emits a triple and handles reification if a reification URI is provided.
@@ -423,20 +428,27 @@ class RdfXmlParser extends FiberIterator
             // And go back to the previous subject and base.
             if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
                 if (
-                    ! $this->subjectStack->isEmpty() &&
-                    $this->subjectStack->top()['depth'] === $this->reader->depth
+                    ! $this->subjectStack->isEmpty()
+                    && $this->subjectStack->top()['depth'] === $this->reader->depth
                 ) {
-                    $popped             = $this->subjectStack->pop();
-                    $thePendingProperty = $this->pendingProperty;
-                    // If there's a pending property, emit the triple with the closing element's subject as object
-                    if ($thePendingProperty !== null && $thePendingProperty['depth'] === $this->reader->depth) {
+                    $popped = $this->subjectStack->top();
+                    // Emit any pending properties whose nested object just finished.
+                    while (
+                        ! $this->pendingProperties->isEmpty()
+                        && $this->pendingProperties->top()['depth'] === $this->reader->depth
+                    ) {
+                        $thePendingProperty = $this->pendingProperties->pop();
                         assert($this->subject !== null, 'subject must be set for pending property');
                         $object = $this->subject;
-                        $this->emitTripleWithReification($thePendingProperty['subject'], $thePendingProperty['predicate'], $object, $thePendingProperty['reificationURI']);
-
-                        $this->pendingProperty = null;
+                        $this->emitTripleWithReification(
+                            $thePendingProperty['subject'],
+                            $thePendingProperty['predicate'],
+                            $object,
+                            $thePendingProperty['reificationURI'],
+                        );
                     }
 
+                    $this->subjectStack->pop();
                     $this->subject = $popped['subject'];
                 }
 
@@ -701,12 +713,12 @@ class RdfXmlParser extends FiberIterator
 
                     // Nested content - store property info to emit when nested element closes
                     // This handles both cases: with and without rdf:ID
-                    $this->pendingProperty = [
+                    $this->pendingProperties->push([
                         'subject' => $this->subject,
                         'predicate' => $predicate,
                         'depth' => $this->reader->depth,
                         'reificationURI' => $reificationURI,
-                    ];
+                    ]);
 
                     continue;
                 }
@@ -949,12 +961,12 @@ class RdfXmlParser extends FiberIterator
                 // Nested content - store property info to emit when nested element closes
                 // This handles both cases: with and without rdf:ID
                 if ($this->subject !== null) {
-                    $this->pendingProperty = [
+                    $this->pendingProperties->push([
                         'subject' => $this->subject,
                         'predicate' => $predicate,
                         'depth' => $this->reader->depth,
                         'reificationURI' => $reificationURI,
-                    ];
+                    ]);
                 }
 
                 continue;

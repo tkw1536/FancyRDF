@@ -6,7 +6,15 @@
   </rdf:Description>
   <rdf:Description rdf:about="http://example.org/b">
     <ns1:p xmlns:ns1="http://example.org/terms#">
+      <rdf:Description rdf:about="http://example.org/c"></rdf:Description>
+    </ns1:p>
+    <ns1:p xmlns:ns1="http://example.org/terms#">
       <rdf:Description rdf:about="http://example.org/e"></rdf:Description>
+    </ns1:p>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://example.org/a">
+    <ns1:p xmlns:ns1="http://example.org/terms#">
+      <rdf:Description rdf:about="http://example.org/b"></rdf:Description>
     </ns1:p>
   </rdf:Description>
   <rdf:Description rdf:about="http://example.org/f">
