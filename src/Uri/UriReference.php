@@ -840,10 +840,7 @@ final class UriReference
             return substr($authority, 0, $at + 1) . $hostLower . $port;
         }
 
-        $result = $hostLower . $port;
-        assert($result !== '');
-
-        return $result;
+        return $hostLower . $port;
     }
 
     /**

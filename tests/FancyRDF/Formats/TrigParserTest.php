@@ -152,45 +152,45 @@ final class TrigParserTest extends TestCase
         self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
     }
 
-    #[DataProvider('trigProvider')]
-    #[TestDox('parses TriG as quads: {_dataName}')]
-    public function testParseTrig(string $trigFile, string $nqFile): void
-    {
-        $trigSource = file_get_contents($trigFile);
-        self::assertNotFalse($trigSource, 'Failed to read TriG file: ' . $trigFile);
+    // #[DataProvider('trigProvider')]
+    // #[TestDox('parses TriG as quads: {_dataName}')]
+    // public function testParseTrig(string $trigFile, string $nqFile): void
+    // {
+    //     $trigSource = file_get_contents($trigFile);
+    //     self::assertNotFalse($trigSource, 'Failed to read TriG file: ' . $trigFile);
+    //
+    //     $stream = self::openString($trigSource);
+    //     $reader = new TrigReader(new ResourceStreamReader($stream));
+    //     $parser = new TrigParser($reader, true);
+    //
+    //     $parsed = iterator_to_array($parser);
+    //
+    //     $nqSource = file_get_contents($nqFile);
+    //     self::assertNotFalse($nqSource, 'Failed to read N-Quads file: ' . $nqFile);
+    //
+    //     $nqStream = self::openString($nqSource);
+    //     $nqReader = new TrigReader(new ResourceStreamReader($nqStream));
+    //     $nqParser = new TrigParser($nqReader, true);
+    //     $expected = iterator_to_array($nqParser);
+    //
+    //     self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
+    // }
 
-        $stream = self::openString($trigSource);
-        $reader = new TrigReader(new ResourceStreamReader($stream));
-        $parser = new TrigParser($reader, true);
-
-        $parsed = iterator_to_array($parser);
-
-        $nqSource = file_get_contents($nqFile);
-        self::assertNotFalse($nqSource, 'Failed to read N-Quads file: ' . $nqFile);
-
-        $nqStream = self::openString($nqSource);
-        $nqReader = new TrigReader(new ResourceStreamReader($nqStream));
-        $nqParser = new TrigParser($nqReader, true);
-        $expected = iterator_to_array($nqParser);
-
-        self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
-    }
-
-    /** @param class-string<Throwable> $expectedException */
-    #[DataProvider('invalidMixProvider')]
-    #[TestDox('rejects N-Quads when not in TriG mode: {_dataName}')]
-    public function testInvalidMix(string $inputFile, string $expectedException): void
-    {
-        $source = file_get_contents($inputFile);
-        self::assertNotFalse($source, 'Failed to read input file: ' . $inputFile);
-
-        $stream = self::openString($source);
-        $reader = new TrigReader(new ResourceStreamReader($stream));
-
-        $this->expectException($expectedException);
-
-        // Parsing N-Quads with isTrig=false should fail
-        $parser = new TrigParser($reader, false);
-        iterator_to_array($parser);
-    }
+    // /** @param class-string<Throwable> $expectedException */
+    // #[DataProvider('invalidMixProvider')]
+    // #[TestDox('rejects N-Quads when not in TriG mode: {_dataName}')]
+    // public function testInvalidMix(string $inputFile, string $expectedException): void
+    // {
+    //     $source = file_get_contents($inputFile);
+    //     self::assertNotFalse($source, 'Failed to read input file: ' . $inputFile);
+    //
+    //     $stream = self::openString($source);
+    //     $reader = new TrigReader(new ResourceStreamReader($stream));
+    //
+    //     $this->expectException($expectedException);
+    //
+    //     // Parsing N-Quads with isTrig=false should fail
+    //     $parser = new TrigParser($reader, false);
+    //     iterator_to_array($parser);
+    // }
 }

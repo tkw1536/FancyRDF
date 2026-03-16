@@ -238,11 +238,7 @@ final class TrigParser extends FiberIterator
             }
 
             if ($this->isPredicateObjectListTerminator($type, $endToken)) {
-                if ($type === TrigToken::EndOfInput) {
-                    $expected = $endToken !== null ? $endToken->value : 'DOT';
-                    assert(false, 'unexpected end of input, expected ' . $expected);
-                }
-
+                assert($type !== TrigToken::EndOfInput, 'unexpected end of input, expected ' . $endToken?->value);
                 assert($hasPredicate || $allowSoleSubject || $type !== TrigToken::Dot, 'expected verb');
                 break;
             }
@@ -287,19 +283,20 @@ final class TrigParser extends FiberIterator
             // label in a top-level triple is non-standard. Keep the extension
             // for production (where assertions may be disabled), but signal a
             // failure under assertions so the W3C negative test passes.
-            if (
-                $this->isTrig
-                && $this->curGraph === null
-                && $nextType !== TrigToken::Comma
-                && $nextType !== TrigToken::Dot
-                && in_array(
-                    $nextType,
-                    [TrigToken::IriRef, TrigToken::PnameLn, TrigToken::PnameNs, TrigToken::BlankNodeLabel],
-                    true,
-                )
-            ) {
-                assert(false, 'TriG input must not use N-Quads graph term');
-            }
+            assert(
+                ! (
+                    $this->isTrig
+                    && $this->curGraph === null
+                    && $nextType !== TrigToken::Comma
+                    && $nextType !== TrigToken::Dot
+                    && in_array(
+                        $nextType,
+                        [TrigToken::IriRef, TrigToken::PnameLn, TrigToken::PnameNs, TrigToken::BlankNodeLabel],
+                        true,
+                    )
+                ),
+                'TriG input must not use N-Quads graph term',
+            );
 
             $this->emit([$this->curSubject, $this->curPredicate, $object, $graphForThisItem]);
 
