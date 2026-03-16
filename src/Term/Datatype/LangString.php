@@ -6,8 +6,6 @@ namespace FancyRDF\Term\Datatype;
 
 use Override;
 
-use function assert;
-
 /** @extends Datatype<array{string, string}> */
 final class LangString extends Datatype
 {
@@ -24,7 +22,9 @@ final class LangString extends Datatype
     #[Override]
     public function toValue(): array
     {
-        assert($this->language !== null, 'language is required');
+        if ($this->language === null || $this->language === '') {
+            throw new InvalidLexicalValueError('language is required for LangString literal', $this->lexical, $this->language);
+        }
 
         return [$this->lexical, $this->language];
     }

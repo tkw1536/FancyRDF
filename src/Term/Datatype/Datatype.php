@@ -26,11 +26,15 @@ abstract class Datatype
      * Converts this value into a PHP value.
      *
      * @return TValue
+     *
+     * @throws InvalidLexicalValueError if the value for this datatype is invalid and cannot be converted.
      */
     abstract public function toValue(): mixed;
 
     /**
      * Returns the canonical lexical form (if any) of this value.
+     *
+     * @throws InvalidLexicalValueError if the value for this datatype is invalid and cannot be converted to a canonical form.
      */
     abstract public function toCanonicalForm(): string;
 
@@ -42,6 +46,21 @@ abstract class Datatype
      */
     public function equals(Datatype $other): bool
     {
-        return $other instanceof static && $this->toCanonicalForm() === $other->toCanonicalForm();
+        if (! $other instanceof static) {
+            return false;
+        }
+
+        // if the lexical and language tags are identical, then we don't need to canonicalize.
+        // and can immediately return true.
+        if ($other->lexical === $this->lexical && $other->language === $this->language) {
+            return true;
+        }
+
+        // If not, we need to canonicalize both values and compare the results.
+        try {
+            return $this->toCanonicalForm() === $other->toCanonicalForm();
+        } catch (InvalidLexicalValueError) {
+            return false;
+        }
     }
 }

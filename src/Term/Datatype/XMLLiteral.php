@@ -7,7 +7,6 @@ namespace FancyRDF\Term\Datatype;
 use DOMDocument;
 use DOMNode;
 use Override;
-use RuntimeException;
 
 use function iterator_to_array;
 
@@ -30,7 +29,7 @@ final class XMLLiteral extends Datatype
         foreach ($this->toValue() as $node) {
             $norm = $node->C14N(false, true);
             if ($norm === false) {
-                throw new RuntimeException('failed to canonicalize node');
+                throw new InvalidLexicalValueError('failed to canonicalize node', $this->lexical, $this->language);
             }
 
             $result .= $norm;
@@ -44,7 +43,10 @@ final class XMLLiteral extends Datatype
     public function toValue(): array
     {
         $dom = new DOMDocument();
-        $dom->loadXML('<root>' . $this->lexical . '</root>');
+        $ok  = $dom->loadXML('<root>' . $this->lexical . '</root>');
+        if (! $ok) {
+            throw new InvalidLexicalValueError('failed to parse XML', $this->lexical, $this->language);
+        }
 
         return iterator_to_array($dom->documentElement->childNodes ?? [], false);
     }
