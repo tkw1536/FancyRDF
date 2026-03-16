@@ -11,6 +11,9 @@ use FancyRDF\Term\Literal;
 use InvalidArgumentException;
 
 use function assert;
+use function str_starts_with;
+use function strlen;
+use function substr;
 
 /**
  * Serializes triples and quads into Turtle or TriG without subject nesting.
@@ -36,9 +39,7 @@ final class TrigSerializer
 
     private bool $hasWrittenSomething = false;
 
-    /**
-     * @param array<string, non-empty-string> $prefixes
-     */
+    /** @param array<string, non-empty-string> $prefixes */
     public function __construct(
         private readonly bool $isTrig = false,
         array $prefixes = [],
@@ -121,10 +122,12 @@ final class TrigSerializer
             $this->ensureStarted();
         }
 
-        if ($this->isTrig && $this->currentGraph !== null) {
-            $this->buffer       .= "}\n";
-            $this->currentGraph  = null;
+        if (! $this->isTrig || $this->currentGraph === null) {
+            return;
         }
+
+        $this->buffer      .= "}\n";
+        $this->currentGraph = null;
     }
 
     /**
@@ -139,6 +142,7 @@ final class TrigSerializer
     // Internal helpers
     // ====================
 
+    /** ensures that the serializer has been started */
     private function ensureStarted(): void
     {
         if ($this->started) {
@@ -151,9 +155,11 @@ final class TrigSerializer
             $this->buffer .= '@prefix ' . $prefix . ': <' . $namespace . "> .\n";
         }
 
-        if ($this->prefixes !== []) {
-            $this->buffer .= "\n";
+        if ($this->prefixes === []) {
+            return;
         }
+
+        $this->buffer .= "\n";
     }
 
     private function isSameGraph(Iri|BlankNode|null $graph): bool
@@ -181,6 +187,48 @@ final class TrigSerializer
 
     private function formatTerm(Iri|Literal|BlankNode $term): string
     {
+        if ($term instanceof Iri) {
+            return $this->formatIri($term);
+        }
+
+        // Literals and blank nodes already have canonical string forms.
         return (string) $term;
+    }
+
+    /**
+     * Formats an IRI using known prefixes when possible.
+     */
+    private function formatIri(Iri $iri): string
+    {
+        $value        = $iri->iri;
+        $bestPrefix   = null;
+        $bestNsLength = -1;
+
+        foreach ($this->prefixes as $prefix => $namespace) {
+            if (! str_starts_with($value, $namespace)) {
+                continue;
+            }
+
+            $nsLength = strlen($namespace);
+            if ($nsLength <= $bestNsLength) {
+                continue;
+            }
+
+            $bestPrefix   = $prefix;
+            $bestNsLength = $nsLength;
+        }
+
+        if ($bestPrefix === null) {
+            // Fall back to full IRI in angle brackets.
+            return '<' . $value . '>';
+        }
+
+        $local = substr($value, $bestNsLength);
+        if ($local === '') {
+            // Degenerate case; fall back to full IRI.
+            return '<' . $value . '>';
+        }
+
+        return $bestPrefix . ':' . $local;
     }
 }

@@ -89,11 +89,16 @@ abstract class FrameSerializer
     }
 
     /**
-     * Writes a single triple or quad using the frame stack.
+     * Writes a single triple or quad to this serializer.
+     *
+     * It is not guaranteed that the entire quad is immediately written to the output.
+     * To finish writing any pending quads, call {@see close()}.
      *
      * @param TripleOrQuadArray $quad
+     *
+     * @throws RuntimeException if close has been called before calling write.
      */
-    final public function writeQuad(array $quad): void
+    final public function write(array $quad): void
     {
         if ($this->closed) {
             throw new RuntimeException('Cannot write after serializer has been closed');
@@ -139,7 +144,23 @@ abstract class FrameSerializer
     }
 
     /**
-     * Closes any remaining open frames and finishes the document.
+     * Closes any open frames (graph, subject, property) down to the root,
+     * so that pending output is written. The document remains open for further writes.
+     * Does nothing if the serializer has not been started or has already been closed.
+     */
+    final public function flush(): void
+    {
+        if ($this->closed || ! $this->started) {
+            return;
+        }
+
+        $this->closeUntilRoot();
+        $this->currentGraph = null;
+    }
+
+    /**
+     * Flushes any pending quads to the output and prevents further write.
+     * Calling close multiple times has no effect.
      */
     final public function close(): void
     {
@@ -147,17 +168,15 @@ abstract class FrameSerializer
             return;
         }
 
-        $this->closed = true;
-
         if (! $this->started) {
             $this->ensureStarted();
         }
 
-        while (count($this->frameStack) > 0) {
-            $this->closeTopFrame();
-        }
+        $this->flush();
 
-        $this->currentGraph = null;
+        $this->closed = true;
+
+        $this->closeTopFrame();
 
         $this->doEndDocument();
     }

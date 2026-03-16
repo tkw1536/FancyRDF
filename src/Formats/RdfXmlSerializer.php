@@ -18,12 +18,11 @@ use XMLWriter;
 use function array_search;
 
 /**
- * Serializes triples into readable, nested RDF/XML.
+ * Serializes triples into readable RDF/XML.
  *
- * Triples are written in streaming fashion. The serializer keeps node elements
- * for subjects open across calls to write(), and tries to reuse the nearest
- * open subject element when possible. This produces nested RDF/XML for
- * resource-valued properties while remaining efficient for large graphs.
+ * Triples are written in streaming fashion, calling the {@see write()} method.
+ * There is no guarantee that an entire triple is written immediately.
+ * Instead, the caller must call {@see close()} to flush any pending triples, and prevent further writes.
  *
  * @phpstan-import-type TripleArray from Quad
  */
@@ -68,18 +67,6 @@ final class RdfXmlSerializer extends FrameSerializer
         }
 
         parent::__construct($allPrefixes);
-    }
-
-    /**
-     * Writes a single triple as RDF/XML.
-     *
-     * @param TripleArray $triple
-     */
-    public function write(array $triple): void
-    {
-        [$subject, $predicate, $object] = $triple;
-
-        $this->writeQuad([$subject, $predicate, $object, null]);
     }
 
     #[Override]
