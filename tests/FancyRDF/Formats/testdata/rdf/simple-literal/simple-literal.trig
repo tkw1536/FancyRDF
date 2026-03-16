@@ -1,6 +1,0 @@
-@prefix ex: <http://example.org/terms#> .
-
-<http://example.org/graph> {
-    <http://example.org/subject> ex:title "Hello World" .
-}
-

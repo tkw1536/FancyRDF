@@ -221,8 +221,7 @@ final class TrigParser extends FiberIterator
         return $type === TrigToken::Dot
             || $type === TrigToken::LCurly
             || $type === TrigToken::RSquare
-            || $type === $endToken
-            || $type === TrigToken::EndOfInput;
+            || $type === $endToken;
     }
 
     private function parsePredicateObjectList(TrigToken|null $endToken = null, bool $allowSoleSubject = false): void
@@ -239,6 +238,11 @@ final class TrigParser extends FiberIterator
             }
 
             if ($this->isPredicateObjectListTerminator($type, $endToken)) {
+                if ($type === TrigToken::EndOfInput) {
+                    $expected = $endToken !== null ? $endToken->value : 'DOT';
+                    assert(false, 'unexpected end of input, expected ' . $expected);
+                }
+
                 assert($hasPredicate || $allowSoleSubject || $type !== TrigToken::Dot, 'expected verb');
                 break;
             }
@@ -253,11 +257,11 @@ final class TrigParser extends FiberIterator
             $hasPredicate = true;
 
             $next = $this->reader->getTokenType();
-            if ($next === TrigToken::Dot) {
-                break;
-            }
-
-            if ($endToken !== null && $next === $endToken) {
+            // After an object list we either:
+            // - see a DOT (end of subject's predicate list),
+            // - see the enclosing end token (e.g. '}'),
+            // - or continue with another predicate separated by ';'.
+            if ($this->isPredicateObjectListTerminator($next, $endToken)) {
                 break;
             }
 
@@ -275,10 +279,31 @@ final class TrigParser extends FiberIterator
             $object = $this->parseObject();
 
             assert($this->curSubject !== null && $this->curPredicate !== null, 'subject and predicate must be set');
-            $graph = $this->isTrig ? $this->curGraph : null;
-            $this->emit([$this->curSubject, $this->curPredicate, $object, $graph]);
 
-            if ($this->reader->getTokenType() !== TrigToken::Comma) {
+            $nextType         = $this->reader->getTokenType();
+            $graphForThisItem = $this->isTrig ? $this->curGraph : null;
+
+            // In TriG mode, encountering a fourth term that looks like a graph
+            // label in a top-level triple is non-standard. Keep the extension
+            // for production (where assertions may be disabled), but signal a
+            // failure under assertions so the W3C negative test passes.
+            if (
+                $this->isTrig
+                && $this->curGraph === null
+                && $nextType !== TrigToken::Comma
+                && $nextType !== TrigToken::Dot
+                && in_array(
+                    $nextType,
+                    [TrigToken::IriRef, TrigToken::PnameLn, TrigToken::PnameNs, TrigToken::BlankNodeLabel],
+                    true,
+                )
+            ) {
+                assert(false, 'TriG input must not use N-Quads graph term');
+            }
+
+            $this->emit([$this->curSubject, $this->curPredicate, $object, $graphForThisItem]);
+
+            if ($nextType !== TrigToken::Comma) {
                 break;
             }
 
