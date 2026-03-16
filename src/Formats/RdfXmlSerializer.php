@@ -139,13 +139,6 @@ final class RdfXmlSerializer extends FrameSerializer
     protected function doOpenProperty(Iri $predicate, string $namespace, string $localName, string $prefix): void
     {
         $this->writer->startElementNs($prefix, $localName, $namespace);
-
-        if (! $this->namespaceNeedsLocalDeclaration($namespace)) {
-            return;
-        }
-
-        $this->writer->writeAttribute('xmlns:' . $prefix, $namespace);
-        $this->markNamespaceDeclaredLocally($namespace);
     }
 
     #[Override]

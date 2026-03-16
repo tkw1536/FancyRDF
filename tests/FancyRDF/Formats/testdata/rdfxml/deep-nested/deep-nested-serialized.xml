@@ -1,0 +1,17 @@
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="http://example.org/c">
+    <ns1:p xmlns:ns1="http://example.org/terms#">
+      <rdf:Description rdf:about="http://example.org/d"></rdf:Description>
+    </ns1:p>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://example.org/b">
+    <ns1:p xmlns:ns1="http://example.org/terms#">
+      <rdf:Description rdf:about="http://example.org/e"></rdf:Description>
+    </ns1:p>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://example.org/f">
+    <ns1:p xmlns:ns1="http://example.org/terms#">
+      <rdf:Description rdf:about="http://example.org/g"></rdf:Description>
+    </ns1:p>
+  </rdf:Description>
+</rdf:RDF>

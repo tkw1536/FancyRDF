@@ -1,0 +1,6 @@
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:ex="http://example.org/terms#">
+  <ex:Person rdf:nodeID="n1">
+    <ex:name>Alice</ex:name>
+  </ex:Person>
+</rdf:RDF>

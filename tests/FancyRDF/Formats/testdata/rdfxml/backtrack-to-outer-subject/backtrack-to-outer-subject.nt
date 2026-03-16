@@ -1,4 +1,3 @@
 <http://example.org/s> <http://example.org/terms#p> _:b1 .
 _:b1 <http://example.org/terms#q> "X" .
 <http://example.org/s> <http://example.org/terms#r> "Y" .
-

@@ -5,148 +5,118 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\RdfXmlParser;
-use FancyRDF\Term\BlankNode;
-use FancyRDF\Term\Iri;
-use FancyRDF\Term\Literal;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use XMLReader;
 
+use function file_get_contents;
+use function is_dir;
+use function is_file;
 use function iterator_to_array;
+use function scandir;
+
+use const DIRECTORY_SEPARATOR;
 
 /** @phpstan-import-type TripleOrQuadArray from Quad */
 final class RdfXmlParserTest extends TestCase
 {
-    /** @return array<string, array{string, list<TripleOrQuadArray>}> */
-    public static function parseProvider(): array
+    /** @return array<string, array{string, string}> */
+    public static function rdfParsesToTriplesProvider(): array
     {
-        $rdfNs = RdfXmlParser::RDF_NAMESPACE;
+        $cases = [];
 
-        return [
-            'simple description with literal' => [
-                <<<XML
-<?xml version="1.0"?>
-<rdf:RDF xmlns:rdf="{$rdfNs}" xmlns:ex="http://example.org/terms#">
-  <rdf:Description rdf:about="http://example.org/subject">
-    <ex:title>Hello World</ex:title>
-  </rdf:Description>
-</rdf:RDF>
-XML,
-                [
-                    [
-                        new Iri('http://example.org/subject'),
-                        new Iri('http://example.org/terms#title'),
-                        new Literal('Hello World'),
-                        null,
-                    ],
-                ],
-            ],
-            'typed node with rdf:about' => [
-                <<<XML
-<?xml version="1.0"?>
-<rdf:RDF xmlns:rdf="{$rdfNs}" xmlns:ex="http://example.org/terms#">
-  <ex:Book rdf:about="http://example.org/book1">
-    <ex:title>Dogs in Hats</ex:title>
-  </ex:Book>
-</rdf:RDF>
-XML,
-                [
-                    [
-                        new Iri('http://example.org/book1'),
-                        new Iri($rdfNs . 'type'),
-                        new Iri('http://example.org/terms#Book'),
-                        null,
-                    ],
-                    [
-                        new Iri('http://example.org/book1'),
-                        new Iri('http://example.org/terms#title'),
-                        new Literal('Dogs in Hats'),
-                        null,
-                    ],
-                ],
-            ],
-            'resource property' => [
-                <<<XML
-<?xml version="1.0"?>
-<rdf:RDF xmlns:rdf="{$rdfNs}" xmlns:ex="http://example.org/terms#">
-  <rdf:Description rdf:about="http://example.org/person">
-    <ex:knows rdf:resource="http://example.org/friend"/>
-  </rdf:Description>
-</rdf:RDF>
-XML,
-                [
-                    [
-                        new Iri('http://example.org/person'),
-                        new Iri('http://example.org/terms#knows'),
-                        new Iri('http://example.org/friend'),
-                        null,
-                    ],
-                ],
-            ],
-            'multiple descriptions' => [
-                <<<XML
-<?xml version="1.0"?>
-<rdf:RDF xmlns:rdf="{$rdfNs}" xmlns:ex="http://example.org/terms#">
-  <rdf:Description rdf:about="http://example.org/s1">
-    <ex:prop1>value1</ex:prop1>
-  </rdf:Description>
-  <rdf:Description rdf:about="http://example.org/s2">
-    <ex:prop2>value2</ex:prop2>
-  </rdf:Description>
-</rdf:RDF>
-XML,
-                [
-                    [
-                        new Iri('http://example.org/s1'),
-                        new Iri('http://example.org/terms#prop1'),
-                        new Literal('value1'),
-                        null,
-                    ],
-                    [
-                        new Iri('http://example.org/s2'),
-                        new Iri('http://example.org/terms#prop2'),
-                        new Literal('value2'),
-                        null,
-                    ],
-                ],
-            ],
-            'blank node with rdf:nodeID' => [
-                <<<XML
-<?xml version="1.0"?>
-<rdf:RDF xmlns:rdf="{$rdfNs}" xmlns:ex="http://example.org/terms#">
-  <ex:Person rdf:nodeID="n1">
-    <ex:name>Alice</ex:name>
-  </ex:Person>
-</rdf:RDF>
-XML,
-                [
-                    [
-                        new BlankNode('n1'),
-                        new Iri($rdfNs . 'type'),
-                        new Iri('http://example.org/terms#Person'),
-                        null,
-                    ],
-                    [
-                        new BlankNode('n1'),
-                        new Iri('http://example.org/terms#name'),
-                        new Literal('Alice'),
-                        null,
-                    ],
-                ],
-            ],
-        ];
+        foreach (self::rdfxmlTestCases() as $name => $paths) {
+            $cases['parser/' . $name] = [$paths['rdf'], $paths['nt']];
+        }
+
+        return $cases;
     }
 
-    /** @param list<TripleOrQuadArray> $expectedQuads */
-    #[DataProvider('parseProvider')]
-    public function testParse(string $xml, array $expectedQuads): void
+    /** @return array<string, array{string, string}> */
+    public static function serializedParsesToTriplesProvider(): array
     {
-        $reader = XMLReader::fromString($xml);
+        $cases = [];
+
+        foreach (self::rdfxmlTestCases() as $name => $paths) {
+            $serialized = $paths['serialized'] ?? null;
+            if ($serialized === null) {
+                continue;
+            }
+
+            $cases['parser/' . $name . '-serialized'] = [$serialized, $paths['nt']];
+        }
+
+        return $cases;
+    }
+
+    /** @return array<string, array{rdf: string, nt: string, serialized?: string}> */
+    public static function rdfxmlTestCases(): array
+    {
+        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdfxml';
+
+        /** @var array<string, array{rdf: string, nt: string, serialized?: string}> $cases */
+        $cases = [];
+
+        $entries = scandir($baseDir);
+        if ($entries === false) {
+            return $cases;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $caseDir = $baseDir . DIRECTORY_SEPARATOR . $entry;
+            if (! is_dir($caseDir)) {
+                continue;
+            }
+
+            $rdfFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '.rdf';
+            $ntFile  = $caseDir . DIRECTORY_SEPARATOR . $entry . '.nt';
+
+            if (! is_file($rdfFile) || ! is_file($ntFile)) {
+                continue;
+            }
+
+            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.xml';
+
+            $cases[$entry] = [
+                'rdf' => $rdfFile,
+                'nt' => $ntFile,
+            ];
+
+            if (! is_file($serializedFile)) {
+                continue;
+            }
+
+            $cases[$entry]['serialized'] = $serializedFile;
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('rdfParsesToTriplesProvider')]
+    #[DataProvider('serializedParsesToTriplesProvider')]
+    #[TestDox('parser/{_dataName}')]
+    public function testParsesRdfAsTriples(string $rdfFile, string $ntFile): void
+    {
+        $rdfSource = file_get_contents($rdfFile);
+        self::assertNotFalse($rdfSource, 'Failed to read RDF/XML file: ' . $rdfFile);
+
+        $reader = XMLReader::fromString($rdfSource);
         $parser = new RdfXmlParser($reader);
 
-        $parsed = iterator_to_array($parser);
-        self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expectedQuads));
+        $triples = iterator_to_array($parser);
+
+        $ntSource = file_get_contents($ntFile);
+        self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
+
+        $expectedTriples = iterator_to_array(NFormatParser::parse($ntSource));
+        self::assertThat($triples, new IsomorphicAsDatasetsConstraint($expectedTriples));
     }
 }

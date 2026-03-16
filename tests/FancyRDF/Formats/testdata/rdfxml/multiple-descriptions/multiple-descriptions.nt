@@ -1,0 +1,2 @@
+<http://example.org/s1> <http://example.org/terms#prop1> "value1" .
+<http://example.org/s2> <http://example.org/terms#prop2> "value2" .

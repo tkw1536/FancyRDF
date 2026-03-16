@@ -6,83 +6,111 @@ namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use DOMDocument;
 use FancyRDF\Dataset\Quad;
-use FancyRDF\Formats\NFormatParser;
+use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Formats\RdfXmlSerializer;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use XMLReader;
 use XMLWriter;
 
-use function assert;
-use function basename;
 use function file_get_contents;
-use function glob;
+use function is_dir;
+use function is_file;
 use function iterator_to_array;
-use function substr;
+use function scandir;
 
 use const DIRECTORY_SEPARATOR;
 
-/** @phpstan-import-type TripleArray from Quad */
+/**
+ * @phpstan-import-type TripleArray from Quad
+ * @phpstan-import-type TripleOrQuadArray from Quad
+ */
 final class RdfXmlSerializerTest extends TestCase
 {
     /** @return array<string, array{string, string}> */
     public static function serializeProvider(): array
     {
-        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdfxml-serializer';
+        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdfxml';
 
-        $cases   = [];
-        $ntFiles = glob($baseDir . DIRECTORY_SEPARATOR . '*.nt');
-        if ($ntFiles === false) {
-            throw new RuntimeException('Failed to glob nt files in ' . $baseDir);
+        $cases = [];
+
+        $entries = scandir($baseDir);
+        if ($entries === false) {
+            return $cases;
         }
 
-        foreach ($ntFiles as $ntFile) {
-            $baseName = basename($ntFile);
-            $name     = substr($baseName, 0, -3);
-            $rdfFile  = $baseDir . DIRECTORY_SEPARATOR . $name . '.rdf';
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
 
-            $cases[$name] = [$ntFile, $rdfFile];
+            $caseDir = $baseDir . DIRECTORY_SEPARATOR . $entry;
+            if (! is_dir($caseDir)) {
+                continue;
+            }
+
+            $rdfFile        = $caseDir . DIRECTORY_SEPARATOR . $entry . '.rdf';
+            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.xml';
+
+            if (! is_file($rdfFile) || ! is_file($serializedFile)) {
+                continue;
+            }
+
+            $cases[$entry] = [$rdfFile, $serializedFile];
         }
 
         return $cases;
     }
 
     /**
-     * @param string $ntFile  Path to the input N-Triples file.
-     * @param string $rdfFile Path to the expected RDF/XML file.
+     * @param string $rdfFile        Path to the input RDF/XML file.
+     * @param string $serializedFile Path to the expected serialized RDF/XML file.
      */
     #[DataProvider('serializeProvider')]
-    public function testSerialize(string $ntFile, string $rdfFile): void
+    #[TestDox('serialize {name}')]
+    public function testSerialize(string $rdfFile, string $serializedFile): void
     {
-        $ntContents = file_get_contents($ntFile);
-        self::assertNotFalse($ntContents, 'Failed to read input file: ' . $ntFile);
+        $rdfSource = file_get_contents($rdfFile);
+        self::assertNotFalse($rdfSource, 'Failed to read input file: ' . $rdfFile);
 
-        $triples = iterator_to_array(NFormatParser::parse($ntContents));
+        $parser  = new RdfXmlParser(XMLReader::fromString($rdfSource));
+        $triples = iterator_to_array($parser);
 
-        $writer = new XMLWriter();
-        $writer->openMemory();
+        $actual = self::serializeTriples($triples);
 
-        $serializer = new RdfXmlSerializer(
-            $writer,
-            ['ex' => 'http://example.org/terms#'],
-        );
-
-        foreach ($triples as $triple) {
-            assert(Quad::isTriple($triple));
-            $serializer->write($triple);
-        }
-
-        $serializer->close();
-
-        $actual = $writer->outputMemory();
-
-        $expected = file_get_contents($rdfFile);
-        self::assertNotFalse($expected, 'Failed to read expected file: ' . $rdfFile);
+        $expected = file_get_contents($serializedFile);
+        self::assertNotFalse($expected, 'Failed to read expected file: ' . $serializedFile);
 
         self::assertSame(
             self::canonicalizeXml($expected),
             self::canonicalizeXml($actual),
         );
+    }
+
+    /**
+     * Serializes a list of triples to RDF/XML.
+     *
+     * @param iterable<TripleOrQuadArray> $triples
+     */
+    private static function serializeTriples(mixed $triples): string
+    {
+        $writer = new XMLWriter();
+        $writer->openMemory();
+
+        $serializer = new RdfXmlSerializer($writer);
+        foreach ($triples as $triple) {
+            if (! Quad::isTriple($triple)) {
+                throw new RuntimeException('Expected a triple, got a quad');
+            }
+
+            $serializer->write($triple);
+        }
+
+        $serializer->close();
+
+        return $writer->outputMemory();
     }
 
     private static function canonicalizeXml(string $xml): string
@@ -91,7 +119,7 @@ final class RdfXmlSerializerTest extends TestCase
         $doc->preserveWhiteSpace = false;
         $doc->formatOutput       = false;
 
-        self::assertTrue($doc->loadXML($xml), 'Failed to parse XML');
+        self::assertTrue($doc->loadXML($xml), 'failed to parse XML: ' . $xml);
 
         $canonical = $doc->C14N(true, false);
         self::assertNotFalse($canonical, 'Failed to canonicalize XML');
