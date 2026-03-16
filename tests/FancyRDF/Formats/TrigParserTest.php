@@ -4,29 +4,30 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
+use AssertionError;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
-use FancyRDF\Term\BlankNode;
-use FancyRDF\Term\Iri;
-use FancyRDF\Term\Literal;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
+use FancyRDF\Tests\Support\LocalRdfTestCases;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Throwable;
 
+use function file_get_contents;
 use function fopen;
 use function fwrite;
 use function iterator_to_array;
 use function rewind;
 
+use const DIRECTORY_SEPARATOR;
+
 /** @phpstan-import-type TripleOrQuadArray from Quad */
 final class TrigParserTest extends TestCase
 {
-    private const string RDF_NS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-
     /** @return resource */
     private static function openString(string $input): mixed
     {
@@ -46,197 +47,150 @@ final class TrigParserTest extends TestCase
         return $stream;
     }
 
-    /** @return array<string, array{string, list<TripleOrQuadArray>, bool}> */
-    public static function parseProvider(): array
+    /** @return array<string, array{string, string}> */
+    public static function turtleProvider(): array
     {
-        return [
-            'simple triple with literal' => [
-                '<http://example.org/s> <http://example.org/p> "Hello" .',
-                [
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/p'),
-                        new Literal('Hello'),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'with @prefix' => [
-                '@prefix ex: <http://example.org/terms#> . <http://example.org/subject> ex:title "Hello World" .',
-                [
-                    [
-                        new Iri('http://example.org/subject'),
-                        new Iri('http://example.org/terms#title'),
-                        new Literal('Hello World'),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'typed node with a' => [
-                '@prefix ex: <http://example.org/terms#> . <http://example.org/book1> a ex:Book ; ex:title "Dogs in Hats" .',
-                [
-                    [
-                        new Iri('http://example.org/book1'),
-                        new Iri(self::RDF_NS . 'type'),
-                        new Iri('http://example.org/terms#Book'),
-                        null,
-                    ],
-                    [
-                        new Iri('http://example.org/book1'),
-                        new Iri('http://example.org/terms#title'),
-                        new Literal('Dogs in Hats'),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'resource as object' => [
-                '@prefix ex: <http://example.org/terms#> . <http://example.org/person> ex:knows <http://example.org/friend> .',
-                [
-                    [
-                        new Iri('http://example.org/person'),
-                        new Iri('http://example.org/terms#knows'),
-                        new Iri('http://example.org/friend'),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'multiple triples' => [
-                '@prefix ex: <http://example.org/terms#> . <http://example.org/s1> ex:prop1 "value1" . <http://example.org/s2> ex:prop2 "value2" .',
-                [
-                    [
-                        new Iri('http://example.org/s1'),
-                        new Iri('http://example.org/terms#prop1'),
-                        new Literal('value1'),
-                        null,
-                    ],
-                    [
-                        new Iri('http://example.org/s2'),
-                        new Iri('http://example.org/terms#prop2'),
-                        new Literal('value2'),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'blank node with label' => [
-                '@prefix ex: <http://example.org/terms#> . _:alice a ex:Person ; ex:name "Alice" .',
-                [
-                    [
-                        new BlankNode('alice'),
-                        new Iri(self::RDF_NS . 'type'),
-                        new Iri('http://example.org/terms#Person'),
-                        null,
-                    ],
-                    [
-                        new BlankNode('alice'),
-                        new Iri('http://example.org/terms#name'),
-                        new Literal('Alice'),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'object list' => [
-                '@prefix ex: <http://example.org/terms#> . <http://example.org/s> ex:name "Spiderman", "Человек-паук"@ru .',
-                [
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/terms#name'),
-                        new Literal('Spiderman'),
-                        null,
-                    ],
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/terms#name'),
-                        new Literal('Человек-паук', 'ru', null),
-                        null,
-                    ],
-                ],
-                false,
-            ],
-            'TriG named graph' => [
-                '@prefix ex: <http://example.org/terms#> . <http://example.org/g1> { <http://example.org/s> ex:p "in graph" . }',
-                [
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/terms#p'),
-                        new Literal('in graph'),
-                        new Iri('http://example.org/g1'),
-                    ],
-                ],
-                true,
-            ],
-            'TriG default graph block' => [
-                '@prefix ex: <http://example.org/terms#> . { <http://example.org/s> ex:p "default" . }',
-                [
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/terms#p'),
-                        new Literal('default'),
-                        null,
-                    ],
-                ],
-                true,
-            ],
-            'default graph followed by other graph' => [
-                '@prefix ex: <http://example.org/terms#> . { <http://example.org/s> ex:p "default" . } <http://example.org/g1> { <http://example.org/s> ex:p "in graph" . }',
-                [
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/terms#p'),
-                        new Literal('default'),
-                        null,
-                    ],
-                    [
-                        new Iri('http://example.org/s'),
-                        new Iri('http://example.org/terms#p'),
-                        new Literal('in graph'),
-                        new Iri('http://example.org/g1'),
-                    ],
-                ],
-                true,
-            ],
-            'nested blank node property lists' => [
-                '{[ <http://a.example/p1> [ <http://a.example/p2> <http://a.example/o2> ] ; <http://a.example/p> <http://a.example/o> ].}',
-                [
-                    [
-                        new BlankNode('outer'),
-                        new Iri('http://a.example/p1'),
-                        new BlankNode('inner'),
-                        null,
-                    ],
-                    [
-                        new BlankNode('inner'),
-                        new Iri('http://a.example/p2'),
-                        new Iri('http://a.example/o2'),
-                        null,
-                    ],
-                    [
-                        new BlankNode('outer'),
-                        new Iri('http://a.example/p'),
-                        new Iri('http://a.example/o'),
-                        null,
-                    ],
-                ],
-                true,
-            ],
-        ];
+        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
+        $all     = LocalRdfTestCases::load($baseDir);
+
+        $cases = [];
+
+        foreach ($all as $name => $paths) {
+            if ($paths['ttl'] === null || $paths['nt'] === null) {
+                continue;
+            }
+
+            $cases[$name] = [$paths['ttl'], $paths['nt']];
+        }
+
+        return $cases;
     }
 
-    /** @param list<TripleOrQuadArray> $expected */
-    #[DataProvider('parseProvider')]
-    #[TestDox('parses Turtle/TriG to expected triples or quads')]
-    public function testParse(string $input, array $expected, bool $isTrig): void
+    /** @return array<string, array{string, string}> */
+    public static function trigProvider(): array
     {
-        $stream = self::openString($input);
+        $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
+        $all     = LocalRdfTestCases::load($baseDir);
+
+        $cases = [];
+
+        foreach ($all as $name => $paths) {
+            if ($paths['trig'] === null || $paths['nq'] === null) {
+                continue;
+            }
+
+            $cases[$name] = [$paths['trig'], $paths['nq']];
+        }
+
+        return $cases;
+    }
+
+    /** @return array<string, array{string, class-string<Throwable>}> */
+    public static function invalidMixProvider(): array
+    {
+        $baseDir = __DIR__ . '/testdata/rdf';
+        $all     = LocalRdfTestCases::load($baseDir);
+
+        $cases = [];
+
+        foreach ($all as $name => $paths) {
+            if ($paths['nq'] === null) {
+                continue;
+            }
+
+            $cases[$name] = [$paths['nq'], AssertionError::class];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('turtleProvider')]
+    #[TestDox('parses Turtle as triples: {_dataName}')]
+    public function testParseTurtle(string $ttlFile, string $ntFile): void
+    {
+        $ttlSource = file_get_contents($ttlFile);
+        self::assertNotFalse($ttlSource, 'Failed to read Turtle file: ' . $ttlFile);
+
+        $stream = self::openString($ttlSource);
         $reader = new TrigReader(new ResourceStreamReader($stream));
-        $parser = new TrigParser($reader, $isTrig);
+        $parser = new TrigParser($reader, false);
 
         $parsed = iterator_to_array($parser);
+
+        $ntSource = file_get_contents($ntFile);
+        self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
+
+        $ntStream = self::openString($ntSource);
+        $ntReader = new TrigReader(new ResourceStreamReader($ntStream));
+        $ntParser = new TrigParser($ntReader, false);
+        $expected = iterator_to_array($ntParser);
+
         self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
+    }
+
+    #[DataProvider('turtleProvider')]
+    #[TestDox('parses Turtle as TriG (no graphs): {_dataName}')]
+    public function testParseTurtleAsTrig(string $ttlFile, string $ntFile): void
+    {
+        $ttlSource = file_get_contents($ttlFile);
+        self::assertNotFalse($ttlSource, 'Failed to read Turtle file: ' . $ttlFile);
+
+        $stream = self::openString($ttlSource);
+        $reader = new TrigReader(new ResourceStreamReader($stream));
+        $parser = new TrigParser($reader, true);
+
+        $parsed = iterator_to_array($parser);
+
+        $ntSource = file_get_contents($ntFile);
+        self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
+
+        $ntStream = self::openString($ntSource);
+        $ntReader = new TrigReader(new ResourceStreamReader($ntStream));
+        $ntParser = new TrigParser($ntReader, true);
+        $expected = iterator_to_array($ntParser);
+
+        self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
+    }
+
+    #[DataProvider('trigProvider')]
+    #[TestDox('parses TriG as quads: {_dataName}')]
+    public function testParseTrig(string $trigFile, string $nqFile): void
+    {
+        $trigSource = file_get_contents($trigFile);
+        self::assertNotFalse($trigSource, 'Failed to read TriG file: ' . $trigFile);
+
+        $stream = self::openString($trigSource);
+        $reader = new TrigReader(new ResourceStreamReader($stream));
+        $parser = new TrigParser($reader, true);
+
+        $parsed = iterator_to_array($parser);
+
+        $nqSource = file_get_contents($nqFile);
+        self::assertNotFalse($nqSource, 'Failed to read N-Quads file: ' . $nqFile);
+
+        $nqStream = self::openString($nqSource);
+        $nqReader = new TrigReader(new ResourceStreamReader($nqStream));
+        $nqParser = new TrigParser($nqReader, true);
+        $expected = iterator_to_array($nqParser);
+
+        self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
+    }
+
+    /** @param class-string<Throwable> $expectedException */
+    #[DataProvider('invalidMixProvider')]
+    #[TestDox('rejects N-Quads when not in TriG mode: {_dataName}')]
+    public function testInvalidMix(string $inputFile, string $expectedException): void
+    {
+        $source = file_get_contents($inputFile);
+        self::assertNotFalse($source, 'Failed to read input file: ' . $inputFile);
+
+        $stream = self::openString($source);
+        $reader = new TrigReader(new ResourceStreamReader($stream));
+
+        $this->expectException($expectedException);
+
+        // Parsing N-Quads with isTrig=false should fail
+        $parser = new TrigParser($reader, false);
+        iterator_to_array($parser);
     }
 }

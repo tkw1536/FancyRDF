@@ -8,6 +8,7 @@ use DOMDocument;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Formats\RdfXmlSerializer;
+use FancyRDF\Tests\Support\LocalRdfTestCases;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
@@ -16,10 +17,7 @@ use XMLReader;
 use XMLWriter;
 
 use function file_get_contents;
-use function is_dir;
-use function is_file;
 use function iterator_to_array;
-use function scandir;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -33,32 +31,16 @@ final class RdfXmlSerializerTest extends TestCase
     public static function serializeProvider(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
+        $all     = LocalRdfTestCases::load($baseDir);
 
         $cases = [];
 
-        $entries = scandir($baseDir);
-        if ($entries === false) {
-            return $cases;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
+        foreach ($all as $name => $paths) {
+            if ($paths['rdf'] === null || $paths['rdf_serialized'] === null) {
                 continue;
             }
 
-            $caseDir = $baseDir . DIRECTORY_SEPARATOR . $entry;
-            if (! is_dir($caseDir)) {
-                continue;
-            }
-
-            $rdfFile        = $caseDir . DIRECTORY_SEPARATOR . $entry . '.rdf';
-            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.rdf';
-
-            if (! is_file($rdfFile) || ! is_file($serializedFile)) {
-                continue;
-            }
-
-            $cases[$entry] = [$rdfFile, $serializedFile];
+            $cases[$name] = [$paths['rdf'], $paths['rdf_serialized']];
         }
 
         return $cases;

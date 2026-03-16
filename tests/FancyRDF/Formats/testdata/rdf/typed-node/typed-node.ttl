@@ -1,0 +1,5 @@
+@prefix ex: <http://example.org/terms#> .
+
+<http://example.org/book1> a ex:Book ;
+    ex:title "Dogs in Hats" .
+

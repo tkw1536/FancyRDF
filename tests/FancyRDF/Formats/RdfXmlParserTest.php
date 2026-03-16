@@ -8,16 +8,14 @@ use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
+use FancyRDF\Tests\Support\LocalRdfTestCases;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use XMLReader;
 
 use function file_get_contents;
-use function is_dir;
-use function is_file;
 use function iterator_to_array;
-use function scandir;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -30,6 +28,10 @@ final class RdfXmlParserTest extends TestCase
         $cases = [];
 
         foreach (self::rdfxmlTestCases() as $name => $paths) {
+            if ($paths['rdf'] === null) {
+                continue;
+            }
+
             $cases['parser/' . $name] = [$paths['rdf'], $paths['nt']];
         }
 
@@ -42,59 +44,42 @@ final class RdfXmlParserTest extends TestCase
         $cases = [];
 
         foreach (self::rdfxmlTestCases() as $name => $paths) {
-            $serialized = $paths['serialized'] ?? null;
-            if ($serialized === null) {
+            if ($paths['rdf_serialized'] === null) {
                 continue;
             }
 
-            $cases['parser/' . $name . '-serialized'] = [$serialized, $paths['nt']];
+            $cases['parser/' . $name . '-serialized'] = [$paths['rdf_serialized'], $paths['nt']];
         }
 
         return $cases;
     }
 
-    /** @return array<string, array{rdf: string, nt: string, serialized?: string}> */
+    /**
+     * @return array<string, array{
+     *     nt: string,
+     *     rdf: string | null,
+     *     rdf_serialized: string | null,
+     * }>
+     */
     public static function rdfxmlTestCases(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
 
-        /** @var array<string, array{rdf: string, nt: string, serialized?: string}> $cases */
         $cases = [];
+        foreach (LocalRdfTestCases::load($baseDir) as $name => $paths) {
+            $rdf           = $paths['rdf'];
+            $nt            = $paths['nt'];
+            $rdfSerialized = $paths['rdf_serialized'];
 
-        $entries = scandir($baseDir);
-        if ($entries === false) {
-            return $cases;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
+            if ($nt === null) {
                 continue;
             }
 
-            $caseDir = $baseDir . DIRECTORY_SEPARATOR . $entry;
-            if (! is_dir($caseDir)) {
-                continue;
-            }
-
-            $rdfFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '.rdf';
-            $ntFile  = $caseDir . DIRECTORY_SEPARATOR . $entry . '.nt';
-
-            if (! is_file($rdfFile) || ! is_file($ntFile)) {
-                continue;
-            }
-
-            $serializedFile = $caseDir . DIRECTORY_SEPARATOR . $entry . '-serialized.rdf';
-
-            $cases[$entry] = [
-                'rdf' => $rdfFile,
-                'nt' => $ntFile,
+            $cases[$name] = [
+                'nt' => $nt,
+                'rdf' => $rdf,
+                'rdf_serialized' => $rdfSerialized,
             ];
-
-            if (! is_file($serializedFile)) {
-                continue;
-            }
-
-            $cases[$entry]['serialized'] = $serializedFile;
         }
 
         return $cases;
