@@ -79,7 +79,8 @@ final class NTriplesTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $parser = NFormatParser::parseStream($source);
+            $parser = new NFormatParser();
+            $parser = $parser->parseStream($source);
 
             foreach ($parser as $statement) {
                 self::assertSame(3, Quad::size($statement));
@@ -102,7 +103,8 @@ final class NTriplesTest extends TestBase
         self::expectException(AssertionError::class);
 
         try {
-            $parser = NFormatParser::parseStream($source);
+            $parser = new NFormatParser();
+            $parser = $parser->parseStream($source);
 
             foreach ($parser as $statement) {
                 self::assertSame(4, Quad::size($statement));
@@ -124,7 +126,8 @@ final class NTriplesTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $parser = NFormatParser::parseStream($source);
+            $parser = new NFormatParser();
+            $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {

@@ -131,7 +131,8 @@ final class RdfCTest extends TestBase
         $action = self::assertOpen($action);
         $input  = [];
         try {
-            $input = new Dataset(iterator_to_array(NFormatParser::parseStream($action)));
+            $parser = new NFormatParser();
+            $input  = new Dataset(iterator_to_array($parser->parseStream($action)));
         } finally {
             if (is_resource($action)) {
                 fclose($action);
@@ -164,7 +165,8 @@ final class RdfCTest extends TestBase
         $action = self::assertOpen($action);
         $input  = [];
         try {
-            $input = new Dataset(iterator_to_array(NFormatParser::parseStream($action)));
+            $parser = new NFormatParser();
+            $input  = new Dataset(iterator_to_array($parser->parseStream($action)));
         } finally {
             if (is_resource($action)) {
                 fclose($action);
@@ -194,7 +196,8 @@ final class RdfCTest extends TestBase
         $action = self::assertOpen($action);
         $input  = [];
         try {
-            $input = new Dataset(iterator_to_array(NFormatParser::parseStream($action)));
+            $parser = new NFormatParser();
+            $input  = new Dataset(iterator_to_array($parser->parseStream($action)));
         } finally {
             if (is_resource($action)) {
                 fclose($action);

@@ -150,8 +150,8 @@ abstract class TestBase extends TestCase
         }
 
         try {
-            $parser = NFormatParser::parseStream($source);
-            $quads  = iterator_to_array($parser);
+            $parser = new NFormatParser();
+            $quads  = iterator_to_array($parser->parseStream($source));
 
             return new IsomorphicAsDatasetsConstraint($quads, false);
         } finally {

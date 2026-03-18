@@ -229,7 +229,7 @@ final class TrigParser extends FiberIterator
         $type = $this->reader->getTokenType();
 
         $hasPredicate = false;
-        $hasNext = true;
+        $hasNext      = true;
         while ($hasNext) {
             while ($type === TrigToken::Semicolon) {
                 $this->reader->next();

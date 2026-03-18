@@ -78,7 +78,8 @@ final class TrigSerializerTest extends TestCase
         $ntContents = file_get_contents($ntFile);
         self::assertNotFalse($ntContents, 'Failed to read input file: ' . $ntFile);
 
-        $statements = iterator_to_array(NFormatParser::parse($ntContents));
+        $parser     = new NFormatParser();
+        $statements = iterator_to_array($parser->parse($ntContents));
 
         $serializer = new TrigSerializer(false);
 
@@ -110,7 +111,8 @@ final class TrigSerializerTest extends TestCase
         $nqContents = file_get_contents($nqFile);
         self::assertNotFalse($nqContents, 'Failed to read input file: ' . $nqFile);
 
-        $statements = iterator_to_array(NFormatParser::parse($nqContents));
+        $parser     = new NFormatParser();
+        $statements = iterator_to_array($parser->parse($nqContents));
 
         $serializer = new TrigSerializer(true);
 
@@ -135,7 +137,8 @@ final class TrigSerializerTest extends TestCase
     {
         $serializer = new TrigSerializer(false);
 
-        $quad = iterator_to_array(NFormatParser::parse('<http://example.org/s> <http://example.org/p> "o" <http://example.org/g> .'))[0] ?? null;
+        $parser = new NFormatParser();
+        $quad   = iterator_to_array($parser->parse('<http://example.org/s> <http://example.org/p> "o" <http://example.org/g> .'))[0] ?? null;
         self::assertNotNull($quad);
 
         $this->expectException(InvalidArgumentException::class);

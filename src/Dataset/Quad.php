@@ -214,7 +214,7 @@ final class Quad
         }
 
         // if we have a triple, we're done!
-        // we know by precondition above, that if one is a triple, both are a triple. 
+        // we know by precondition above, that if one is a triple, both are a triple.
         if ($left[3] === null) {
             return true;
         }

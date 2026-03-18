@@ -101,7 +101,7 @@ final class RdfXmlParserTest extends TestCase
         $ntSource = file_get_contents($ntFile);
         self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
 
-        $expectedTriples = iterator_to_array(NFormatParser::parse($ntSource));
+        $expectedTriples = iterator_to_array((new NFormatParser())->parse($ntSource));
         self::assertThat($triples, new IsomorphicAsDatasetsConstraint($expectedTriples));
     }
 }

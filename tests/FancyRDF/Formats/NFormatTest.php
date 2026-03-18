@@ -78,21 +78,21 @@ final class NFormatTest extends TestCase
         Iri|BlankNode|null $graph,
         string $line,
     ): void {
-        $parsed = NFormatParser::parseLine($line);
+        $parsed = (new NFormatParser())->parseLine($line);
         self::assertNotNull($parsed);
         self::assertTrue(Quad::equals($parsed, [$subject, $predicate, $object, $graph]));
     }
 
     public function testParseLineEmptyReturnsNull(): void
     {
-        self::assertNull(NFormatParser::parseLine(''));
-        self::assertNull(NFormatParser::parseLine('   '));
+        self::assertNull((new NFormatParser())->parseLine(''));
+        self::assertNull((new NFormatParser())->parseLine('   '));
     }
 
     public function testParseLineCommentReturnsNull(): void
     {
-        self::assertNull(NFormatParser::parseLine('# comment'));
-        self::assertNull(NFormatParser::parseLine('  # rest is comment'));
+        self::assertNull((new NFormatParser())->parseLine('# comment'));
+        self::assertNull((new NFormatParser())->parseLine('  # rest is comment'));
     }
 
     #[RequiresSetting('zend.assertions', '1')]
@@ -100,6 +100,6 @@ final class NFormatTest extends TestCase
     {
         $this->expectException(AssertionError::class);
         $this->expectExceptionMessage('expected "." at end of statement at position 71');
-        NFormatParser::parseLine('<https://example.com/s> <https://example.com/p> <https://example.com/o>');
+        (new NFormatParser())->parseLine('<https://example.com/s> <https://example.com/p> <https://example.com/o>');
     }
 }

@@ -78,7 +78,8 @@ final class NQuadsTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $parser = NFormatParser::parseStream($source);
+            $parser = new NFormatParser();
+            $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -98,7 +99,8 @@ final class NQuadsTest extends TestBase
 
         self::expectException(AssertionError::class);
         try {
-            $parser = NFormatParser::parseStream($source);
+            $parser = new NFormatParser();
+            $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -117,7 +119,8 @@ final class NQuadsTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $parser = NFormatParser::parseStream($source);
+            $parser = new NFormatParser();
+            $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
