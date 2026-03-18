@@ -9,9 +9,11 @@ use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancyRDF\Tests\Support\LocalRdfTestCases;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use XMLReader;
 
 use function file_get_contents;
@@ -22,7 +24,11 @@ use const DIRECTORY_SEPARATOR;
 /** @phpstan-import-type TripleOrQuadArray from Quad */
 final class RdfXmlParserTest extends TestCase
 {
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function rdfParsesToTriplesProvider(): array
     {
         $cases = [];
@@ -38,7 +44,11 @@ final class RdfXmlParserTest extends TestCase
         return $cases;
     }
 
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function serializedParsesToTriplesProvider(): array
     {
         $cases = [];
@@ -60,6 +70,8 @@ final class RdfXmlParserTest extends TestCase
      *     rdf: string | null,
      *     rdf_serialized: string | null,
      * }>
+     *
+     * @throws RuntimeException
      */
     public static function rdfxmlTestCases(): array
     {
@@ -85,6 +97,7 @@ final class RdfXmlParserTest extends TestCase
         return $cases;
     }
 
+    /** @throws InvalidArgumentException */
     #[DataProvider('rdfParsesToTriplesProvider')]
     #[DataProvider('serializedParsesToTriplesProvider')]
     #[TestDox('parser/{_dataName}')]

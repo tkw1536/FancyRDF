@@ -51,6 +51,8 @@ final class TrigSerializer
      * Writes a single triple or quad.
      *
      * @param TripleOrQuadArray $quad
+     *
+     * @throws InvalidArgumentException
      */
     public function writeQuad(array $quad): void
     {

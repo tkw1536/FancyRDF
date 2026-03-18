@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Term;
 
 use DOMDocument;
+use DOMException;
 use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Datatype\XSDString;
 use FancyRDF\Term\Iri;
@@ -15,6 +16,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 /** @phpstan-import-type LiteralArray from Literal */
 final class LiteralTest extends TestCase
@@ -68,6 +70,8 @@ final class LiteralTest extends TestCase
      * @param non-empty-string|null $language
      * @param non-empty-string|null $datatype
      * @param non-empty-string|null $expectDatatype
+     *
+     * @throws InvalidArgumentException
      */
     #[DataProvider('constructorProvider')]
     #[TestDox('$_dataname allows instantiating valid literals')]
@@ -98,7 +102,12 @@ final class LiteralTest extends TestCase
         self::assertSame($expectedJson, $literal->jsonSerialize(), 'JSON serialization');
     }
 
-    /** @param LiteralArray $expectedJson */
+    /**
+     * @param LiteralArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws DOMException
+     */
     #[DataProviderExternal(TermTest::class, 'literalSerializationProvider')]
     #[TestDox('$_dataname correctly serializes to xml')]
     public function testSerializeXml(
@@ -110,7 +119,12 @@ final class LiteralTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @param LiteralArray $expectedJson */
+    /**
+     * @param LiteralArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProviderExternal(TermTest::class, 'literalSerializationProvider')]
     #[TestDox('$_dataname correctly deserializes from xml')]
     public function testDeserializeXml(
@@ -122,7 +136,11 @@ final class LiteralTest extends TestCase
         self::assertTrue($literalFromXml->equals($literal), 'XML deserialize');
     }
 
-    /** @param LiteralArray $expectedJson */
+    /**
+     * @param LiteralArray $expectedJson
+     *
+     * @throws InvalidArgumentException
+     */
     #[DataProviderExternal(TermTest::class, 'literalSerializationProvider')]
     #[TestDox('$_dataname correctly deserializes from json')]
     public function testDeserializeJson(
@@ -134,6 +152,10 @@ final class LiteralTest extends TestCase
         self::assertTrue($literalFromJson->equals($literal), 'JSON deserialize');
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('deserializeInvalidXMLProvider')]
     #[TestDox('$_dataname refuses to deserialize invalid xml')]
     public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
@@ -144,7 +166,11 @@ final class LiteralTest extends TestCase
         Literal::deserializeXML(XMLUtils::parseAndGetRootNode($xml));
     }
 
-    /** @param mixed[] $invalidData */
+    /**
+     * @param mixed[] $invalidData
+     *
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('deserializeInvalidJSONProvider')]
     #[TestDox('$_dataname refuses to deserialize invalid json')]
     public function testDeserializeInvalidJSON(array $invalidData, string $expectedMessage): void

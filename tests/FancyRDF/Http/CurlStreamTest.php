@@ -9,6 +9,7 @@ use FancyRDF\Tests\Support\TestServer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use XMLReader;
 
 use function curl_init;
@@ -44,7 +45,11 @@ final class CurlStreamTest extends TestCase
         ];
     }
 
-    /** @param array<string, string> $headers */
+    /**
+     * @param array<string, string> $headers
+     *
+     * @throws RuntimeException
+    */
     #[DataProvider('serverResponseProvider')]
     #[TestDox('fetches response body, status code and headers from TestServer')]
     public function testFetchesFromTestServer(int $statusCode, array $headers, string $body): void
@@ -76,6 +81,7 @@ final class CurlStreamTest extends TestCase
         }
     }
 
+    /** @throws RuntimeException */
     #[TestDox('response body can be read via XMLReader')]
     public function testReadResponseViaXmlReader(): void
     {

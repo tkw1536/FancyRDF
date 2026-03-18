@@ -11,13 +11,18 @@ use FancyRDF\Formats\NFormatSerializer;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\TestCase;
 
 final class NFormatTest extends TestCase
 {
-    /** @return array<string, array{Iri|BlankNode, Iri, Iri|Literal|BlankNode, Iri|BlankNode|null, string}> */
+    /**
+     * @return array<string, array{Iri|BlankNode, Iri, Iri|Literal|BlankNode, Iri|BlankNode|null, string}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function statementProvider(): array
     {
         return [
@@ -70,6 +75,7 @@ final class NFormatTest extends TestCase
         self::assertSame($expected, NFormatSerializer::serialize([$subject, $predicate, $object, $graph]));
     }
 
+    /** @throws InvalidArgumentException */
     #[DataProvider('statementProvider')]
     public function testParseLine(
         Iri|BlankNode $subject,
@@ -83,18 +89,21 @@ final class NFormatTest extends TestCase
         self::assertTrue(Quad::equals($parsed, [$subject, $predicate, $object, $graph]));
     }
 
+    /** @throws InvalidArgumentException */
     public function testParseLineEmptyReturnsNull(): void
     {
         self::assertNull((new NFormatParser())->parseLine(''));
         self::assertNull((new NFormatParser())->parseLine('   '));
     }
 
+    /** @throws InvalidArgumentException */
     public function testParseLineCommentReturnsNull(): void
     {
         self::assertNull((new NFormatParser())->parseLine('# comment'));
         self::assertNull((new NFormatParser())->parseLine('  # rest is comment'));
     }
 
+    /** @throws InvalidArgumentException */
     #[RequiresSetting('zend.assertions', '1')]
     public function testParseLineInvalidThrows(): void
     {

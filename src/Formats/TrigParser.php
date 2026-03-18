@@ -11,7 +11,9 @@ use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
+use InvalidArgumentException;
 use Override;
+use RuntimeException;
 
 use function assert;
 use function in_array;
@@ -77,7 +79,11 @@ final class TrigParser extends FiberIterator
         }
     }
 
-    /** @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX */
+    /**
+     * @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX
+     *
+     * @throws InvalidArgumentException
+     * */
     private function parsePrefixDirective(bool $isAtDirective): void
     {
         $this->reader->next();
@@ -101,7 +107,11 @@ final class TrigParser extends FiberIterator
         assert($this->reader->getTokenType() === TrigToken::Dot, 'expected \'.\' after @prefix');
     }
 
-    /** @param bool $isAtDirective true for @base (expect DOT after), false for BASE */
+    /**
+     * @param bool $isAtDirective true for @base (expect DOT after), false for BASE
+     *
+     * @throws InvalidArgumentException
+     */
     private function parseBaseDirective(bool $isAtDirective): void
     {
         $this->reader->next();
@@ -120,6 +130,10 @@ final class TrigParser extends FiberIterator
         assert($this->reader->getTokenType() === TrigToken::Dot, 'expected DOT');
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseWrappedGraphDefault(): void
     {
         assert($this->isTrig, 'UNEXPECTED \'{\' in Turtle mode');
@@ -140,6 +154,10 @@ final class TrigParser extends FiberIterator
 
     private bool $lastBlankNodePropertyListWasEmpty = true;
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseGraphKeywordBlock(): void
     {
         assert($this->isTrig, 'GRAPH keyword not allowed in Turtle mode');
@@ -158,6 +176,10 @@ final class TrigParser extends FiberIterator
         $this->parseTriplesBlock();
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseTriplesOrGraphBlock(): void
     {
         $type            = $this->reader->getTokenType();
@@ -188,6 +210,10 @@ final class TrigParser extends FiberIterator
         $this->parsePredicateObjectList(null, $allowSoleSubject);
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseTriplesBlock(): void
     {
         while (
@@ -224,6 +250,10 @@ final class TrigParser extends FiberIterator
             || $type === $endToken;
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parsePredicateObjectList(TrigToken|null $endToken = null, bool $allowSoleSubject = false): void
     {
         $type = $this->reader->getTokenType();
@@ -270,6 +300,10 @@ final class TrigParser extends FiberIterator
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseObjectList(): void
     {
         while (true) {
@@ -330,11 +364,16 @@ final class TrigParser extends FiberIterator
         return new Iri(self::FALLBACK_IRI);
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseSubject(TrigToken $type): Iri|BlankNode
     {
         return $this->parseResource($type) ?? $this->neverReachedFallback('subject', false);
     }
 
+    /** @throws InvalidArgumentException */
     private function parsePredicate(): Iri
     {
         $type = $this->reader->getTokenType();
@@ -347,7 +386,12 @@ final class TrigParser extends FiberIterator
         };
     }
 
-    /** Parses an iri or blank node */
+    /**
+     * Parses an iri or blank node
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseResource(TrigToken $type): Iri|BlankNode|null
     {
         return match ($type) {
@@ -360,6 +404,10 @@ final class TrigParser extends FiberIterator
         };
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseObject(): Iri|BlankNode|Literal
     {
         $type = $this->reader->getTokenType();
@@ -379,6 +427,7 @@ final class TrigParser extends FiberIterator
         };
     }
 
+    /** @throws InvalidArgumentException */
     private function parseIriRef(): Iri
     {
         $value    = $this->reader->getTokenValue();
@@ -387,6 +436,7 @@ final class TrigParser extends FiberIterator
         return new Iri($resolved);
     }
 
+    /** @throws InvalidArgumentException */
     private function parsePName(): Iri
     {
         $value = $this->reader->getTokenValue();
@@ -410,7 +460,11 @@ final class TrigParser extends FiberIterator
         return new Iri($full);
     }
 
-    /** @return non-empty-string */
+    /**
+     * @return non-empty-string
+     *
+     * @throws InvalidArgumentException
+     */
     private function resolveIriRef(string $decodedIri): string
     {
         assert(preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $decodedIri) !== 1, 'IRIREF contains disallowed character');
@@ -431,6 +485,9 @@ final class TrigParser extends FiberIterator
 
     /**
      * Parse a blank node property list: [ predicateObjectList ].
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     private function parseBlankNodePropertyList(bool $mayBeEmpty = true): BlankNode
     {
@@ -454,6 +511,10 @@ final class TrigParser extends FiberIterator
         return $bnode;
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function parseCollection(): Iri|BlankNode
     {
         $this->reader->next();
@@ -499,6 +560,7 @@ final class TrigParser extends FiberIterator
         return $headNode;
     }
 
+    /** @throws InvalidArgumentException */
     private function parseStringLiteral(): Literal
     {
         $lexical  = $this->reader->getTokenValue();
@@ -533,6 +595,7 @@ final class TrigParser extends FiberIterator
         return new Literal($lexical);
     }
 
+    /** @throws InvalidArgumentException */
     private function parseNumericLiteral(): Literal
     {
         $type     = $this->reader->getTokenType();
@@ -549,6 +612,7 @@ final class TrigParser extends FiberIterator
         return new Literal($value, null, new Iri($datatype));
     }
 
+    /** @throws InvalidArgumentException */
     private function parseBooleanLiteral(): Literal
     {
         $value = $this->reader->getTokenValue();

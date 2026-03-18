@@ -10,7 +10,7 @@ use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
 use FancyRDF\Formats\NFormatSerializer;
 use FancyRDF\Term\BlankNode;
 use Generator;
-use RuntimeException;
+use InvalidArgumentException;
 
 use function assert;
 use function count;
@@ -36,12 +36,13 @@ use function usort;
  */
 final class RdfCanonicalizer
 {
+    /** @throws InvalidArgumentException */
     public function __construct(RdfCanonicalizationOptions|null $options = null)
     {
         $this->options = $options ?? new RdfCanonicalizationOptions();
 
         if (! in_array($this->options->hashAlgorithm, hash_algos(), true)) {
-            throw new RuntimeException('Unsupported hash algorithm: ' . $this->options->hashAlgorithm);
+            throw new InvalidArgumentException('Unsupported hash algorithm: ' . $this->options->hashAlgorithm);
         }
 
         $this->reset();
@@ -108,6 +109,8 @@ final class RdfCanonicalizer
      * Canonicalizes the input dataset, implementing the RDFC-1.0 canonicalization algorithm.
      *
      * @see https://www.w3.org/TR/rdf-canon/#canon-algo-algo
+     *
+     * @throws CanonicalizationLimitExceeded
      */
     public function canonicalize(Dataset $input): RdfCanonicalizationResult
     {
@@ -234,6 +237,8 @@ final class RdfCanonicalizer
      * @param non-empty-string $reference
      *
      * @return non-empty-string
+     *
+     * @throws CanonicalizationLimitExceeded
      */
     private function hashFirstDegreeQuads(string $reference): string
     {
@@ -285,6 +290,8 @@ final class RdfCanonicalizer
      * @param 's'|'o'|'g'       $position
      *
      * @return non-empty-string
+     *
+     * @throws CanonicalizationLimitExceeded
      */
     private function hashRelatedBlankNode(string $related, array $quad, IdentifierIssuer $issuer, string $position): string
     {
@@ -321,6 +328,8 @@ final class RdfCanonicalizer
      * @param non-empty-string $identifier
      *
      * @return array{hash: non-empty-string, issuer: IdentifierIssuer}
+     *
+     * @throws CanonicalizationLimitExceeded
      */
     private function hashNDegreeQuads(string $identifier, IdentifierIssuer $issuer, int $depth): array
     {
@@ -513,7 +522,11 @@ final class RdfCanonicalizer
         }
     }
 
-    /** @return non-empty-string */
+    /**
+     * @return non-empty-string
+     *
+     * @throws CanonicalizationLimitExceeded
+     */
     private function hashString(string $input): string
     {
         $this->checkTime('hash');
@@ -521,6 +534,7 @@ final class RdfCanonicalizer
         return hash($this->options->hashAlgorithm, $input);
     }
 
+    /** @throws CanonicalizationLimitExceeded */
     private function checkTime(string $context): void
     {
         if ($this->options->maxTimeMs === null) {

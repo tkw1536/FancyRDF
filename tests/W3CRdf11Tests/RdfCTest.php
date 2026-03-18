@@ -10,6 +10,7 @@ use FancyRDF\Dataset\RdfCanon\RdfCanonicalizer;
 use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
+use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -47,6 +48,10 @@ final class RdfCTest extends TestBase
         return $testSuiteBaseUri . 'manifest';
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -63,7 +68,12 @@ final class RdfCTest extends TestBase
 
     public const string HASH_ALGORITHM_PROPERTY = 'https://w3c.github.io/rdf-canon/tests/vocab#hashAlgorithm';
 
-    /** @return Generator<string, array{action: string, result: string, algorithm: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string, result: string, algorithm: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function rdfc10EvalTestProvider(): Generator
     {
         foreach (self::cases('https://w3c.github.io/rdf-canon/tests/vocab#RDFC10EvalTest', [self::HASH_ALGORITHM_PROPERTY]) as $info) {
@@ -84,7 +94,12 @@ final class RdfCTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string, result: string, algorithm: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string, result: string, algorithm: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function rdfc10MapTestProvider(): Generator
     {
         foreach (self::cases('https://w3c.github.io/rdf-canon/tests/vocab#RDFC10MapTest', [self::HASH_ALGORITHM_PROPERTY]) as $info) {
@@ -105,7 +120,12 @@ final class RdfCTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string, algorithm: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string, algorithm: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function rdfc10NegativeEvalTestProvider(): Generator
     {
         foreach (self::cases('https://w3c.github.io/rdf-canon/tests/vocab#RDFC10NegativeEvalTest', [self::HASH_ALGORITHM_PROPERTY]) as $info) {
@@ -121,7 +141,12 @@ final class RdfCTest extends TestBase
         }
     }
 
-    /** @param non-empty-string $algorithm */
+    /**
+     * @param non-empty-string $algorithm
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[TestDox('$_dataName evaluates to the correct result')]
     #[DataProvider('rdfc10EvalTestProvider')]
     #[Group('positive-eval')]
@@ -155,7 +180,12 @@ final class RdfCTest extends TestBase
         self::assertSame($expected, $result->toCanonicalNQuads());
     }
 
-    /** @param non-empty-string $algorithm */
+    /**
+     * @param non-empty-string $algorithm
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[TestDox('$_dataName hits limits when trying to canonicalize')]
     #[DataProvider('rdfc10NegativeEvalTestProvider')]
     #[Group('negative-eval')]
@@ -186,7 +216,12 @@ final class RdfCTest extends TestBase
         $canonicalizer->canonicalize($input);
     }
 
-    /** @param non-empty-string $algorithm */
+    /**
+     * @param non-empty-string $algorithm
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[TestDox('$_dataName produces the correct blank node map')]
     #[DataProvider('rdfc10MapTestProvider')]
     #[Group('positive-eval')]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Xml;
 
 use DOMDocument;
+use DOMException;
 use FancyRDF\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -13,6 +14,7 @@ use RuntimeException;
 
 final class XMLUtilsTest extends TestCase
 {
+    /** @throws RuntimeException */
     #[TestWith(['<root/>' . "\n"])]
     #[TestWith(['<foo>bar</foo>' . "\n"])]
     #[TestWith(['<ns:item xmlns:ns="http://example.com/ns"/>' . "\n"])]
@@ -29,6 +31,7 @@ final class XMLUtilsTest extends TestCase
         self::assertSame($source, $restringified);
     }
 
+    /** @throws RuntimeException */
     #[TestWith(['<unclosed>', 'Failed to parse XML'])]
     #[TestWith(['<invalid:namespace>', 'Failed to parse XML'])]
     public function testParseAndGetRootNodeFailure(string $source, string $expectedMessage): void
@@ -41,6 +44,7 @@ final class XMLUtilsTest extends TestCase
         @XMLUtils::parseAndGetRootNode($source);
     }
 
+    /** @throws RuntimeException */
     public function testFormatXMLWithSingleDocumentMultipleNodes(): void
     {
         $source = XMLUtils::XML_DECLARATION . '<root>  <a>text</a>  <b>  spaced  </b>  <c/></root>';
@@ -71,6 +75,7 @@ final class XMLUtilsTest extends TestCase
         self::assertSame('<c/>', $formattedC);
     }
 
+    /** @throws RuntimeException */
     public function testFormatXMLPrettifyIndentsOutput(): void
     {
         $source    = '<root><a><b/></a></root>';
@@ -91,6 +96,10 @@ final class XMLUtilsTest extends TestCase
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws DOMException
+     */
     #[DataProvider('createElementProvider')]
     public function testCreateElement(string $qualifiedName, string|null $value, string|null $namespace, string $expected): void
     {
@@ -138,6 +147,7 @@ final class XMLUtilsTest extends TestCase
         ];
     }
 
+    /** @throws RuntimeException */
     #[DataProvider('serializerInnerXMLProvider')]
     public function testSerializerInnerXML(string $input, string $expected): void
     {

@@ -7,12 +7,17 @@ namespace FancyRDF\Tests\FancyRDF\Formats;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class NFormatSerializerTest extends TestCase
 {
-    /** @return array<string, array{Iri|Literal|BlankNode, string}> */
+    /**
+     * @return array<string, array{Iri|Literal|BlankNode, string}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function serializeTermProvider(): array
     {
         return [

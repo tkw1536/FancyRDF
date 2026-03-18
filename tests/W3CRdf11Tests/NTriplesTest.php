@@ -8,11 +8,13 @@ use AssertionError;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
+use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
+use RuntimeException;
 
 use function fclose;
 use function is_resource;
@@ -37,6 +39,10 @@ final class NTriplesTest extends TestBase
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -50,7 +56,12 @@ final class NTriplesTest extends TestBase
         );
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function ntriplesPositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestNTriplesPositiveSyntax') as $info) {
@@ -60,7 +71,12 @@ final class NTriplesTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function ntriplesNegativeSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestNTriplesNegativeSyntax') as $info) {
@@ -70,6 +86,10 @@ final class NTriplesTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('ntriplesPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
@@ -92,6 +112,10 @@ final class NTriplesTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('ntriplesNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
     #[RequiresSetting('zend.assertions', '1')]
@@ -116,6 +140,10 @@ final class NTriplesTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('ntriplesNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not throw with assertions disabled')]
     #[RequiresSetting('zend.assertions', '0')]

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Uri;
 
-use RuntimeException;
+use InvalidArgumentException;
 
 use function assert;
 use function chr;
@@ -341,6 +341,8 @@ final class UriReference
      * component (if any), identical to the base URI.
      *
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-4.4
+     *
+     * @throws InvalidArgumentException
      */
     public function isSameDocumentReference(UriReference $base): bool
     {
@@ -385,6 +387,8 @@ final class UriReference
      * @see \FancyRDF\Uri\UriReference::resolve()
      *
      * @return string The resolved URI. Whenever possible, this is an absolute URI.
+     *
+     * @throws InvalidArgumentException
      */
     public static function resolveRelative(string $base, string $uri, bool $strict = true, bool $normalize = true): string
     {
@@ -401,6 +405,8 @@ final class UriReference
      *   If true (the default) act as a strict parser
      * @param bool $normalize
      *   If true (the default) apply all normalization rules of the normalize() method prior to using the base URI.
+     *
+     * @throws InvalidArgumentException
      */
     public function resolve(UriReference $reference, bool $strict = true, bool $normalize = true): self
     {
@@ -644,6 +650,8 @@ final class UriReference
      * @param bool $pathSegment     If true, apply path segment normalization per RFC 3986 §6.2.2.3.
      *
      * @return self The normalized URI reference.
+     *
+     * @throws InvalidArgumentException
      */
     public function normalize(
         bool $case = true,
@@ -679,6 +687,8 @@ final class UriReference
      * @see \FancyRDF\Url\UriReference::normalize()
      *
      * @param non-empty-string|null &$scheme
+     *
+     * @throws InvalidArgumentException
      */
     private static function normalizeComponents(
         string|null &$scheme,
@@ -768,6 +778,8 @@ final class UriReference
      * @see https://www.rfc-editor.org/rfc/rfc3986#section-2.3
      *
      * @param non-empty-string|null $scheme
+     *
+     * @throws InvalidArgumentException
      */
     private static function normalizePercentEncodingInUriString(
         string|null &$scheme,
@@ -862,6 +874,8 @@ final class UriReference
      * Decodes percent-encoded octets that correspond to unreserved characters (ALPHA, DIGIT, -, ., _, ~) in a single component.
      *
      * @return ($s is non-empty-string ? non-empty-string : string)
+     *
+     * @throws InvalidArgumentException
      */
     private static function decodeUnreservedInComponent(string $s): string
     {
@@ -886,7 +900,7 @@ final class UriReference
             return '%' . strtoupper($m[1]);
         }, $s);
         if ($result === null) {
-            throw new RuntimeException('Failed to decode unreserved in component: ' . $s);
+            throw new InvalidArgumentException('Failed to decode unreserved in component: ' . $s);
         }
 
         return $result;

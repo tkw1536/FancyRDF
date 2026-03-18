@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
-use RuntimeException;
 
 /**
  * Serializes a triple or quad into canonical N-Triples or N-Quads format.
@@ -49,8 +48,6 @@ final class NFormatSerializer
      *
      * @return string
      *   The serialized quad.
-     *
-     * @throws RuntimeException
      */
     public static function serialize(array $quad, bool $finalEOL = true): string
     {

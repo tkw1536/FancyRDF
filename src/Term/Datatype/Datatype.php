@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FancyRDF\Term\Datatype;
 
+use FancyRDF\Exceptions\InvalidLexicalValueError;
+
 /**
  * Datatype represents a value of a specific RDF1.1 datatype.
  *
@@ -43,6 +45,8 @@ abstract class Datatype
      *
      * @param Datatype<mixed> $other
      *   The other datatype to compare with.
+     *
+     * @throws InvalidLexicalValueError
      */
     public function equals(Datatype $other): bool
     {

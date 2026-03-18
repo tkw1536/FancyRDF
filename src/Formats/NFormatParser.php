@@ -9,13 +9,14 @@ use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
+use InvalidArgumentException;
 use Traversable;
-use TypeError;
 
 use function assert;
 use function fclose;
 use function fgets;
 use function hexdec;
+use function is_resource;
 use function mb_chr;
 use function preg_match;
 use function preg_split;
@@ -55,6 +56,8 @@ final class NFormatParser
      * Reads content from the given string.
      *
      * @return Traversable<TripleOrQuadArray>
+     *
+     * @throws InvalidArgumentException
      */
     public function parse(string $source): Traversable
     {
@@ -85,6 +88,8 @@ final class NFormatParser
      *   The stream will be closed once the parser is done.
      *
      * @return Traversable<TripleOrQuadArray>
+     *
+     * @throws InvalidArgumentException
      */
     public function parseStream(mixed $stream): Traversable
     {
@@ -105,9 +110,8 @@ final class NFormatParser
                 yield $term;
             }
         } finally {
-            try {
+            if (is_resource($stream)) {
                 fclose($stream);
-            } catch (TypeError) {
             }
         }
     }
@@ -120,6 +124,8 @@ final class NFormatParser
      *
      * @return TripleOrQuadArray|null
      *   The triple, quad, or null if the line is empty or a comment.
+     *
+     * @throws InvalidArgumentException
      */
     public function parseLine(string $line): array|null
     {
@@ -165,6 +171,8 @@ final class NFormatParser
 
     /**
      * Parses an object of a triple.
+     *
+     * @throws InvalidArgumentException
      */
     private function parseLiteralOrIriOrBlankNode(): Iri|Literal|BlankNode
     {
@@ -300,6 +308,8 @@ final class NFormatParser
 
     /**
      * Parses a literal: "..." with optional @lang or ^^<datatype>.
+     *
+     * @throws InvalidArgumentException
      */
     private function parseLiteral(): Literal
     {

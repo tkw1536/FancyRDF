@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Results;
 
 use DOMDocument;
+use DOMException;
 use FancyRDF\Results\Result;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
@@ -14,6 +15,7 @@ use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 /**
  * @phpstan-import-type LiteralArray from Literal
@@ -25,6 +27,9 @@ final class ResultTest extends TestCase
     /**
      * @param array<string, Literal|Iri|BlankNode>                $bindings
      * @param array<string, IRIArray|LiteralArray|BlankNodeArray> $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws DOMException
      */
     #[DataProvider('resultSerializationProvider')]
     public function testSerialize(
@@ -40,7 +45,11 @@ final class ResultTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @return array<string, array{array<string, Literal|Iri|BlankNode>, array<string, IRIArray|LiteralArray|BlankNodeArray>, string}> */
+    /**
+     * @return array<string, array{array<string, Literal|Iri|BlankNode>, array<string, IRIArray|LiteralArray|BlankNodeArray>, string}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function resultSerializationProvider(): array
     {
         return [
@@ -83,6 +92,8 @@ final class ResultTest extends TestCase
     // ==================================================
 
     /** tests the get method */
+
+    /** @throws InvalidArgumentException */
     public function testGet(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -101,6 +112,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->get('missing'));
     }
 
+    /** @throws InvalidArgumentException */
     public function testGetInvalidMissing(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -118,6 +130,8 @@ final class ResultTest extends TestCase
     // ==================================================
 
     /** tests the getResource method */
+
+    /** @throws InvalidArgumentException */
     public function testGetResource(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -134,6 +148,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getResource('missing'));
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetResourceInvalidLiteral(bool $allowMissing): void
@@ -148,6 +163,7 @@ final class ResultTest extends TestCase
         $result->getResource('literal', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     public function testGetResourceInvalidMissing(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -165,6 +181,8 @@ final class ResultTest extends TestCase
     // ==================================================
 
     /** tests the getIri method */
+
+    /** @throws InvalidArgumentException */
     public function testGetIri(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -178,6 +196,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getIri('missing'));
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetIriInvalidLiteral(bool $allowMissing): void
@@ -192,6 +211,7 @@ final class ResultTest extends TestCase
         $result->getIri('literal', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetIriInvalidBNode(bool $allowMissing): void
@@ -206,6 +226,7 @@ final class ResultTest extends TestCase
         $result->getIri('bnode', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     public function testGetIriInvalidMissing(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -222,7 +243,7 @@ final class ResultTest extends TestCase
     // getLiteral
     // ==================================================
 
-    /** tests the getLiteral method */
+    /** @throws InvalidArgumentException */
     public function testGetLiteral(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -236,6 +257,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getLiteral('missing'));
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetLiteralInvalidIri(bool $allowMissing): void
@@ -250,6 +272,7 @@ final class ResultTest extends TestCase
         $result->getLiteral('iri', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetLiteralInvalidBNode(bool $allowMissing): void
@@ -264,6 +287,7 @@ final class ResultTest extends TestCase
         $result->getLiteral('bnode', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     public function testGetLiteralInvalidMissing(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -281,6 +305,8 @@ final class ResultTest extends TestCase
     // ==================================================
 
     /** tests the getBlankNode method */
+
+    /** @throws InvalidArgumentException */
     public function testGetBlankNode(): void
     {
         $iri       = new Iri('https://example.com/s');
@@ -294,6 +320,7 @@ final class ResultTest extends TestCase
         self::assertNull($result->getBlankNode('missing'));
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetBlankNodeInvalidIri(bool $allowMissing): void
@@ -308,6 +335,7 @@ final class ResultTest extends TestCase
         $result->getBlankNode('iri', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     #[TestWith([true])]
     #[TestWith([false])]
     public function testGetBlankNodeInvalidLiteral(bool $allowMissing): void
@@ -322,6 +350,7 @@ final class ResultTest extends TestCase
         $result->getBlankNode('literal', $allowMissing);
     }
 
+    /** @throws InvalidArgumentException */
     public function testGetBlankNodeInvalidMissing(): void
     {
         $iri       = new Iri('https://example.com/s');

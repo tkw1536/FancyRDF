@@ -9,6 +9,7 @@ use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
 use Generator;
+use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -39,6 +40,10 @@ final class TrigTest extends TestBase
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -54,7 +59,12 @@ final class TrigTest extends TestBase
         );
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function trigPositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTrigPositiveSyntax') as $info) {
@@ -64,7 +74,12 @@ final class TrigTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string, result: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string, result: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function trigEvaluationProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTrigEval') as $info) {
@@ -79,7 +94,12 @@ final class TrigTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function trigNegativeSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTrigNegativeSyntax') as $info) {
@@ -99,6 +119,10 @@ final class TrigTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('trigPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
@@ -118,6 +142,10 @@ final class TrigTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('trigNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
     #[RequiresSetting('zend.assertions', '1')]
@@ -139,6 +167,10 @@ final class TrigTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('trigNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not throw with assertions disabled')]
     #[RequiresSetting('zend.assertions', '0')]
@@ -159,6 +191,10 @@ final class TrigTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('trigEvaluationProvider')]
     #[TestDox('$_dataname evaluates correctly')]
     #[Group('positive-evaluation')]

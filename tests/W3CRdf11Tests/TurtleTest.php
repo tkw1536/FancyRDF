@@ -10,6 +10,7 @@ use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
 use Generator;
+use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -40,6 +41,10 @@ final class TurtleTest extends TestBase
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -55,7 +60,12 @@ final class TurtleTest extends TestBase
         );
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function turtlePositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTurtlePositiveSyntax') as $info) {
@@ -65,7 +75,12 @@ final class TurtleTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string, result: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string, result: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function turtleEvaluationProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTurtleEval') as $info) {
@@ -80,7 +95,12 @@ final class TurtleTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function turtleNegativeSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTurtleNegativeSyntax') as $info) {
@@ -101,6 +121,10 @@ final class TurtleTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('turtlePositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
@@ -123,6 +147,10 @@ final class TurtleTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('turtleEvaluationProvider')]
     #[TestDox('$_dataname evaluates correctly')]
     #[Group('positive-evaluation')]
@@ -147,6 +175,10 @@ final class TurtleTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('turtleNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
     #[RequiresSetting('zend.assertions', '1')]
@@ -169,6 +201,10 @@ final class TurtleTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('turtleNegativeSyntaxProvider')]
     #[RequiresSetting('zend.assertions', '0')]
     #[TestDox('$_dataname does not assert with assertions disabled')]

@@ -9,6 +9,7 @@ use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Formats\RdfXmlSerializer;
 use FancyRDF\Tests\Support\LocalRdfTestCases;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
@@ -27,7 +28,11 @@ use const DIRECTORY_SEPARATOR;
  */
 final class RdfXmlSerializerTest extends TestCase
 {
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function serializeProvider(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
@@ -49,6 +54,9 @@ final class RdfXmlSerializerTest extends TestCase
     /**
      * @param string $rdfFile        Path to the input RDF/XML file.
      * @param string $serializedFile Path to the expected serialized RDF/XML file.
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     #[DataProvider('serializeProvider')]
     #[TestDox('serialize {name}')]
@@ -75,6 +83,9 @@ final class RdfXmlSerializerTest extends TestCase
      * Serializes a list of triples to RDF/XML.
      *
      * @param iterable<TripleOrQuadArray> $triples
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     private static function serializeTriples(mixed $triples): string
     {

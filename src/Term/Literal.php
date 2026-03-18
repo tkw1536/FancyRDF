@@ -7,6 +7,7 @@ namespace FancyRDF\Term;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
+use FancyRDF\Exceptions\InvalidLexicalValueError;
 use FancyRDF\Term\Datatype\Datatype;
 use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Datatype\XSDString;
@@ -38,6 +39,8 @@ final class Literal extends Term
      * Returns the RDF1.1 literal value of this literal as a php value.
      *
      * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-value
+     *
+     * @throws InvalidLexicalValueError
      */
     public function getValue(): mixed
     {
@@ -88,6 +91,8 @@ final class Literal extends Term
      * @param non-empty-string|null $language
      *   A valid non-empty BCP47 language tag, if and only if the datatype iri is {@see self::DATATYPE_LANG_STRING} or NULL.
      *   The constructor makes no attempt to validate the language tag, and passing an invalid language tag may lead to undefined behavior.
+     *
+     * @throws InvalidArgumentException if the language and datatype are in an invalid combination.
      */
     public function __construct(public readonly string $lexical, public readonly string|null $language = null, Iri|null $datatype = null)
     {
@@ -114,7 +119,11 @@ final class Literal extends Term
         }
 
         // if not, compare their values
-        return $this->getDatatypeInstance()->equals($other->getDatatypeInstance());
+        try {
+            return $this->getDatatypeInstance()->equals($other->getDatatypeInstance());
+        } catch (InvalidLexicalValueError) {
+            return false;
+        }
     }
 
     #[Override]

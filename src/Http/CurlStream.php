@@ -6,7 +6,6 @@ namespace FancyRDF\Http;
 
 use CurlHandle;
 use Fiber;
-use LogicException;
 use RuntimeException;
 use Throwable;
 
@@ -16,6 +15,7 @@ use function curl_exec;
 use function curl_getinfo;
 use function curl_setopt;
 use function explode;
+use function fopen;
 use function strlen;
 use function strtolower;
 use function trigger_error;
@@ -25,6 +25,7 @@ use const CURLINFO_CONTENT_LENGTH_DOWNLOAD;
 use const CURLINFO_RESPONSE_CODE;
 use const CURLOPT_HEADERFUNCTION;
 use const CURLOPT_WRITEFUNCTION;
+use const E_USER_NOTICE;
 use const E_USER_WARNING;
 
 /**
@@ -188,11 +189,20 @@ final class CurlStream
      * This method may be called at most once.
      *
      * @return resource
+     *
+     * @throws RuntimeException if the stream cannot be opened.
      */
     public function getContent()
     {
         if ($this->bodyRead) {
-            throw new LogicException('You can only get the content once');
+            trigger_error('CurlStream::getContent(): Can only be called once. Returning empty stream. ', E_USER_NOTICE);
+
+            $memory = fopen('memory://', 'r');
+            if ($memory === false) {
+                throw new RuntimeException('failed to open memory stream');
+            }
+
+            return $memory;
         }
 
         $this->bodyRead = true;

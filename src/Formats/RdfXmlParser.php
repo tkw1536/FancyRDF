@@ -10,7 +10,9 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
 use FancyRDF\Xml\XMLUtils;
+use InvalidArgumentException;
 use Override;
+use RuntimeException;
 use SplStack;
 use XMLReader;
 
@@ -53,6 +55,8 @@ class RdfXmlParser extends FiberIterator
      * @return non-empty-string
      *   The resolved absolute URI.
      *   The function asserts that the URI is resolvable, i.e. that the result is non-empty.
+     *
+     * @throws InvalidArgumentException
      */
     private function resolveURI(string $uri): string
     {
@@ -176,6 +180,8 @@ class RdfXmlParser extends FiberIterator
      * @param bool        $checkDuplicates Whether to check for duplicate rdf:ID values
      *
      * @return Iri|BlankNode The resolved subject Resource
+     *
+     * @throws InvalidArgumentException
      */
     private function resolveSubject(string|null $about, string|null $nodeId, string|null $idAttr, bool $checkDuplicates = false): Iri|BlankNode
     {
@@ -214,6 +220,8 @@ class RdfXmlParser extends FiberIterator
      * @param Iri|BlankNode         $subject        The subject of the collection property
      * @param Iri                   $predicate      The predicate of the collection property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
+     *
+     * @throws InvalidArgumentException
      */
     private function handleParseTypeCollection(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI): void
     {
@@ -338,6 +346,9 @@ class RdfXmlParser extends FiberIterator
      * @param Iri                   $predicate      The predicate of the literal property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      * @param string|null           $resourceAttr   The rdf:resource attribute value (must be null)
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     private function handleParseTypeLiteral(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI, string|null $resourceAttr): void
     {
@@ -380,6 +391,8 @@ class RdfXmlParser extends FiberIterator
      *
      * @param Iri|BlankNode         $object The object (IRI or Blank Node) to add properties to
      * @param non-empty-string|null $lang   The language for literal values
+     *
+     * @throws InvalidArgumentException
      */
     private function processPropertyElementAttributes(Iri|BlankNode $object, string|null $lang): void
     {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Term\Datatype;
+namespace FancyRDF\Exceptions;
 
 use InvalidArgumentException;
 use Throwable;

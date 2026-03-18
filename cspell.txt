@@ -58,6 +58,7 @@ RDFS
 rdft
 rdfxml
 reencoded
+Regexes
 reif
 relfile
 restringified

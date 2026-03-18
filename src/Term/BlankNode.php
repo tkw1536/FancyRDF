@@ -79,11 +79,7 @@ final class BlankNode extends Term
         return true;
     }
 
-    /**
-     * @param mixed[] $data
-     *
-     * @throws InvalidArgumentException
-     */
+    /** @param mixed[] $data */
     #[Override]
     public static function deserializeJSON(array $data): BlankNode
     {
@@ -100,7 +96,6 @@ final class BlankNode extends Term
         return new BlankNode($value);
     }
 
-    /** @throws InvalidArgumentException */
     #[Override]
     public static function deserializeXML(DOMNode $element): BlankNode
     {

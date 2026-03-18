@@ -184,6 +184,7 @@ PHP;
     private const int WAIT_UNTIL_READY_TIMEOUT_NS = 60_000_000_000; // 60s
     private const int SLEEP_INTERVAL_NS           = 100_000_000; // .1s
 
+    /** @throws RuntimeException */
     private function wait(): void
     {
         // This function waits for the server to start up and be ready to accept connections.
@@ -246,6 +247,8 @@ PHP;
      *
      * @return array{string, int}
      *   A pair of address and port that was picked.
+     *
+     * @throws RuntimeException
      */
     private function pickFreePort(): array
     {

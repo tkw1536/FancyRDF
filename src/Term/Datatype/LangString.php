@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Term\Datatype;
 
+use FancyRDF\Exceptions\InvalidLexicalValueError;
 use Override;
 
 /** @extends Datatype<array{string, string}> */
@@ -29,6 +30,7 @@ final class LangString extends Datatype
         return [$this->lexical, $this->language];
     }
 
+    /** @throws void */
     #[Override]
     public function toCanonicalForm(): string
     {

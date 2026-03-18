@@ -40,6 +40,8 @@ final class LocalRdfTestCases
      *     rdf: string|null,
      *     rdf_serialized: string|null
      * }>
+     *
+     * @throws RuntimeException
      */
     public static function load(string $baseDir): array
     {

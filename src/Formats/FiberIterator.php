@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use Fiber;
+use InvalidArgumentException;
 use IteratorAggregate;
-use LogicException;
 use Override;
+use RuntimeException;
 use Traversable;
+
+use function trigger_error;
+
+use const E_USER_NOTICE;
 
 /**
  * A class that emits from a fiber.
@@ -30,7 +35,9 @@ abstract class FiberIterator implements IteratorAggregate
     public function getIterator(): Traversable
     {
         if ($this->getIteratorStarted) {
-            throw new LogicException('Can only use getIterator() once');
+            trigger_error('FiberIterator::getIterator(): Can only be called once. Returning empty iterator. ', E_USER_NOTICE);
+
+            return;
         }
 
         $this->getIteratorStarted = true;
@@ -83,6 +90,9 @@ abstract class FiberIterator implements IteratorAggregate
      * Performs the actual iteration.
      *
      * It should call the emit() function at any point to suspend itself and emit a value.
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     abstract protected function doIterate(): void;
 }

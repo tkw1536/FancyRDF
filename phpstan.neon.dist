@@ -43,6 +43,11 @@ parameters:
         check:
             throwTypeCovariance: true
             tooWideImplicitThrowType: true
+            missingCheckedExceptionInThrows: true
+        implicitThrows: false
+        uncheckedExceptionClasses: []
+        uncheckedExceptionRegexes: []
+        reportUncheckedExceptionDeadCatch: true
     reportUnmatchedIgnoredErrors: true
 
     errorFormat: raw

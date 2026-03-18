@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\W3CRdf11Tests;
 use AssertionError;
 use FancyRDF\Formats\RdfXmlParser;
 use Generator;
+use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -38,6 +39,10 @@ final class RDFXMLTest extends TestBase
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -51,7 +56,12 @@ final class RDFXMLTest extends TestBase
         );
     }
 
-    /** @return Generator<string, array{action: string, result: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string, result: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function xmlTestEvaluationProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestXMLEval') as $info) {
@@ -66,7 +76,12 @@ final class RDFXMLTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function xmlTestNegativeSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestXMLNegativeSyntax') as $info) {
@@ -76,6 +91,10 @@ final class RDFXMLTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('xmlTestEvaluationProvider')]
     #[TestDox('$_dataname')]
     #[Group('positive-evaluation')]
@@ -100,6 +119,10 @@ final class RDFXMLTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('xmlTestNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
     #[RequiresSetting('zend.assertions', '1')]
@@ -123,6 +146,10 @@ final class RDFXMLTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('xmlTestNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not assert with assertions enabled')]
     #[RequiresSetting('zend.assertions', '0')]

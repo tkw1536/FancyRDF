@@ -8,6 +8,7 @@ use FancyRDF\Dataset\Quad;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
+use InvalidArgumentException;
 use RuntimeException;
 
 use function array_key_exists;
@@ -66,6 +67,8 @@ abstract class FrameSerializer
     /**
      * @param array<string, non-empty-string> $prefixes
      *   A mapping of prefixes to namespace URIs that should be declared on the root element.
+     *
+     * @throws InvalidArgumentException
      */
     public function __construct(array $prefixes = [])
     {
@@ -75,11 +78,11 @@ abstract class FrameSerializer
             }
 
             if (isset($this->prefixToNamespace[$prefix]) && $this->prefixToNamespace[$prefix] !== $namespace) {
-                throw new RuntimeException('Prefix "' . $prefix . '" already mapped to a different namespace');
+                throw new InvalidArgumentException('Prefix "' . $prefix . '" already mapped to a different namespace');
             }
 
             if (isset($this->namespaceToPrefix[$namespace]) && $this->namespaceToPrefix[$namespace] !== $prefix) {
-                throw new RuntimeException('Namespace "' . $namespace . '" already mapped to a different prefix');
+                throw new InvalidArgumentException('Namespace "' . $namespace . '" already mapped to a different prefix');
             }
 
             $this->prefixToNamespace[$prefix]         = $namespace;
@@ -97,6 +100,7 @@ abstract class FrameSerializer
      * @param TripleOrQuadArray $quad
      *
      * @throws RuntimeException if close has been called before calling write.
+     * @throws InvalidArgumentException
      */
     final public function write(array $quad): void
     {
@@ -147,6 +151,8 @@ abstract class FrameSerializer
      * Closes any open frames (graph, subject, property) down to the root,
      * so that pending output is written. The document remains open for further writes.
      * Does nothing if the serializer has not been started or has already been closed.
+     *
+     * @throws InvalidArgumentException
      */
     final public function flush(): void
     {
@@ -161,6 +167,8 @@ abstract class FrameSerializer
     /**
      * Flushes any pending quads to the output and prevents further write.
      * Calling close multiple times has no effect.
+     *
+     * @throws InvalidArgumentException
      */
     final public function close(): void
     {
@@ -205,6 +213,8 @@ abstract class FrameSerializer
      * Opens a graph frame for the given graph name.
      *
      * Implementations should start any structure needed to represent a named graph.
+     *
+     * @throws InvalidArgumentException
      */
     abstract protected function doOpenGraph(Iri|BlankNode $graph): void;
 
@@ -212,6 +222,8 @@ abstract class FrameSerializer
      * Closes the graph frame for the given graph name.
      *
      * Implementations should finish any structure started in {@see doOpenGraph()}.
+     *
+     * @throws InvalidArgumentException
      */
     abstract protected function doCloseGraph(Iri|BlankNode $graph): void;
 
@@ -285,6 +297,8 @@ abstract class FrameSerializer
      * @param non-empty-string $iri
      *
      * @return array{0: non-empty-string, 1: non-empty-string} [namespace, localName]
+     *
+     * @throws RuntimeException
      */
     final protected function splitNamespaceAndLocalName(string $iri): array
     {
@@ -372,6 +386,8 @@ abstract class FrameSerializer
 
     /**
      * Closes all frames above the given index, leaving the frame at $index open.
+     *
+     * @throws InvalidArgumentException
      */
     private function closeFramesAbove(int $index): void
     {
@@ -382,6 +398,8 @@ abstract class FrameSerializer
 
     /**
      * Closes all frames down to the root frame, but not including it.
+     *
+     * @throws InvalidArgumentException
      */
     private function closeUntilRoot(): void
     {
@@ -395,6 +413,7 @@ abstract class FrameSerializer
         }
     }
 
+    /** @throws InvalidArgumentException */
     private function openGraphFrame(Iri|BlankNode $graph): void
     {
         $this->doOpenGraph($graph);
@@ -421,6 +440,7 @@ abstract class FrameSerializer
         ];
     }
 
+    /** @throws InvalidArgumentException */
     private function closeTopFrame(): void
     {
         $frame = array_pop($this->frameStack);
@@ -444,6 +464,10 @@ abstract class FrameSerializer
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private function writePredicateAndObject(Iri $predicate, Iri|Literal|BlankNode $object): void
     {
         [$namespace, $localName] = $this->splitNamespaceAndLocalName($predicate->iri);

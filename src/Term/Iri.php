@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace FancyRDF\Term;
 
 use DOMDocument;
+use DOMException;
 use DOMNode;
 use FancyRDF\Uri\UriReference;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
+use RuntimeException;
 
 use function is_string;
 use function mb_ord;
@@ -66,11 +68,7 @@ final class Iri extends Term
         return $other instanceof Iri && $this->iri === $other->iri;
     }
 
-    /**
-     * @param mixed[] $data
-     *
-     * @throws InvalidArgumentException
-     */
+    /** @param mixed[] $data */
     #[Override]
     public static function deserializeJSON(array $data): Iri
     {
@@ -87,7 +85,6 @@ final class Iri extends Term
         return new Iri($value);
     }
 
-    /** @throws InvalidArgumentException */
     #[Override]
     public static function deserializeXML(DOMNode $element): Iri
     {
@@ -129,6 +126,10 @@ final class Iri extends Term
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws DOMException
+     */
     #[Override]
     public function xmlSerialize(DOMDocument $document): DOMNode
     {

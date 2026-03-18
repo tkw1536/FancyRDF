@@ -12,6 +12,7 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
 use Generator;
+use InvalidArgumentException;
 use RuntimeException;
 
 use function dirname;
@@ -40,6 +41,10 @@ class Rdf11TestCases
     private string $baseIri;
     private string $baseDirectory;
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public function __construct(
         private readonly string $manifestPath,
         private readonly string $manifestIri,

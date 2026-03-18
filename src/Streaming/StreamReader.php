@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace FancyRDF\Streaming;
 
-use InvalidArgumentException;
-
 use function mb_convert_case;
 use function mb_substr;
 use function strlen;
 use function substr;
+use function trigger_error;
 
+use const E_USER_NOTICE;
+use const E_USER_WARNING;
 use const MB_CASE_FOLD_SIMPLE;
 
 /**
@@ -31,6 +32,8 @@ abstract class StreamReader
      * Reads data from the underlying stream into $this->buffer.
      *
      * After a call either len($this->buffer) >= $bytes or the input stream has ended.
+     *
+     * @param non-negative-int $bytes
      */
     private function buffer(int $bytes): void
     {
@@ -63,16 +66,17 @@ abstract class StreamReader
      *
      * @param int $offset
      *   An offset in number of bytes to read from the current position.
+     *   An negative offset triggers a warning and returns null.
      *
      * @return non-empty-string|null
      *   The next unicode code point, or null if the end of input has been reached.
-     *
-     * @throws InvalidArgumentException if $offset is negative.
      */
     public function peek(int $offset = 0): string|null
     {
         if ($offset < 0) {
-            throw new InvalidArgumentException('offset must be non-negative');
+            trigger_error('StreamReader::peek(' . $offset . '): Expected positive or zero offset', E_USER_WARNING);
+
+            return null;
         }
 
         $this->buffer($offset + self::MAX_CODE_POINT_LENGTH);
@@ -116,12 +120,21 @@ abstract class StreamReader
      * Consumes and returns the given number of bytes from the input.
      * If there are fewer than $bytes bytes available, the remaining bytes are returned.
      *
-     * @throws InvalidArgumentException if $bytes is negative.
+     * @param int $bytes The number of bytes to consume.
+     *   This number should be positive, and a negative value will trigger an E_USER_NOTICE.
+     *
+     * @return ($bytes is positive-int ? string : '') The string consumed from the input.
      */
     public function consume(int $bytes): string
     {
         if ($bytes < 0) {
-            throw new InvalidArgumentException('offset must be non-negative');
+            trigger_error('StreamReader::consume(' . $bytes . '): Negative offset treated as zero', E_USER_NOTICE);
+
+            return '';
+        }
+
+        if ($bytes === 0) {
+            return '';
         }
 
         $this->buffer($bytes);

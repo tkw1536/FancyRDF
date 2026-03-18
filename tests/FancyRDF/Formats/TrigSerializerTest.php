@@ -24,7 +24,11 @@ use const DIRECTORY_SEPARATOR;
 /** @phpstan-import-type TripleOrQuadArray from Quad */
 final class TrigSerializerTest extends TestCase
 {
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function turtleSerializeProvider(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'trig-serializer';
@@ -46,7 +50,11 @@ final class TrigSerializerTest extends TestCase
         return $cases;
     }
 
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function trigSerializeProvider(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'trig-serializer';
@@ -72,6 +80,8 @@ final class TrigSerializerTest extends TestCase
      * @param string $ntFile  Path to the input N-Triples file.
      * @param string $ttlFile Path to the expected Turtle file.
      */
+
+    /** @throws InvalidArgumentException */
     #[DataProvider('turtleSerializeProvider')]
     public function testTurtleSerialize(string $ntFile, string $ttlFile): void
     {
@@ -105,6 +115,8 @@ final class TrigSerializerTest extends TestCase
      * @param string $nqFile   Path to the input N-Quads file.
      * @param string $trigFile Path to the expected TriG file.
      */
+
+    /** @throws InvalidArgumentException */
     #[DataProvider('trigSerializeProvider')]
     public function testTrigSerialize(string $nqFile, string $trigFile): void
     {
@@ -133,6 +145,7 @@ final class TrigSerializerTest extends TestCase
         );
     }
 
+    /** @throws InvalidArgumentException */
     public function testTurtleRejectsGraphs(): void
     {
         $serializer = new TrigSerializer(false);

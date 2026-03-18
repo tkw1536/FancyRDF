@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Term;
 
 use DOMDocument;
+use DOMException;
 use FancyRDF\Term\Iri;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
@@ -12,6 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 /** @phpstan-import-type IRIArray from Iri */
 final class IriTest extends TestCase
@@ -54,7 +56,11 @@ final class IriTest extends TestCase
         ];
     }
 
-    /** @param IRIArray $expectedJson */
+    /**
+     * @param IRIArray $expectedJson
+     *
+     * @throws RuntimeException
+     */
     #[DataProviderExternal(TermTest::class, 'iriSerializationProvider')]
     #[TestDox('$_dataname correctly serializes to json')]
     public function testSerializeJson(
@@ -65,7 +71,12 @@ final class IriTest extends TestCase
         self::assertSame($expectedJson, $iri->jsonSerialize(), 'JSON serialization');
     }
 
-    /** @param IRIArray $expectedJson */
+    /**
+     * @param IRIArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws DOMException
+     */
     #[DataProviderExternal(TermTest::class, 'iriSerializationProvider')]
     #[TestDox('$_dataname correctly serializes to xml')]
     public function testSerializeXml(
@@ -77,7 +88,12 @@ final class IriTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @param IRIArray $expectedJson */
+    /**
+     * @param IRIArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProviderExternal(TermTest::class, 'iriSerializationProvider')]
     #[TestDox('$_dataname correctly deserializes from xml')]
     public function testDeserializeXml(
@@ -89,7 +105,12 @@ final class IriTest extends TestCase
         self::assertTrue($iriFromXml->equals($iri), 'XML deserialize');
     }
 
-    /** @param IRIArray $expectedJson */
+    /**
+     * @param IRIArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProviderExternal(TermTest::class, 'iriSerializationProvider')]
     #[TestDox('$_dataname correctly deserializes from json')]
     public function testDeserializeJson(
@@ -101,6 +122,10 @@ final class IriTest extends TestCase
         self::assertTrue($iriFromJson->equals($iri), 'JSON deserialize');
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('deserializeInvalidXMLProvider')]
     #[TestDox('$_dataname refuses to deserialize invalid xml')]
     public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
@@ -111,7 +136,11 @@ final class IriTest extends TestCase
         Iri::deserializeXML(XMLUtils::parseAndGetRootNode($xml));
     }
 
-    /** @param mixed[] $invalidData */
+    /**
+     * @param mixed[] $invalidData
+     *
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('deserializeInvalidJSONProvider')]
     #[TestDox('$_dataname refuses to deserialize invalid json')]
     public function testDeserializeInvalidJSON(array $invalidData, string $expectedMessage): void

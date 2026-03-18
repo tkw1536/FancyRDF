@@ -6,6 +6,7 @@ namespace FancyRDF\Term\Datatype;
 
 use DOMDocument;
 use DOMNode;
+use FancyRDF\Exceptions\InvalidLexicalValueError;
 use Override;
 
 use function iterator_to_array;

@@ -11,19 +11,19 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Throwable;
 
 use function fopen;
 use function fwrite;
 use function rewind;
 use function str_repeat;
-use function trigger_error;
-
-use const E_USER_WARNING;
 
 final class TrigReaderTest extends TestCase
 {
-    /** @return resource */
+    /**
+     * @return resource
+     *
+     * @throws RuntimeException
+     */
     private static function openString(string $input): mixed
     {
         $stream = fopen('php://memory', 'r+');
@@ -42,7 +42,11 @@ final class TrigReaderTest extends TestCase
         return $stream;
     }
 
-    /** @param list<array{TrigToken, string}> $expected */
+    /**
+     * @param list<array{TrigToken, string}> $expected
+     *
+     * @throws RuntimeException
+    */
     #[DataProvider('tokenizeProvider')]
     #[TestDox('tokenizes input to expected token sequence')]
     public function testTokenize(string $input, array $expected): void
@@ -50,12 +54,9 @@ final class TrigReaderTest extends TestCase
         $stream = self::openString($input);
         $reader = new TrigReader(new ResourceStreamReader($stream));
         $tokens = [];
-        try {
-            while ($reader->next()) {
-                $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];
-            }
-        } catch (Throwable $e) {
-            trigger_error($e->getMessage(), E_USER_WARNING);
+
+        while ($reader->next()) {
+            $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];
         }
 
         $tokens[] = [TrigToken::EndOfInput, $reader->getTokenValue()];
@@ -195,6 +196,7 @@ TRIG;
         ];
     }
 
+    /** @throws RuntimeException */
     #[TestDox('streaming reader yields same token sequence when using small chunk size')]
     public function testStreamingReadsInChunks(): void
     {

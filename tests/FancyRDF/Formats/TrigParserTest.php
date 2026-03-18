@@ -28,7 +28,11 @@ use const DIRECTORY_SEPARATOR;
 /** @phpstan-import-type TripleOrQuadArray from Quad */
 final class TrigParserTest extends TestCase
 {
-    /** @return resource */
+    /**
+     * @return resource
+     *
+     * @throws RuntimeException
+     */
     private static function openString(string $input): mixed
     {
         $stream = fopen('php://memory', 'r+');
@@ -47,7 +51,11 @@ final class TrigParserTest extends TestCase
         return $stream;
     }
 
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function turtleProvider(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
@@ -66,7 +74,11 @@ final class TrigParserTest extends TestCase
         return $cases;
     }
 
-    /** @return array<string, array{string, string}> */
+    /**
+     * @return array<string, array{string, string}>
+     *
+     * @throws RuntimeException
+     */
     public static function trigProvider(): array
     {
         $baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'testdata' . DIRECTORY_SEPARATOR . 'rdf';
@@ -85,7 +97,11 @@ final class TrigParserTest extends TestCase
         return $cases;
     }
 
-    /** @return array<string, array{string, class-string<Throwable>}> */
+    /**
+     * @return array<string, array{string, class-string<Throwable>}>
+     *
+     * @throws RuntimeException
+     */
     public static function invalidMixProvider(): array
     {
         $baseDir = __DIR__ . '/testdata/rdf';
@@ -104,6 +120,7 @@ final class TrigParserTest extends TestCase
         return $cases;
     }
 
+    /** @throws RuntimeException */
     #[DataProvider('turtleProvider')]
     #[TestDox('parses Turtle as triples: {_dataName}')]
     public function testParseTurtle(string $ttlFile, string $ntFile): void
@@ -128,6 +145,7 @@ final class TrigParserTest extends TestCase
         self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
     }
 
+    /** @throws RuntimeException */
     #[DataProvider('turtleProvider')]
     #[TestDox('parses Turtle as TriG (no graphs): {_dataName}')]
     public function testParseTurtleAsTrig(string $ttlFile, string $ntFile): void

@@ -9,6 +9,7 @@ use Fiber;
 use Generator;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use XMLReader;
 
 use function fstat;
@@ -16,6 +17,7 @@ use function stream_get_contents;
 
 final class IteratorStreamTest extends TestCase
 {
+    /** @throws RuntimeException */
     #[TestDox('stream_get_contents reads all chunked yields')]
     public function testStreamGetContentsWithChunkedYields(): void
     {
@@ -31,6 +33,7 @@ final class IteratorStreamTest extends TestCase
         self::assertSame('Hello, world!', $contents);
     }
 
+    /** @throws RuntimeException */
     #[TestDox('stream opened with size parameter reports that size in fstat')]
     public function testStreamWithSizeParameterReturnsSizeInStat(): void
     {
@@ -48,6 +51,7 @@ final class IteratorStreamTest extends TestCase
         self::assertSame($expectedSize, $stat['size']);
     }
 
+    /** @throws RuntimeException */
     #[TestDox('openFiber with not-yet-started fiber yields string suspends and ignores non-strings')]
     public function testOpenFiberNotStartedSuspendsWithChunksAndIgnoresNonStrings(): void
     {
@@ -69,6 +73,7 @@ final class IteratorStreamTest extends TestCase
         self::assertSame('Hello world!', $contents);
     }
 
+    /** @throws RuntimeException */
     #[TestDox('XMLReader parses oddly chunked XML and reports element names')]
     public function testXmlReaderWithOddlyChunkedXml(): void
     {

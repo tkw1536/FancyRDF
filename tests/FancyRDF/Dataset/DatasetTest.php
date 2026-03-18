@@ -8,13 +8,18 @@ use FancyRDF\Dataset\Dataset;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
 final class DatasetTest extends TestCase
 {
-    /** @return iterable<string, array{Dataset, Dataset, array<string, string>, array<string, string>, bool, bool}> */
+    /**
+     * @return iterable<string, array{Dataset, Dataset, array<string, string>, array<string, string>, bool, bool}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function isIsomorphicToProvider(): iterable
     {
         $s = new Iri('https://example.org/s');

@@ -18,12 +18,14 @@ final class XSDString extends Datatype
         return [self::IRI];
     }
 
+    /** @throws void */
     #[Override]
     public function toValue(): string
     {
         return $this->lexical;
     }
 
+    /** @throws void */
     #[Override]
     public function toCanonicalForm(): string
     {

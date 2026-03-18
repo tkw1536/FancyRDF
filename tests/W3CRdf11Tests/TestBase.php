@@ -10,8 +10,10 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancyRDF\Tests\Support\Rdf11TestCases;
 use Generator;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\BeforeClass;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 use function dirname;
 use function fclose;
@@ -58,6 +60,10 @@ abstract class TestBase extends TestCase
         return $testSuiteBaseUri . 'manifest.ttl';
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[BeforeClass()]
     public static function ensureManifestLoaded(): void
     {
@@ -81,6 +87,10 @@ abstract class TestBase extends TestCase
         );
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     private static function casesInstance(): Rdf11TestCases
     {
         self::ensureManifestLoaded();
@@ -98,6 +108,9 @@ abstract class TestBase extends TestCase
      *   Extra properties to add to the entry.
      *
      * @return Generator<int, array{iri: string, name: string, comment: string|null, action: string, result: string|null, extra: array<non-empty-string, string|null>}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     protected static function cases(string $typ, array $extraProps = []): Generator
     {
@@ -108,6 +121,9 @@ abstract class TestBase extends TestCase
      * Opens a file for the given iri and asserts that it can be opened correctly.
      *
      * @return resource
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     protected static function assertOpen(string $iri)
     {
@@ -122,6 +138,9 @@ abstract class TestBase extends TestCase
 
     /**
      * Reads a file for the given iri and asserts that it can be read correctly.
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     protected static function assertRead(string $iri): string
     {
@@ -136,6 +155,9 @@ abstract class TestBase extends TestCase
 
     /**
      * Loads an evaluation file and returns an appropriate constraint.
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     protected static function makeEvaluationConstraint(string $iri): IsomorphicAsDatasetsConstraint
     {
@@ -167,6 +189,9 @@ abstract class TestBase extends TestCase
      * @return array<string, int>
      *   The number of entries for each type.
      *   The array is sorted by key.
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     public static function caseCount(): array
     {

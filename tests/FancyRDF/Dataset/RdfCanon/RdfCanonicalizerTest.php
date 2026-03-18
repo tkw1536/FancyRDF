@@ -11,6 +11,7 @@ use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
@@ -25,7 +26,11 @@ final class RdfCanonicalizerTest extends TestCase
         return new Iri('http://example.com/#' . $suffix);
     }
 
-    /** @return iterable<string, array{Dataset, array<string, string>, list<string>}> */
+    /**
+     * @return iterable<string, array{Dataset, array<string, string>, list<string>}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function canonicalizeProvider(): iterable
     {
         $p = self::iri('p');
@@ -141,7 +146,10 @@ final class RdfCanonicalizerTest extends TestCase
     /**
      * @param array<string, string> $expectedBlankNodeMap
      * @param list<string>          $expectedNQuadsLines
-     */
+     *
+     * @throws CanonicalizationLimitExceeded
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('canonicalizeProvider')]
     public function testCanonicalizeExamples(Dataset $dataset, array $expectedBlankNodeMap, array $expectedNQuadsLines): void
     {
@@ -154,6 +162,10 @@ final class RdfCanonicalizerTest extends TestCase
         self::assertArraysHaveIdenticalValuesIgnoringOrder($expectedNQuadsLines, $lines);
     }
 
+    /**
+     * @throws CanonicalizationLimitExceeded
+     * @throws InvalidArgumentException
+     */
     #[TestDox('aborts when permutation exploration limit is exceeded')]
     public function testAbortOnPermutationLimitExceeded(): void
     {

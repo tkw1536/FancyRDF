@@ -8,9 +8,11 @@ use FancyRDF\Term\Datatype\Datatype;
 use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Datatype\XMLLiteral;
 use FancyRDF\Term\Datatype\XSDString;
-use RuntimeException;
 
 use function sprintf;
+use function trigger_error;
+
+use const E_USER_WARNING;
 
 final class Datatypes
 {
@@ -27,7 +29,7 @@ final class Datatypes
     {
         foreach ($class::getIRIs() as $iri) {
             if (isset(self::$dataClasses[$iri])) {
-                throw new RuntimeException(sprintf('Datatype IRI %s is already registered', $iri));
+                trigger_error(sprintf('Datatype IRI %s is already registered', $iri), E_USER_WARNING);
             }
 
             self::$dataClasses[$iri] = $class;

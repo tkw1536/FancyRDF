@@ -12,7 +12,6 @@ use FancyRDF\Term\Literal;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
-use RuntimeException;
 use XMLWriter;
 
 use function array_search;
@@ -31,6 +30,8 @@ final class RdfXmlSerializer extends FrameSerializer
     /**
      * @param array<string, non-empty-string> $prefixes
      *   A mapping of XML prefixes to namespace URIs that should be declared on the root element.
+     *
+     * @throws InvalidArgumentException
      */
     public function __construct(
         private XMLWriter $writer,
@@ -48,19 +49,19 @@ final class RdfXmlSerializer extends FrameSerializer
 
             if ($prefix === 'rdf') {
                 if ($namespace !== $rdfNamespace) {
-                    throw new RuntimeException('rdf prefix must map to the RDF namespace');
+                    throw new InvalidArgumentException('rdf prefix must map to the RDF namespace');
                 }
 
                 continue;
             }
 
             if (isset($allPrefixes[$prefix]) && $allPrefixes[$prefix] !== $namespace) {
-                throw new RuntimeException('Prefix "' . $prefix . '" already mapped to a different namespace');
+                throw new InvalidArgumentException('Prefix "' . $prefix . '" already mapped to a different namespace');
             }
 
             $existingPrefix = array_search($namespace, $allPrefixes, true);
             if ($existingPrefix !== false && $existingPrefix !== $prefix) {
-                throw new RuntimeException('Namespace "' . $namespace . '" already mapped to a different prefix');
+                throw new InvalidArgumentException('Namespace "' . $namespace . '" already mapped to a different prefix');
             }
 
             $allPrefixes[$prefix] = $namespace;

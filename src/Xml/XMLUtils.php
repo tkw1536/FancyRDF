@@ -6,6 +6,7 @@ namespace FancyRDF\Xml;
 
 use DOMDocument;
 use DOMElement;
+use DOMException;
 use DOMNode;
 use DOMXPath;
 use RuntimeException;
@@ -87,6 +88,7 @@ final class XMLUtils
      * Creates a new element inside the given document.
      *
      * @throws RuntimeException
+     * @throws DOMException
      */
     public static function createElement(
         DOMDocument $document,
@@ -109,6 +111,8 @@ final class XMLUtils
 
     /**
      * Given a completely valid XML string, returns the inner html of the node as a canonical string.
+     *
+     * @throws RuntimeException
      */
     public static function serializerInnerXML(string $outerXml): string
     {
@@ -143,6 +147,8 @@ final class XMLUtils
      *   The namespaces that are already defined.
      * @param array<string, bool> &$consumed
      *   A set of namespace lookups that were "consumed" somewhere down in the tree.
+     *
+     * @throws RuntimeException
      */
     private static function serializeAddPrefixes(DOMNode $node, DOMNode|null $context, array $defined, array &$consumed = []): string
     {
@@ -229,7 +235,11 @@ final class XMLUtils
         return $openingTag . $childrenAndClosing;
     }
 
-    /** @return array<string, string> Namespaces of the root element as $prefix => $uri. */
+    /**
+     * @return array<string, string> Namespaces of the root element as $prefix => $uri.
+     *
+     * @throws RuntimeException
+     */
     private static function getInScopeNamespaces(DOMNode $node): array
     {
         assert($node->ownerDocument !== null, 'node must have an owner document');

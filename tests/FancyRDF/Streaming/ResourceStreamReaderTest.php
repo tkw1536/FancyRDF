@@ -6,7 +6,6 @@ namespace FancyRDF\Tests\FancyRDF\Streaming;
 
 use FancyRDF\Streaming\ResourceStreamReader;
 use Generator;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -19,12 +18,21 @@ use function fopen;
 use function fwrite;
 use function is_resource;
 use function mb_str_split;
+use function restore_error_handler;
 use function rewind;
+use function set_error_handler;
 use function strlen;
+
+use const E_USER_NOTICE;
+use const E_USER_WARNING;
 
 final class ResourceStreamReaderTest extends TestCase
 {
-    /** @return resource */
+    /**
+     * @return resource
+     *
+     * @throws RuntimeException
+     */
     private static function openString(string $input)
     {
         $stream = fopen('php://memory', 'r+');
@@ -43,6 +51,7 @@ final class ResourceStreamReaderTest extends TestCase
         return $stream;
     }
 
+    /** @throws RuntimeException */
     #[TestWith([1])]
     #[TestWith([2])]
     #[TestWith([3])]
@@ -143,6 +152,7 @@ final class ResourceStreamReaderTest extends TestCase
         }
     }
 
+    /** @throws RuntimeException */
     #[TestDox('peek and consume handle UTF-8 runes of size > 1 byte with chunk size $chunkSize')]
     #[DataProvider('multiByteProvider')]
     public function testPeekAndConsumeWithMultiByteUtf8Runes(int $chunkSize, string $input): void
@@ -186,41 +196,66 @@ final class ResourceStreamReaderTest extends TestCase
         }
     }
 
-    #[TestDox('peek with negative offset throws InvalidArgumentException')]
-    public function testPeekNegativeOffsetThrows(): void
+    /** @throws RuntimeException */
+    #[TestDox('peek with negative offset warns')]
+    public function testPeekNegativeOffsetWarns(): void
     {
         $stream = self::openString('x');
+
+        $capturedError = null;
+        set_error_handler(
+            static function (int $errno, string $errstr) use (&$capturedError): bool {
+                $capturedError = [$errno, $errstr];
+
+                return true;
+            },
+        );
 
         try {
             $reader = new ResourceStreamReader($stream);
 
-            $this->expectException(InvalidArgumentException::class);
-            $this->expectExceptionMessage('offset must be non-negative');
+            $result = $reader->peek(-1);
 
-            $reader->peek(-1);
+            self::assertNull($result);
+            self::assertSame(
+                [E_USER_WARNING, 'StreamReader::peek(-1): Expected positive or zero offset'],
+                $capturedError,
+            );
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
             }
+
+            restore_error_handler();
         }
     }
 
+    /** @throws RuntimeException */
     #[TestDox('consume with negative bytes throws InvalidArgumentException')]
-    public function testConsumeNegativeBytesThrows(): void
+    public function testConsumeNegativeBytesWarns(): void
     {
         $stream = self::openString('x');
 
+        $capturedError = null;
+        set_error_handler(
+            static function (int $errno, string $errstr) use (&$capturedError): bool {
+                $capturedError = [$errno, $errstr];
+
+                return true;
+            },
+        );
+
         try {
             $reader = new ResourceStreamReader($stream);
-
-            $this->expectException(InvalidArgumentException::class);
-            $this->expectExceptionMessage('offset must be non-negative');
-
             $reader->consume(-1);
+
+            $this->assertSame($capturedError, [E_USER_NOTICE, 'StreamReader::consume(-1): Negative offset treated as zero']);
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
             }
+
+            restore_error_handler();
         }
     }
 }

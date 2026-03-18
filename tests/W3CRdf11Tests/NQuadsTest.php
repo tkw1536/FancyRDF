@@ -7,11 +7,13 @@ namespace FancyRDF\Tests\W3CRdf11Tests;
 use AssertionError;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
+use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
+use RuntimeException;
 
 use function fclose;
 use function is_resource;
@@ -36,6 +38,10 @@ final class NQuadsTest extends TestBase
         ];
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -49,7 +55,12 @@ final class NQuadsTest extends TestBase
         );
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function nquadsPositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestNQuadsPositiveSyntax') as $info) {
@@ -59,7 +70,12 @@ final class NQuadsTest extends TestBase
         }
     }
 
-    /** @return Generator<string, array{action: string}, mixed, void> */
+    /**
+     * @return Generator<string, array{action: string}, mixed, void>
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     public static function nquadsNegativeSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestNQuadsNegativeSyntax') as $info) {
@@ -69,6 +85,10 @@ final class NQuadsTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('nquadsPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
@@ -88,6 +108,10 @@ final class NQuadsTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('nquadsNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
     #[RequiresSetting('zend.assertions', '1')]
@@ -109,6 +133,10 @@ final class NQuadsTest extends TestBase
         }
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('nquadsNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not throw with assertions disabled')]
     #[RequiresSetting('zend.assertions', '0')]

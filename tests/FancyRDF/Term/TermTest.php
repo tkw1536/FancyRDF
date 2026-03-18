@@ -9,9 +9,11 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Term\Term;
 use FancyRDF\Xml\XMLUtils;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 use function var_export;
 
@@ -22,7 +24,11 @@ use function var_export;
  */
 final class TermTest extends TestCase
 {
-    /** @return array<string, array{Literal|Iri|BlankNode, LiteralArray|IRIArray|BlankNodeArray, string}> */
+    /**
+     * @return array<string, array{Literal|Iri|BlankNode, LiteralArray|IRIArray|BlankNodeArray, string}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function termDeserializationProvider(): array
     {
         $cases = [];
@@ -41,7 +47,11 @@ final class TermTest extends TestCase
         return $cases;
     }
 
-    /** @return array<string, array{Literal, LiteralArray, string}> */
+    /**
+     * @return array<string, array{Literal, LiteralArray, string}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function literalSerializationProvider(): array
     {
         return [
@@ -106,7 +116,11 @@ final class TermTest extends TestCase
         ];
     }
 
-    /** @return list<Iri|Literal|BlankNode> a list of terms in increasing order */
+    /**
+     * @return list<Iri|Literal|BlankNode> a list of terms in increasing order
+     *
+     * @throws InvalidArgumentException
+     */
     private function getTerms(): array
     {
         return [
@@ -136,7 +150,11 @@ final class TermTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{Iri|BlankNode|Literal, Iri|BlankNode|Literal, array<string, string>, array<string, string>, bool}> */
+    /**
+     * @return array<string, array{Iri|BlankNode|Literal, Iri|BlankNode|Literal, array<string, string>, array<string, string>, bool}>
+     *
+     * @throws InvalidArgumentException
+     */
     public static function unifyProvider(): array
     {
         $blank1 = new BlankNode('b1');
@@ -185,7 +203,11 @@ final class TermTest extends TestCase
         ];
     }
 
-    /** @param LiteralArray|IRIArray|BlankNodeArray $expectedJson */
+    /**
+     * @param LiteralArray|IRIArray|BlankNodeArray $expectedJson
+     *
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('termDeserializationProvider')]
     #[TestDox('$_dataname correctly deserializes xml')]
     public function testDeserializeJSON(Literal|Iri|BlankNode $term, array $expectedJson, string $expectedXml): void
@@ -194,7 +216,12 @@ final class TermTest extends TestCase
         self::assertTrue($fromJson->equals($term), 'JSON deserialize' . var_export($expectedJson, true));
     }
 
-    /** @param LiteralArray|IRIArray|BlankNodeArray $expectedJson */
+    /**
+     * @param LiteralArray|IRIArray|BlankNodeArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+    */
     #[DataProvider('termDeserializationProvider')]
     #[TestDox('$_dataname correctly deserializes json')]
     public function testDeserializeXML(Literal|Iri|BlankNode $term, array $expectedJson, string $expectedXml): void
@@ -203,6 +230,7 @@ final class TermTest extends TestCase
         self::assertTrue($fromXml->equals($term), 'XML deserialize');
     }
 
+    /** @throws InvalidArgumentException */
     #[TestDox('only equal terms are actually literally equal')]
     public function testLiteralEquals(): void
     {
@@ -219,6 +247,7 @@ final class TermTest extends TestCase
         }
     }
 
+    /** @throws InvalidArgumentException */
     #[TestDox('lexically compared terms are ordered correctly')]
     public function testCompare(): void
     {

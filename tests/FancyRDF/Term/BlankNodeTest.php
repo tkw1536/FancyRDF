@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Term;
 
 use DOMDocument;
+use DOMException;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
@@ -12,6 +13,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 /** @phpstan-import-type BlankNodeArray from BlankNode */
 final class BlankNodeTest extends TestCase
@@ -27,7 +29,12 @@ final class BlankNodeTest extends TestCase
         self::assertSame($expectedJson, $blankNode->jsonSerialize(), 'JSON serialization');
     }
 
-    /** @param BlankNodeArray $expectedJson */
+    /**
+     * @param BlankNodeArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws DOMException
+     */
     #[DataProviderExternal(TermTest::class, 'blankNodeSerializationProvider')]
     #[TestDox('$_dataname correctly serializes to xml')]
     public function testSerializeXml(
@@ -39,7 +46,12 @@ final class BlankNodeTest extends TestCase
         self::assertSame($expectedXml, $gotXML, 'XML serialization');
     }
 
-    /** @param BlankNodeArray $expectedJson */
+    /**
+     * @param BlankNodeArray $expectedJson
+     *
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProviderExternal(TermTest::class, 'blankNodeSerializationProvider')]
     #[TestDox('$_dataname correctly deserializes from xml')]
     public function testDeserializeXml(
@@ -51,7 +63,11 @@ final class BlankNodeTest extends TestCase
         self::assertTrue($blankFromXml->equals($blankNode), 'XML deserialize');
     }
 
-    /** @param BlankNodeArray $expectedJson */
+    /**
+     * @param BlankNodeArray $expectedJson
+     *
+     * @throws InvalidArgumentException
+     */
     #[DataProviderExternal(TermTest::class, 'blankNodeSerializationProvider')]
     #[TestDox('$_dataname correctly deserializes from json')]
     public function testDeserializeJson(
@@ -63,6 +79,10 @@ final class BlankNodeTest extends TestCase
         self::assertTrue($blankFromJson->equals($blankNode), 'JSON deserialize');
     }
 
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('deserializeInvalidXMLProvider')]
     #[TestDox('$_dataname refuses to deserialize invalid xml')]
     public function testDeserializeInvalidXMLElement(string $xml, string $expectedMessage): void
@@ -84,7 +104,11 @@ final class BlankNodeTest extends TestCase
         ];
     }
 
-    /** @param mixed[] $invalidData */
+    /**
+     * @param mixed[] $invalidData
+     *
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('deserializeInvalidJSONProvider')]
     #[TestDox('$_dataname refuses to deserialize invalid json')]
     public function testDeserializeInvalidJSON(array $invalidData, string $expectedMessage): void

@@ -41,6 +41,8 @@ final class IteratorStream
      *   If the size does not match what the generator yields, the behavior of the stream is undefined.
      *
      * @return resource
+     *
+     * @throws RuntimeException
      */
     public static function open(callable $func, int|null $size = null)
     {
@@ -74,6 +76,8 @@ final class IteratorStream
      *
      * @return resource
      *   The stream resource.
+     *
+     * @throws RuntimeException
      *
      * @template TStart
      * @template TResume
