@@ -213,9 +213,10 @@ final class Quad
             return false;
         }
 
-        // unify graph (iff it is set)
-        if ($left[3] === null || $right[3] === null) {
-            return $left[3] === null && $right[3] === null;
+        // if we have a triple, we're done!
+        // we know by precondition above, that if one is a triple, both are a triple. 
+        if ($left[3] === null) {
+            return true;
         }
 
         return $left[3]->unify($right[3], $partial, $literal);
