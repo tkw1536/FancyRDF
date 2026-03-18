@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Dataset\RdfCanon;
 
 use FancyRDF\Dataset\Dataset;
-use FancyRDF\Dataset\RdfCanon\CanonicalizationLimitExceeded;
 use FancyRDF\Dataset\RdfCanon\RdfCanonicalizationOptions;
 use FancyRDF\Dataset\RdfCanon\RdfCanonicalizer;
+use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;

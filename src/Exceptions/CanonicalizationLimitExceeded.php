@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FancyRDF\Dataset\RdfCanon;
+namespace FancyRDF\Exceptions;
 
 use RuntimeException;
 

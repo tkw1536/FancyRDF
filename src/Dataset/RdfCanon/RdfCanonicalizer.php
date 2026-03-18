@@ -6,6 +6,7 @@ namespace FancyRDF\Dataset\RdfCanon;
 
 use FancyRDF\Dataset\Dataset;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
 use FancyRDF\Formats\NFormatSerializer;
 use FancyRDF\Term\BlankNode;
 use Generator;

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use FancyRDF\Dataset\Dataset;
-use FancyRDF\Dataset\RdfCanon\CanonicalizationLimitExceeded;
 use FancyRDF\Dataset\RdfCanon\RdfCanonicalizationOptions;
 use FancyRDF\Dataset\RdfCanon\RdfCanonicalizer;
+use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
 use Override;
