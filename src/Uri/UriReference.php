@@ -865,7 +865,10 @@ final class UriReference
         $result = preg_replace_callback('/%([0-9A-Fa-f])([0-9A-Fa-f])/', static function (array $m): string {
             return '%' . strtoupper($m[1]) . strtoupper($m[2]);
         }, $s);
-        assert($result !== null && ($s === '' || $result !== ''));
+        assert(
+            $result !== null && ($s === '' || $result !== ''),
+            'valid pattern must succeed, replacement keeps same length',
+        );
 
         return $result;
     }
