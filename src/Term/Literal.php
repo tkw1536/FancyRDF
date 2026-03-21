@@ -105,6 +105,30 @@ final class Literal extends Term
         }
     }
 
+    /**
+     * Callers should use this method to check for special literals.
+     *
+     * @return string|Iri|null
+     *   If this literal is of type LangString, returns the language tag as a string.
+     *   If this literal does not have datatype XSDString, returns the datatype IRI.
+     *   Otherwise, returns null.
+     */
+    public function getTypeOrLanguage(): string|Iri|null
+    {
+        if ($this->datatype->iri === LangString::IRI) {
+            assert($this->language !== null, 'datatype indicates a language string');
+
+            return $this->language;
+        }
+
+        assert($this->language === null, 'datatype indicates no language tag');
+        if ($this->datatype->iri === XSDString::IRI) {
+            return null;
+        }
+
+        return $this->datatype;
+    }
+
     #[Override]
     public function equals(Iri|Literal|BlankNode $other, bool $literal = true): bool
     {
@@ -235,12 +259,12 @@ final class Literal extends Term
     #[Override]
     public function jsonSerialize(): array
     {
-        $data = ['type' => 'literal', 'value' => $this->lexical];
-        if ($this->datatype->iri === LangString::IRI) {
-            assert($this->language !== null, 'Datatype indicates a language string');
-            $data['language'] = $this->language;
-        } elseif ($this->datatype->iri !== XSDString::IRI) {
-            $data['datatype'] = $this->datatype->iri;
+        $data           = ['type' => 'literal', 'value' => $this->lexical];
+        $typeOrLanguage = $this->getTypeOrLanguage();
+        if (is_string($typeOrLanguage)) {
+            $data['language'] = $typeOrLanguage;
+        } elseif ($typeOrLanguage instanceof Iri) {
+            $data['datatype'] = $typeOrLanguage->iri;
         }
 
         return $data;
@@ -252,7 +276,7 @@ final class Literal extends Term
         $element = XMLUtils::createElement($document, 'literal', $this->lexical);
 
         if ($this->datatype->iri === LangString::IRI) {
-            assert($this->language !== null, 'Datatype indicates a language string');
+            assert($this->language !== null, 'datatype indicates a language string');
             $element->setAttributeNS(XMLUtils::XML_NAMESPACE, 'xml:lang', $this->language);
         } elseif ($this->datatype->iri !== XSDString::IRI) {
             $element->setAttribute('datatype', $this->datatype->iri);

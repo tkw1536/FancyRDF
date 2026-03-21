@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\FancyRDF\Term;
 use DOMDocument;
 use DOMException;
 use FancyRDF\Term\Datatype\LangString;
+use FancyRDF\Term\Datatype\XSDBoolean;
 use FancyRDF\Term\Datatype\XSDString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
@@ -15,8 +16,11 @@ use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\Attributes\TestDox;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+
+use function json_encode;
 
 /** @phpstan-import-type LiteralArray from Literal */
 final class LiteralTest extends TestCase
@@ -64,6 +68,16 @@ final class LiteralTest extends TestCase
                 'Datatype must be a non-empty string',
             ],
         ];
+    }
+
+    #[TestWith([new Literal('hello', 'en', null), 'en'])]
+    #[TestWith([new Literal('hello', null, new Iri(XSDString::IRI)), null])]
+    #[TestWith([new Literal('1', null, new Iri(XSDBoolean::IRI)), new Iri(XSDBoolean::IRI)])]
+    #[TestDox('$_dataname getTypeOrLanguage returns the correct type or language')]
+    public function testGetTypeOrLanguage(Literal $literal, string|Iri|null $expected): void
+    {
+        $got = $literal->getTypeOrLanguage();
+        self::assertSame(json_encode($expected), json_encode($got));
     }
 
     /**
