@@ -9,11 +9,13 @@ use DOMElement;
 use DOMException;
 use DOMNode;
 use DOMXPath;
+use InvalidArgumentException;
 use RuntimeException;
 
-use function assert;
 use function htmlspecialchars;
+use function trigger_error;
 
+use const E_USER_NOTICE;
 use const ENT_QUOTES;
 use const ENT_XML1;
 
@@ -113,6 +115,7 @@ final class XMLUtils
      * Given a completely valid XML string, returns the inner html of the node as a canonical string.
      *
      * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     public static function serializerInnerXML(string $outerXml): string
     {
@@ -149,6 +152,7 @@ final class XMLUtils
      *   A set of namespace lookups that were "consumed" somewhere down in the tree.
      *
      * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     private static function serializeAddPrefixes(DOMNode $node, DOMNode|null $context, array $defined, array &$consumed = []): string
     {
@@ -184,7 +188,10 @@ final class XMLUtils
 
             $resolved = $namespace === '' ? $node->lookupNamespaceURI(null) : $node->lookupNamespaceURI($namespace);
             if ($resolved === null) {
-                assert($namespace === '', 'everything except the root namespace must be resolvable');
+                if ($namespace !== '') {
+                    trigger_error('namespace "' . $namespace . '" is not resolvable', E_USER_NOTICE);
+                }
+
                 continue;
             }
 
@@ -236,13 +243,20 @@ final class XMLUtils
     }
 
     /**
+     * @param DOMNode $node
+     *   A node with an owner document.
+     *
      * @return array<string, string> Namespaces of the root element as $prefix => $uri.
      *
      * @throws RuntimeException
+     * @throws InvalidArgumentException
      */
     private static function getInScopeNamespaces(DOMNode $node): array
     {
-        assert($node->ownerDocument !== null, 'node must have an owner document');
+        if ($node->ownerDocument === null) {
+            throw new InvalidArgumentException('node must have an owner document');
+        }
+
         $xpath = new DOMXPath($node->ownerDocument);
 
         $namespaceNodes = $xpath->query('namespace::*', $node);

@@ -7,6 +7,7 @@ namespace FancyRDF\Tests\FancyRDF\Xml;
 use DOMDocument;
 use DOMException;
 use FancyRDF\Xml\XMLUtils;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
@@ -147,7 +148,10 @@ final class XMLUtilsTest extends TestCase
         ];
     }
 
-    /** @throws RuntimeException */
+    /**
+     * @throws RuntimeException
+     * @throws InvalidArgumentException
+     */
     #[DataProvider('serializerInnerXMLProvider')]
     public function testSerializerInnerXML(string $input, string $expected): void
     {
