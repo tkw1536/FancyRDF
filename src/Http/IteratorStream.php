@@ -10,7 +10,6 @@ use RuntimeException;
 use Throwable;
 
 use function array_key_exists;
-use function assert;
 use function fopen;
 use function is_array;
 use function is_string;
@@ -22,6 +21,7 @@ use function substr;
 use function trigger_error;
 
 use const E_USER_WARNING;
+use const STREAM_REPORT_ERRORS;
 
 /**
  * A class that allows using a generator as a stream.
@@ -140,20 +140,41 @@ final class IteratorStream
     // phpcs:ignore PSR1.Methods.CamelCapsMethodName.NotCamelCaps -- stream wrapper protocol
     public function stream_open(string $path, string $mode, int $options, string|null &$openedPath): bool
     {
-        assert($mode === 'r', 'not a valid open mode');
-        assert($this->context !== null, 'no stream context provided');
+        $shouldShowErrors = (bool) ($options & STREAM_REPORT_ERRORS);
+        if ($mode !== 'r') {
+            if ($shouldShowErrors) {
+                trigger_error('unsupported open mode: ' . $mode, E_USER_WARNING);
+            }
+
+            return false;
+        }
+
+        if ($this->context === null) {
+            if ($shouldShowErrors) {
+                trigger_error('no stream context provided', E_USER_WARNING);
+            }
+
+            return false;
+        }
 
         $scheme = self::$scheme;
-        assert(is_string($scheme), 'no scheme provided');
+        if (! is_string($scheme)) {
+            if ($shouldShowErrors) {
+                trigger_error('no scheme provided', E_USER_WARNING);
+            }
+
+            return false;
+        }
 
         $contextOptions = stream_context_get_options($this->context);
-        assert(
-            array_key_exists($scheme, $contextOptions) &&
-            is_array($contextOptions[$scheme]) &&
-            array_key_exists('context', $contextOptions[$scheme]) &&
-            $contextOptions[$scheme]['context'] instanceof IteratorContext,
-            'invalid stream context provided',
-        );
+        if (! array_key_exists($scheme, $contextOptions) || ! is_array($contextOptions[$scheme]) || ! array_key_exists('context', $contextOptions[$scheme]) || ! $contextOptions[$scheme]['context'] instanceof IteratorContext) {
+            if ($shouldShowErrors) {
+                trigger_error('invalid stream context provided', E_USER_WARNING);
+            }
+
+            return false;
+        }
+
         $this->iteratorContext = $contextOptions[$scheme]['context'];
         $generator             = $this->iteratorContext->generator;
 
