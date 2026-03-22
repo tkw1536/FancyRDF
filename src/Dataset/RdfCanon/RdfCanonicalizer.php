@@ -475,7 +475,10 @@ final class RdfCanonicalizer
             $dataToHash .= $chosenPath;
 
             // 5.6) Replace issuer, by reference, with chosen issuer.
-            assert($chosenIssuer !== null, 'chosen issuer cannot be null');
+            assert(
+                $chosenIssuer !== null,
+                'the standard mandates to replace the issuer by reference, so it must exist',
+            );
             $issuer = $chosenIssuer;
         }
 

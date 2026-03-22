@@ -10,7 +10,6 @@ use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use Override;
 
-use function assert;
 use function in_array;
 use function is_string;
 use function strcmp;
@@ -40,6 +39,7 @@ final class BlankNode extends Term
      *
      * @param non-empty-string $identifier
      *   A valid blank node identifier.
+     *   The identifier should be non-empty, but the implementation does not validate this.
      */
     public function __construct(readonly string $identifier)
     {
@@ -103,7 +103,9 @@ final class BlankNode extends Term
             throw new InvalidArgumentException('Invalid element name');
         }
 
-        assert($element->textContent !== '', 'Blank node identifier must be a non-empty string');
+        if ($element->textContent === '') {
+            throw new InvalidArgumentException('Blank node identifier must be a non-empty string');
+        }
 
         return new BlankNode($element->textContent);
     }

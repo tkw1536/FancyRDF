@@ -36,40 +36,9 @@ use function strlen;
 final class Literal extends Term
 {
     /**
-     * Returns the RDF1.1 literal value of this literal as a php value.
-     *
-     * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-value
-     *
-     * @throws InvalidLexicalValueError
-     */
-    public function getValue(): mixed
-    {
-        return $this->getDatatypeInstance()->toValue();
-    }
-
-    /** @var Datatype<mixed>|null */
-    private Datatype|null $datatypeInstance = null;
-
-    /**
-     * Returns the RDF1.1 datatype of this literal.
-     *
-     * @return Datatype<mixed>
-     */
-    public function getDatatypeInstance(): Datatype
-    {
-        if ($this->datatypeInstance === null) {
-            $this->datatypeInstance = Datatypes::getDatatype($this->datatype->iri, $this->lexical, $this->language);
-        }
-
-        return $this->datatypeInstance;
-    }
-
-    /**
      * The RDF1.1 datatype IRI of this literal.
      *
      * @see https://www.w3.org/TR/rdf11-concepts/#dfn-datatype-iri
-     *
-     * @var Iri
      */
     public readonly Iri $datatype;
 
@@ -103,6 +72,35 @@ final class Literal extends Term
             // a non-empty language tag as defined by [BCP47]."
             throw new InvalidArgumentException('Literal must have a language tag if and only if the datatype IRI is ' . LangString::IRI);
         }
+    }
+
+    /**
+     * Returns the RDF1.1 literal value of this literal as a php value.
+     *
+     * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-value
+     *
+     * @throws InvalidLexicalValueError
+     */
+    public function getValue(): mixed
+    {
+        return $this->getDatatypeInstance()->toValue();
+    }
+
+    /** @var Datatype<mixed>|null */
+    private Datatype|null $datatypeInstance = null;
+
+    /**
+     * Returns the RDF1.1 datatype of this literal.
+     *
+     * @return Datatype<mixed>
+     */
+    public function getDatatypeInstance(): Datatype
+    {
+        if ($this->datatypeInstance === null) {
+            $this->datatypeInstance = Datatypes::getDatatype($this->datatype->iri, $this->lexical, $this->language);
+        }
+
+        return $this->datatypeInstance;
     }
 
     /**

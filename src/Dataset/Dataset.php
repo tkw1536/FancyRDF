@@ -157,7 +157,10 @@ final class Dataset implements IteratorAggregate
      */
     private function matchNonGroundedQuads(array $ours, array $theirs, array &$partial, bool $literal): bool
     {
-        assert(count($ours) === count($theirs), 'by precondition');
+        assert(
+            count($ours) === count($theirs),
+            'this function may only be called if the number of quads is the same',
+        );
 
         // no quads on either side, so we match for sure!
         if (count($ours) === 0) {

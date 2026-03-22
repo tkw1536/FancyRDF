@@ -10,7 +10,6 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use InvalidArgumentException;
 
-use function assert;
 use function str_starts_with;
 use function strlen;
 use function substr;
@@ -69,7 +68,6 @@ final class TrigSerializer
         }
 
         if (! $this->isTrig) {
-            assert($graph === null);
             $this->buffer             .= $this->formatTriple($subject, $predicate, $object);
             $this->hasWrittenSomething = true;
 
