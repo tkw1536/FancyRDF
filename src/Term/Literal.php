@@ -275,11 +275,11 @@ final class Literal extends Term
     {
         $element = XMLUtils::createElement($document, 'literal', $this->lexical);
 
-        if ($this->datatype->iri === LangString::IRI) {
-            assert($this->language !== null, 'datatype indicates a language string');
-            $element->setAttributeNS(XMLUtils::XML_NAMESPACE, 'xml:lang', $this->language);
-        } elseif ($this->datatype->iri !== XSDString::IRI) {
-            $element->setAttribute('datatype', $this->datatype->iri);
+        $typeOrLanguage = $this->getTypeOrLanguage();
+        if (is_string($typeOrLanguage)) {
+            $element->setAttributeNS(XMLUtils::XML_NAMESPACE, 'xml:lang', $typeOrLanguage);
+        } elseif ($typeOrLanguage instanceof Iri) {
+            $element->setAttribute('datatype', $typeOrLanguage->iri);
         }
 
         return $element;
