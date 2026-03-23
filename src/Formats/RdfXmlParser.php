@@ -576,12 +576,11 @@ class RdfXmlParser extends FiberIterator
 
                 // Error: rdf:nodeID and rdf:ID cannot be used together
                 if ($this->strict && ! ($nodeId === null || $idAttr === null)) {
-                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:ID');
+                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:ID together');
                 }
 
-                // Error: rdf:nodeID and rdf:about cannot be used togeth
                 if ($this->strict && ! ($nodeId === null || $about === null)) {
-                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:about');
+                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:about together');
                 }
 
                 $this->subject = $this->resolveSubject($about, $nodeId, $idAttr, true);
