@@ -8,6 +8,7 @@ use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigToken;
 use FancyRDF\Term\BlankNode;
+use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
@@ -79,11 +80,7 @@ final class TrigParser extends FiberIterator
         }
     }
 
-    /**
-     * @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX
-     *
-     * @throws InvalidArgumentException
-     * */
+    /** @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX */
     private function parsePrefixDirective(bool $isAtDirective): void
     {
         $this->reader->next();
@@ -107,11 +104,7 @@ final class TrigParser extends FiberIterator
         assert($this->reader->getTokenType() === TrigToken::Dot, 'expected \'.\' after @prefix');
     }
 
-    /**
-     * @param bool $isAtDirective true for @base (expect DOT after), false for BASE
-     *
-     * @throws InvalidArgumentException
-     */
+    /** @param bool $isAtDirective true for @base (expect DOT after), false for BASE */
     private function parseBaseDirective(bool $isAtDirective): void
     {
         $this->reader->next();
@@ -373,7 +366,6 @@ final class TrigParser extends FiberIterator
         return $this->parseResource($type) ?? $this->neverReachedFallback('subject', false);
     }
 
-    /** @throws InvalidArgumentException */
     private function parsePredicate(): Iri
     {
         $type = $this->reader->getTokenType();
@@ -427,7 +419,6 @@ final class TrigParser extends FiberIterator
         };
     }
 
-    /** @throws InvalidArgumentException */
     private function parseIriRef(): Iri
     {
         $value    = $this->reader->getTokenValue();
@@ -436,7 +427,6 @@ final class TrigParser extends FiberIterator
         return new Iri($resolved);
     }
 
-    /** @throws InvalidArgumentException */
     private function parsePName(): Iri
     {
         $value = $this->reader->getTokenValue();
@@ -460,11 +450,7 @@ final class TrigParser extends FiberIterator
         return new Iri($full);
     }
 
-    /**
-     * @return non-empty-string
-     *
-     * @throws InvalidArgumentException
-     */
+    /** @return non-empty-string */
     private function resolveIriRef(string $decodedIri): string
     {
         assert(preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $decodedIri) !== 1, 'IRIREF contains disallowed character');
@@ -560,7 +546,6 @@ final class TrigParser extends FiberIterator
         return $headNode;
     }
 
-    /** @throws InvalidArgumentException */
     private function parseStringLiteral(): Literal
     {
         $lexical  = $this->reader->getTokenValue();
@@ -568,7 +553,7 @@ final class TrigParser extends FiberIterator
         $datatype = null;
 
         if (! $this->reader->next()) {
-            return new Literal($lexical);
+            return Literal::XSDString($lexical);
         }
 
         $token = $this->reader->getTokenType();
@@ -577,7 +562,7 @@ final class TrigParser extends FiberIterator
             assert($lang !== '', 'LANGTAG is empty');
             $this->reader->next();
 
-            return new Literal($lexical, $lang);
+            return Literal::langString($lexical, $lang);
         }
 
         if ($token === TrigToken::HatHat) {
@@ -589,13 +574,14 @@ final class TrigParser extends FiberIterator
             };
             $this->reader->next();
 
-            return new Literal($lexical, null, new Iri($datatype));
+            assert($datatype !== LangString::IRI, 'LangString literals cannot be created with a datatype IRI');
+
+            return Literal::typed($lexical, $datatype);
         }
 
-        return new Literal($lexical);
+        return Literal::XSDString($lexical);
     }
 
-    /** @throws InvalidArgumentException */
     private function parseNumericLiteral(): Literal
     {
         $type     = $this->reader->getTokenType();
@@ -609,19 +595,14 @@ final class TrigParser extends FiberIterator
 
         $this->reader->next();
 
-        return new Literal($value, null, new Iri($datatype));
+        return Literal::typed($value, $datatype);
     }
 
-    /** @throws InvalidArgumentException */
     private function parseBooleanLiteral(): Literal
     {
         $value = $this->reader->getTokenValue();
         $this->reader->next();
 
-        return new Literal(
-            $value,
-            null,
-            new Iri(self::XSD_NAMESPACE . 'boolean'),
-        );
+        return Literal::typed($value, self::XSD_NAMESPACE . 'boolean');
     }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
-use AssertionError;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\NFormatSerializer;
 use FancyRDF\Term\BlankNode;
@@ -13,7 +13,7 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\RequiresSetting;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 
 final class NFormatTest extends TestCase
@@ -75,7 +75,7 @@ final class NFormatTest extends TestCase
         self::assertSame($expected, NFormatSerializer::serialize([$subject, $predicate, $object, $graph]));
     }
 
-    /** @throws InvalidArgumentException */
+    /** @throws NonCompliantInputError */
     #[DataProvider('statementProvider')]
     public function testParseLine(
         Iri|BlankNode $subject,
@@ -84,31 +84,38 @@ final class NFormatTest extends TestCase
         Iri|BlankNode|null $graph,
         string $line,
     ): void {
-        $parsed = (new NFormatParser())->parseLine($line);
+        $parsed = (new NFormatParser(true))->parseLine($line);
+        self::assertNotNull($parsed);
+        self::assertTrue(Quad::equals($parsed, [$subject, $predicate, $object, $graph]));
+
+        $parsed = (new NFormatParser(false))->parseLine($line);
         self::assertNotNull($parsed);
         self::assertTrue(Quad::equals($parsed, [$subject, $predicate, $object, $graph]));
     }
 
-    /** @throws InvalidArgumentException */
-    public function testParseLineEmptyReturnsNull(): void
+    /** @throws NonCompliantInputError */
+    #[TestWith([true])]
+    #[TestWith([false])]
+    public function testParseLineEmptyReturnsNull(bool $strict): void
     {
-        self::assertNull((new NFormatParser())->parseLine(''));
-        self::assertNull((new NFormatParser())->parseLine('   '));
+        self::assertNull((new NFormatParser($strict))->parseLine(''));
+        self::assertNull((new NFormatParser($strict))->parseLine('   '));
     }
 
-    /** @throws InvalidArgumentException */
-    public function testParseLineCommentReturnsNull(): void
+    /** @throws NonCompliantInputError */
+    #[TestWith([true])]
+    #[TestWith([false])]
+    public function testParseLineCommentReturnsNull(bool $strict): void
     {
-        self::assertNull((new NFormatParser())->parseLine('# comment'));
-        self::assertNull((new NFormatParser())->parseLine('  # rest is comment'));
+        self::assertNull((new NFormatParser($strict))->parseLine('# comment'));
+        self::assertNull((new NFormatParser($strict))->parseLine('  # rest is comment'));
     }
 
-    /** @throws InvalidArgumentException */
-    #[RequiresSetting('zend.assertions', '1')]
+    /** @throws NonCompliantInputError */
     public function testParseLineInvalidThrows(): void
     {
-        $this->expectException(AssertionError::class);
+        $this->expectException(NonCompliantInputError::class);
         $this->expectExceptionMessage('expected "." at end of statement at position 71');
-        (new NFormatParser())->parseLine('<https://example.com/s> <https://example.com/p> <https://example.com/o>');
+        (new NFormatParser(true))->parseLine('<https://example.com/s> <https://example.com/p> <https://example.com/o>');
     }
 }

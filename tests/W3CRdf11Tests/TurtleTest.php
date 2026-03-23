@@ -6,6 +6,7 @@ namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use AssertionError;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
@@ -43,7 +44,7 @@ final class TurtleTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
@@ -64,7 +65,7 @@ final class TurtleTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function turtlePositiveSyntaxProvider(): Generator
     {
@@ -79,7 +80,7 @@ final class TurtleTest extends TestBase
      * @return Generator<string, array{action: string, result: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function turtleEvaluationProvider(): Generator
     {
@@ -99,7 +100,7 @@ final class TurtleTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function turtleNegativeSyntaxProvider(): Generator
     {
@@ -123,7 +124,7 @@ final class TurtleTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('turtlePositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
@@ -150,6 +151,7 @@ final class TurtleTest extends TestBase
     /**
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('turtleEvaluationProvider')]
     #[TestDox('$_dataname evaluates correctly')]
@@ -177,7 +179,7 @@ final class TurtleTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('turtleNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
@@ -203,7 +205,7 @@ final class TurtleTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('turtleNegativeSyntaxProvider')]
     #[RequiresSetting('zend.assertions', '0')]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use AssertionError;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\RdfXmlParser;
 use Generator;
 use InvalidArgumentException;
@@ -41,8 +42,8 @@ final class RDFXMLTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
-    */
+     * @throws NonCompliantInputError
+     */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -60,7 +61,7 @@ final class RDFXMLTest extends TestBase
      * @return Generator<string, array{action: string, result: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function xmlTestEvaluationProvider(): Generator
     {
@@ -80,7 +81,7 @@ final class RDFXMLTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function xmlTestNegativeSyntaxProvider(): Generator
     {
@@ -94,6 +95,7 @@ final class RDFXMLTest extends TestBase
     /**
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('xmlTestEvaluationProvider')]
     #[TestDox('$_dataname')]
@@ -121,7 +123,7 @@ final class RDFXMLTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('xmlTestNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
@@ -148,7 +150,7 @@ final class RDFXMLTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('xmlTestNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not assert with assertions enabled')]

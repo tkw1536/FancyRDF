@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Term\Iri;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
@@ -62,7 +63,7 @@ abstract class TestBase extends TestCase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[BeforeClass()]
     public static function ensureManifestLoaded(): void
@@ -89,7 +90,7 @@ abstract class TestBase extends TestCase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     private static function casesInstance(): Rdf11TestCases
     {
@@ -110,7 +111,7 @@ abstract class TestBase extends TestCase
      * @return Generator<int, array{iri: string, name: string, comment: string|null, action: string, result: string|null, extra: array<non-empty-string, string|null>}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     protected static function cases(string $typ, array $extraProps = []): Generator
     {
@@ -123,7 +124,7 @@ abstract class TestBase extends TestCase
      * @return resource
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     protected static function assertOpen(string $iri)
     {
@@ -141,6 +142,7 @@ abstract class TestBase extends TestCase
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     protected static function assertRead(string $iri): string
     {
@@ -158,6 +160,7 @@ abstract class TestBase extends TestCase
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     protected static function makeEvaluationConstraint(string $iri): IsomorphicAsDatasetsConstraint
     {
@@ -172,7 +175,7 @@ abstract class TestBase extends TestCase
         }
 
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser(true);
             $quads  = iterator_to_array($parser->parseStream($source));
 
             return new IsomorphicAsDatasetsConstraint($quads, false);
@@ -191,7 +194,7 @@ abstract class TestBase extends TestCase
      *   The array is sorted by key.
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function caseCount(): array
     {

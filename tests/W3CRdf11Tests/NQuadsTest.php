@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
-use AssertionError;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
 use RuntimeException;
 
@@ -40,8 +38,8 @@ final class NQuadsTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
-    */
+     * @throws NonCompliantInputError
+     */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -59,12 +57,18 @@ final class NQuadsTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function nquadsPositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestNQuadsPositiveSyntax') as $info) {
-            yield $info['iri'] => [
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
+                'action' => $info['action'],
+            ];
+
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
                 'action' => $info['action'],
             ];
         }
@@ -74,7 +78,7 @@ final class NQuadsTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function nquadsNegativeSyntaxProvider(): Generator
     {
@@ -87,18 +91,19 @@ final class NQuadsTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('nquadsPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
     public function testNQuadsPositiveSyntax(
+        bool $strict,
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser($strict);
             $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {
@@ -110,20 +115,19 @@ final class NQuadsTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('nquadsNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
-    #[RequiresSetting('zend.assertions', '1')]
     #[Group('negative-syntax-strict')]
-    public function testNQuadsNegativeSyntaxWithAssertions(
+    public function testNQuadsNegativeSyntaxStrict(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
-        self::expectException(AssertionError::class);
+        self::expectException(NonCompliantInputError::class);
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser(true);
             $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {
@@ -135,19 +139,18 @@ final class NQuadsTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('nquadsNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not throw with assertions disabled')]
-    #[RequiresSetting('zend.assertions', '0')]
     #[Group('negative-syntax-lenient')]
-    public function testNQuadsNegativeSyntaxWithoutAssertions(
+    public function testNQuadsNegativeSyntaxLenient(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser(false);
             $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {

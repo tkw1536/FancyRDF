@@ -7,8 +7,8 @@
 [![Tests](https://github.com/tkw1536/FancyRDF/actions/workflows/php.yml/badge.svg)](https://github.com/tkw1536/FancyRDF/actions/workflows/php.yml)
 
 A streaming PHP 8.4+ Library for [RDF 1.1](https://www.w3.org/TR/rdf11-concepts/) and eventually SPARQL focusing on standards compliance and proper typing.
-When run with [PHP Assertions](https://www.php.net/manual/en/function.assert.php) enabled, any non-compliant document may produce an assertion.
-When run in production mode, all test cases do not throw, but may provide erroneous output.
+Most classes have 'strict' mode and a 'loose mode'. 
+In strict mode, any non-compliant document produces an exception, a best effort processing strategy is attempted, and no exceptions will be thrown. 
 
 The library is currently a work-in-progress.
 This library is eventually intended to replace [EasyRDF](https://www.easyrdf.org) in [WissKI](https://wiss-ki.eu). 

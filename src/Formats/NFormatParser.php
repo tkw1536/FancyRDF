@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Term\BlankNode;
+use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
-use InvalidArgumentException;
+use RuntimeException;
 use Traversable;
 
-use function assert;
 use function fclose;
 use function fgets;
 use function hexdec;
@@ -47,8 +48,14 @@ use const PREG_SPLIT_NO_EMPTY;
  */
 final class NFormatParser
 {
-    /** you cannot instantiate this class */
-    public function __construct()
+    /**
+     * Constructs a new NFormatParser.
+     *
+     * @param bool $strict
+     *   Enable strict mode.
+     *   In strict mode, additional checks are performed to validate compliance with the standard, and appropriate NonCompliantInputErrors may be thrown.
+     */
+    public function __construct(public readonly bool $strict)
     {
     }
 
@@ -57,12 +64,15 @@ final class NFormatParser
      *
      * @return Traversable<TripleOrQuadArray>
      *
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError if strict mode is enabled and the input is not compliant with the standard.
+     * @throws RuntimeException
      */
     public function parse(string $source): Traversable
     {
         $lines = preg_split('/\r\n|\r|\n/', $source, -1, PREG_SPLIT_NO_EMPTY);
-        assert($lines !== false, 'failed to split lines from source');
+        if ($lines === false) {
+            throw new RuntimeException('failed to split lines from source');
+        }
 
         foreach ($lines as $line) {
             $term = $this->parseLine($line);
@@ -89,7 +99,7 @@ final class NFormatParser
      *
      * @return Traversable<TripleOrQuadArray>
      *
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError if strict mode is enabled and the input is not compliant with the standard.
      */
     public function parseStream(mixed $stream): Traversable
     {
@@ -125,7 +135,7 @@ final class NFormatParser
      * @return TripleOrQuadArray|null
      *   The triple, quad, or null if the line is empty or a comment.
      *
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public function parseLine(string $line): array|null
     {
@@ -141,12 +151,16 @@ final class NFormatParser
 
             $subject = $this->parseIriOrBlankNode();
             $this->skipWhitespace();
-            assert($this->pos < $this->len, 'unexpected end of line while reading term at position ' . $this->pos);
+            if ($this->strict && $this->pos >= $this->len) {
+                throw new NonCompliantInputError('unexpected end of line while reading term at position ' . $this->pos);
+            }
 
             $predicate = $this->parseIRI();
 
             $this->skipWhitespace();
-            assert($this->pos < $this->len, 'unexpected end of line while reading term at position ' . $this->pos);
+            if ($this->strict && $this->pos >= $this->len) {
+                throw new NonCompliantInputError('unexpected end of line while reading term at position ' . $this->pos);
+            }
 
             $object = $this->parseLiteralOrIriOrBlankNode();
 
@@ -159,7 +173,9 @@ final class NFormatParser
             }
 
             // require the trailing dot.
-            assert($this->pos < $this->len && $this->line[$this->pos] === '.', 'expected "." at end of statement at position ' . $this->pos);
+            if ($this->strict && ! ($this->pos < $this->len && $this->line[$this->pos] === '.')) {
+                throw new NonCompliantInputError('expected "." at end of statement at position ' . $this->pos);
+            }
 
             return [$subject, $predicate, $object, $graph];
         } finally {
@@ -172,7 +188,7 @@ final class NFormatParser
     /**
      * Parses an object of a triple.
      *
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     private function parseLiteralOrIriOrBlankNode(): Iri|Literal|BlankNode
     {
@@ -185,6 +201,7 @@ final class NFormatParser
         return $this->parseIriOrBlankNode();
     }
 
+    /** @throws NonCompliantInputError */
     private function parseIriOrBlankNode(): Iri|BlankNode
     {
         // look at the current character and decide what to parse.
@@ -193,14 +210,19 @@ final class NFormatParser
             return $this->parseIRI();
         }
 
-        assert($ch === '_' && $this->pos + 1 < $this->len && $this->line[$this->pos + 1] === ':', 'invalid blank node start at position ' . $this->pos);
+        if ($this->strict && ! ($ch === '_' && $this->pos + 1 < $this->len && $this->line[$this->pos + 1] === ':')) {
+            throw new NonCompliantInputError('invalid blank node start at position ' . $this->pos);
+        }
 
         return new BlankNode($this->parseBlankNodeLabel());
     }
 
+    /** @throws NonCompliantInputError */
     private function parseIRI(): Iri
     {
-        assert($this->pos < $this->len && $this->line[$this->pos] === '<', 'expected "<" at position ' . $this->pos);
+        if ($this->strict && ! ($this->pos < $this->len && $this->line[$this->pos] === '<')) {
+            throw new NonCompliantInputError('expected "<" at position ' . $this->pos);
+        }
 
         return $this->parseIriRef();
     }
@@ -217,10 +239,15 @@ final class NFormatParser
 
     /**
      * Parses an IRI reference <...>, with \u and \U unescaping.
+     *
+     * @throws NonCompliantInputError
      */
     private function parseIriRef(): Iri
     {
-        assert($this->line[$this->pos] === '<', 'expected "<" at position ' . $this->pos);
+        if ($this->strict && ! ($this->line[$this->pos] === '<')) {
+            throw new NonCompliantInputError('expected "<" at position ' . $this->pos);
+        }
+
         $this->pos++;
 
         $start = $this->pos;
@@ -234,9 +261,11 @@ final class NFormatParser
                 $this->pos++;
 
                 $buf .= substr($this->line, $start, $end - $start);
-                assert($buf !== '' && $this->isValidRDFIri($buf), 'IRI reference must be a valid absolute IRI: ' . $buf);
+                if ($this->strict && $buf !== '' && ! $this->isValidRDFIri($buf)) {
+                    throw new NonCompliantInputError('invalid IRI reference at position ' . $this->pos);
+                }
 
-                return new Iri($buf);
+                return $buf !== '' ? new Iri($buf) : $this->fallbackIRI('empty IRI reference');
             }
 
             // parse an escape sequence.
@@ -251,12 +280,7 @@ final class NFormatParser
             $this->pos++;
         }
 
-        // @phpstan-ignore function.impossibleType (GIGO)
-        assert(false, 'unclosed IRI reference at position ' . $this->pos);
-
-        // GIGO: Return a random blank node.
-        // This branch can only be triggered if assertions are disabled.
-        return new Iri('invalid://');
+        return $this->fallbackIRI('unclosed IRI reference');
     }
 
     private function isValidRDFIri(string $iri): bool
@@ -274,10 +298,14 @@ final class NFormatParser
      * Colon is not allowed (W3C N-Triples).
      *
      * @return non-empty-string
+     *
+     * @throws NonCompliantInputError
      */
     private function parseBlankNodeLabel(): string
     {
-        assert($this->line[$this->pos] === '_' && $this->line[$this->pos + 1] === ':', 'expected _: at position ' . $this->pos);
+        if ($this->strict && ! ($this->line[$this->pos] === '_' && $this->line[$this->pos + 1] === ':')) {
+            throw new NonCompliantInputError('expected _: at position ' . $this->pos);
+        }
 
         $this->pos += 2; // skip the _: prefix
 
@@ -291,7 +319,9 @@ final class NFormatParser
         );
 
         $label = $m[0] ?? '';
-        assert($matchCount === 1, 'invalid blank node label at position ' . $this->pos);
+        if ($this->strict && ! ($matchCount === 1)) {
+            throw new NonCompliantInputError('invalid blank node label at position ' . $this->pos);
+        }
 
         $labelLen = strlen($label);
         if (str_ends_with($label, '.')) {
@@ -301,7 +331,15 @@ final class NFormatParser
         $this->pos += $labelLen;
 
         $label = substr($this->line, $start, $labelLen);
-        assert($label !== '', 'empty blank node label at position ' . $this->pos);
+        if ($label === '') {
+            if ($this->strict) {
+                throw new NonCompliantInputError('empty blank node label at position ' . $this->pos);
+            }
+
+            // Technically there isn't a valid blank node label here.
+            // But we do best-effort parsing, so return something that is vaguely sensible.
+            return '_';
+        }
 
         return $label;
     }
@@ -309,7 +347,7 @@ final class NFormatParser
     /**
      * Parses a literal: "..." with optional @lang or ^^<datatype>.
      *
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     private function parseLiteral(): Literal
     {
@@ -324,15 +362,35 @@ final class NFormatParser
             $rest = substr($this->line, $this->pos, $this->len - $this->pos);
             preg_match('/^[a-zA-Z]+(-[a-zA-Z0-9]+)*/Su', $rest, $m);
             $lang = $m[0] ?? '';
-            assert($lang !== '', 'missing language tag at position ' . $this->pos);
+            if ($lang === '') {
+                if ($this->strict) {
+                    throw new NonCompliantInputError('missing language tag at position ' . $this->pos);
+                }
+
+                return Literal::XSDString($lexical);
+            }
 
             $this->pos += strlen($lang);
-        } elseif ($this->pos + 1 < $this->len && $this->line[$this->pos] === '^' && $this->line[$this->pos + 1] === '^') {
-            $this->pos += 2;
-            $datatype   = $this->parseIriRef();
+
+            return Literal::langString($lexical, $lang);
         }
 
-        return new Literal($lexical, $lang, $datatype);
+        if ($this->pos + 1 < $this->len && $this->line[$this->pos] === '^' && $this->line[$this->pos + 1] === '^') {
+            $this->pos += 2;
+            $datatype   = $this->parseIriRef();
+
+            if ($datatype->iri === LangString::IRI) {
+                if ($this->strict) {
+                    throw new NonCompliantInputError('LangString literals cannot be created with a datatype IRI at position ' . $this->pos);
+                }
+
+                return Literal::XSDString($lexical);
+            }
+
+            return Literal::typed($lexical, $datatype->iri);
+        }
+
+        return Literal::XSDString($lexical);
     }
 
     /**
@@ -340,10 +398,14 @@ final class NFormatParser
      *
      * @return string
      *   The lexical form.
+     *
+     * @throws NonCompliantInputError
      */
     private function parseStringLiteralQuote(): string
     {
-        assert($this->line[$this->pos] === '"', 'expected quote at position ' . $this->pos);
+        if ($this->strict && ! ($this->line[$this->pos] === '"')) {
+            throw new NonCompliantInputError('expected quote at position ' . $this->pos);
+        }
 
         $this->pos++;
 
@@ -379,49 +441,67 @@ final class NFormatParser
             $this->pos++;
         }
 
-        // @phpstan-ignore function.impossibleType (GIGO)
-        assert(false, 'unclosed string literal at position ' . $this->pos);
+        if ($this->strict) {
+            throw new NonCompliantInputError('unclosed string literal at position ' . $this->pos);
+        }
 
         return '';
     }
 
     /**
      * Decodes one \uXXXX or \UXXXXXXXX sequence; $pos is advanced.
+     *
+     * @throws NonCompliantInputError
      */
     private function decodeUchar(): string
     {
-        assert($this->line[$this->pos] === '\\', 'expected backslash at position ' . $this->pos);
+        if ($this->strict && ! ($this->line[$this->pos] === '\\')) {
+            throw new NonCompliantInputError('expected backslash at position ' . $this->pos);
+        }
 
         $this->pos++;
-        assert($this->pos < $this->len, 'unexpected end in escape sequence at position ' . $this->pos);
-        assert($this->line[$this->pos] === 'u' || $this->line[$this->pos] === 'U', 'expected \\u or \\U at position ' . $this->pos);
+        if ($this->strict && ! ($this->pos < $this->len)) {
+            throw new NonCompliantInputError('unexpected end in escape sequence at position ' . $this->pos);
+        }
+
+        if ($this->strict && ! ($this->line[$this->pos] === 'u' || $this->line[$this->pos] === 'U')) {
+            throw new NonCompliantInputError('expected \\u or \\U at position ' . $this->pos);
+        }
 
         $u = $this->line[$this->pos] === 'u';
         $this->pos++;
 
         // determine the number of characters to read.
         $hexLen = $u ? 4 : 8;
-        assert($this->pos + $hexLen <= $this->len, 'incomplete \\u or \\U escape at position ' . $this->pos);
+        if ($this->strict && ! ($this->pos + $hexLen <= $this->len)) {
+            throw new NonCompliantInputError('incomplete \\u or \\U escape at position ' . $this->pos);
+        }
 
         // read the escape sequence.
         $hex = substr($this->line, $this->pos, $hexLen);
-        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in \\u or \\U escape at position ' . $this->pos);
+        if ($this->strict && ! (preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1)) {
+            throw new NonCompliantInputError('invalid hex in \\u or \\U escape at position ' . $this->pos);
+        }
 
         $this->pos += $hexLen;
 
         // do the actual decoding.
         $ord = (int) @hexdec($hex);
-        assert($ord <= 0x10FFFF, 'code point out of range at position ' . $this->pos);
+        if ($this->strict && $ord > 0x10FFFF) {
+            throw new NonCompliantInputError('code point out of range at position ' . $this->pos);
+        }
 
         return mb_chr($ord, 'UTF-8');
     }
 
     /**
      * Decodes one ECHAR (single character escape).
+     *
+     * @throws NonCompliantInputError
      */
     private function decodeEchar(string $char, int $pos): string
     {
-        return match ($char) {
+        $result = match ($char) {
             't' => "\t",
             'b' => "\x08",
             'n' => "\n",
@@ -430,12 +510,28 @@ final class NFormatParser
             '"' => '"',
             '\'' => "'",
             '\\' => '\\',
-            default => (static function () use ($pos): string {
-                // @phpstan-ignore function.impossibleType (GIGO)
-                assert(false, 'invalid escape sequence at position ' . $pos);
-
-                return '';
-            })()
+            default => '',
         };
+
+        if ($this->strict && $result === '') {
+            throw new NonCompliantInputError('invalid escape sequence at position ' . $pos);
+        }
+
+        return $result;
+    }
+
+    /**
+     * If in strict mode, throws a NonCompliantInputError with the given message.
+     * If in loose mode, returns an IRI that can be used as a placeholder.
+     *
+     * @throws NonCompliantInputError
+     */
+    private function fallbackIRI(string $message): Iri
+    {
+        if ($this->strict) {
+            throw new NonCompliantInputError($message . ' at position ' . $this->pos);
+        }
+
+        return new Iri('invalid://');
     }
 }

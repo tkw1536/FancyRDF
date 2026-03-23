@@ -25,6 +25,9 @@ use function preg_match;
 use function sprintf;
 use function strcmp;
 use function strlen;
+use function trigger_error;
+
+use const E_USER_WARNING;
 
 /**
  * Represents an RDF1.1 Literal.
@@ -45,6 +48,9 @@ final class Literal extends Term
     /**
      * Constructs a new Literal.
      *
+     * @see self::XSDString()
+     * @see self::LangString()
+     * @see self::Typed()
      * @see https://www.w3.org/TR/rdf11-concepts/#section-Graph-Literal
      * @see https://www.w3.org/TR/rdf11-concepts/#section-IRIs
      * @see https://www.rfc-editor.org/info/bcp47
@@ -72,6 +78,86 @@ final class Literal extends Term
             // a non-empty language tag as defined by [BCP47]."
             throw new InvalidArgumentException('Literal must have a language tag if and only if the datatype IRI is ' . LangString::IRI);
         }
+    }
+
+    /**
+     * Creates a new XSDString literal.
+     *
+     * As opposed to the constructor, this method never throws an exception.
+     *
+     * @return Literal
+     */
+    public static function XSDString(string $lexical): self
+    {
+        try {
+            $result = new self($lexical, null, null);
+        } catch (InvalidArgumentException) {
+            $result = null;
+        }
+
+        assert($result !== null, 'never reached: an XSDString literal is always valid');
+
+        return $result;
+    }
+
+    /**
+     * Creates a new LangString literal.
+     *
+     * As opposed to the constructor, this method never throws an exception.
+     *
+     * @param string           $lexical
+     *   The lexical form of the literal.
+     * @param non-empty-string $language
+     *   A valid non-empty BCP47 language tag.
+     *
+     * @return Literal
+     */
+    public static function langString(string $lexical, string $language): self
+    {
+        try {
+            $literal = new self($lexical, $language, null);
+        } catch (InvalidArgumentException) {
+            $literal = null;
+        }
+
+        assert($literal !== null, 'never reached: a LangString literal is always valid');
+
+        return $literal;
+    }
+
+    /**
+     * Creates a new literal with the specified datatype and lexical form.
+     *
+     * As opposed to the constructor, this method never throws an exception.
+     *
+     * @param string               $lexical
+     *   The lexical form of the literal.
+     * @param non-empty-string|Iri $datatype
+     *   A datatype IRI as per RFC3987.
+     *   If the datatype is LangString::IRI, a warning is issued and XSDString::IRI is used instead.
+     *
+     * @return Literal
+     */
+    public static function typed(string $lexical, string|Iri $datatype): self
+    {
+        if (
+            (is_string($datatype) && $datatype === LangString::IRI) ||
+            ($datatype instanceof Iri && $datatype->iri === LangString::IRI)
+        ) {
+            trigger_error('LangString literals cannot be created with a datatype IRI, using XSDString instead', E_USER_WARNING);
+
+            return self::XSDString($lexical);
+        }
+
+        try {
+            $literal = new self($lexical, null, is_string($datatype) ? new Iri($datatype) : $datatype);
+        } catch (InvalidArgumentException) {
+            $literal = null;
+        }
+
+        assert($literal !== null, 'never reached: a literal with non-LangString datatype is always valid');
+
+        return $literal;
     }
 
     /**

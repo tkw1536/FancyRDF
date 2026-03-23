@@ -6,13 +6,12 @@ namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use AssertionError;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
 use RuntimeException;
 
@@ -41,8 +40,8 @@ final class NTriplesTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
-    */
+     * @throws NonCompliantInputError
+     */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -60,12 +59,18 @@ final class NTriplesTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function ntriplesPositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestNTriplesPositiveSyntax') as $info) {
-            yield $info['iri'] => [
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
+                'action' => $info['action'],
+            ];
+
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
                 'action' => $info['action'],
             ];
         }
@@ -75,7 +80,7 @@ final class NTriplesTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function ntriplesNegativeSyntaxProvider(): Generator
     {
@@ -88,18 +93,20 @@ final class NTriplesTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
+     * @throws AssertionError
      */
     #[DataProvider('ntriplesPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
     public function testNTriplesPositiveSyntax(
+        bool $strict,
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser($strict);
             $parser = $parser->parseStream($source);
 
             foreach ($parser as $statement) {
@@ -114,20 +121,19 @@ final class NTriplesTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('ntriplesNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
-    #[RequiresSetting('zend.assertions', '1')]
     #[Group('negative-syntax-strict')]
-    public function testNTriplesNegativeSyntaxWithAssertions(
+    public function testNTriplesNegativeSyntaxStrict(
         string $action,
     ): void {
         $source = self::assertOpen($action);
-        self::expectException(AssertionError::class);
+        self::expectException(NonCompliantInputError::class);
 
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser(true);
             $parser = $parser->parseStream($source);
 
             foreach ($parser as $statement) {
@@ -142,19 +148,18 @@ final class NTriplesTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('ntriplesNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not throw with assertions disabled')]
-    #[RequiresSetting('zend.assertions', '0')]
     #[Group('negative-syntax-lenient')]
-    public function testNTriplesNegativeSyntaxWithoutAssertions(
+    public function testNTriplesNegativeSyntaxLenient(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $parser = new NFormatParser();
+            $parser = new NFormatParser(false);
             $parser = $parser->parseStream($source);
             iterator_to_array($parser);
         } finally {

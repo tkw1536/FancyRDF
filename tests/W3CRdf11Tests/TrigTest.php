@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use AssertionError;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
@@ -42,7 +43,7 @@ final class TrigTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
@@ -63,7 +64,7 @@ final class TrigTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function trigPositiveSyntaxProvider(): Generator
     {
@@ -78,7 +79,7 @@ final class TrigTest extends TestBase
      * @return Generator<string, array{action: string, result: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function trigEvaluationProvider(): Generator
     {
@@ -98,7 +99,7 @@ final class TrigTest extends TestBase
      * @return Generator<string, array{action: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function trigNegativeSyntaxProvider(): Generator
     {
@@ -121,7 +122,7 @@ final class TrigTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('trigPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
@@ -144,7 +145,7 @@ final class TrigTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[DataProvider('trigNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
@@ -169,7 +170,7 @@ final class TrigTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('trigNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not throw with assertions disabled')]
@@ -194,6 +195,7 @@ final class TrigTest extends TestBase
     /**
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('trigEvaluationProvider')]
     #[TestDox('$_dataname evaluates correctly')]

@@ -8,6 +8,7 @@ use FancyRDF\Dataset\Dataset;
 use FancyRDF\Dataset\RdfCanon\RdfCanonicalizationOptions;
 use FancyRDF\Dataset\RdfCanon\RdfCanonicalizer;
 use FancyRDF\Exceptions\CanonicalizationLimitExceeded;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use Generator;
 use InvalidArgumentException;
@@ -50,8 +51,8 @@ final class RdfCTest extends TestBase
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
-    */
+     * @throws NonCompliantInputError
+     */
     #[TestDox('manifest loaded correct case counts')]
     #[Group('manifest')]
     public function testCaseCounts(): void
@@ -72,7 +73,7 @@ final class RdfCTest extends TestBase
      * @return Generator<string, array{action: string, result: string, algorithm: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function rdfc10EvalTestProvider(): Generator
     {
@@ -98,7 +99,7 @@ final class RdfCTest extends TestBase
      * @return Generator<string, array{action: string, result: string, algorithm: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function rdfc10MapTestProvider(): Generator
     {
@@ -124,7 +125,7 @@ final class RdfCTest extends TestBase
      * @return Generator<string, array{action: string, algorithm: string}, mixed, void>
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public static function rdfc10NegativeEvalTestProvider(): Generator
     {
@@ -146,6 +147,7 @@ final class RdfCTest extends TestBase
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[TestDox('$_dataName evaluates to the correct result')]
     #[DataProvider('rdfc10EvalTestProvider')]
@@ -156,8 +158,7 @@ final class RdfCTest extends TestBase
         $action = self::assertOpen($action);
         $input  = [];
         try {
-            $parser = new NFormatParser();
-            $input  = new Dataset(iterator_to_array($parser->parseStream($action)));
+            $input = new Dataset(iterator_to_array((new NFormatParser(true))->parseStream($action)));
         } finally {
             if (is_resource($action)) {
                 fclose($action);
@@ -185,6 +186,7 @@ final class RdfCTest extends TestBase
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[TestDox('$_dataName hits limits when trying to canonicalize')]
     #[DataProvider('rdfc10NegativeEvalTestProvider')]
@@ -195,8 +197,7 @@ final class RdfCTest extends TestBase
         $action = self::assertOpen($action);
         $input  = [];
         try {
-            $parser = new NFormatParser();
-            $input  = new Dataset(iterator_to_array($parser->parseStream($action)));
+            $input = new Dataset(iterator_to_array((new NFormatParser(true))->parseStream($action)));
         } finally {
             if (is_resource($action)) {
                 fclose($action);
@@ -221,6 +222,7 @@ final class RdfCTest extends TestBase
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     #[TestDox('$_dataName produces the correct blank node map')]
     #[DataProvider('rdfc10MapTestProvider')]
@@ -231,8 +233,7 @@ final class RdfCTest extends TestBase
         $action = self::assertOpen($action);
         $input  = [];
         try {
-            $parser = new NFormatParser();
-            $input  = new Dataset(iterator_to_array($parser->parseStream($action)));
+            $input = new Dataset(iterator_to_array((new NFormatParser(true))->parseStream($action)));
         } finally {
             if (is_resource($action)) {
                 fclose($action);

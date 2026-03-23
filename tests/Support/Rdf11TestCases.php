@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\Support;
 
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
@@ -12,7 +13,6 @@ use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
 use Generator;
-use InvalidArgumentException;
 use RuntimeException;
 
 use function dirname;
@@ -43,7 +43,7 @@ class Rdf11TestCases
 
     /**
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     public function __construct(
         private readonly string $manifestPath,

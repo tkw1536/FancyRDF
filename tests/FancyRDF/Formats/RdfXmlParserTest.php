@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancyRDF\Tests\Support\LocalRdfTestCases;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
@@ -97,7 +97,10 @@ final class RdfXmlParserTest extends TestCase
         return $cases;
     }
 
-    /** @throws InvalidArgumentException */
+    /**
+     * @throws NonCompliantInputError
+     * @throws RuntimeException
+     */
     #[DataProvider('rdfParsesToTriplesProvider')]
     #[DataProvider('serializedParsesToTriplesProvider')]
     #[TestDox('parser/{_dataName}')]
@@ -114,7 +117,7 @@ final class RdfXmlParserTest extends TestCase
         $ntSource = file_get_contents($ntFile);
         self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
 
-        $expectedTriples = iterator_to_array((new NFormatParser())->parse($ntSource));
+        $expectedTriples = iterator_to_array((new NFormatParser(true))->parse($ntSource));
         self::assertThat($triples, new IsomorphicAsDatasetsConstraint($expectedTriples));
     }
 }

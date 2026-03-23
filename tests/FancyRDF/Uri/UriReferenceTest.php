@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Uri;
 
 use FancyRDF\Uri\UriReference;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -552,8 +551,6 @@ final class UriReferenceTest extends TestCase
     /**
      * Tests isSameDocumentReference() per RFC 3986 §4.4.
      */
-
-    /** @throws InvalidArgumentException */
     #[DataProvider('sameDocumentReferenceProvider')]
     #[TestDox('Is same document reference: base=$baseUri, reference=$referenceUri')]
     public function testIsSameDocumentReference(string $baseUri, string $referenceUri, bool $expectedIsSameDocument): void
@@ -631,8 +628,6 @@ final class UriReferenceTest extends TestCase
 
     /**
      * Case normalization per RFC 3986 §6.2.2.1.
-     *
-     * @throws InvalidArgumentException
      */
     #[TestDox('Normalize case: $input => $expected')]
     #[TestWith(['HTTP://example.com/', 'http://example.com/'])]
@@ -651,8 +646,6 @@ final class UriReferenceTest extends TestCase
 
     /**
      * Percent-encoding normalization per RFC 3986 §6.2.2.2.
-     *
-     * @throws InvalidArgumentException
      */
     #[TestDox('Normalize percent-encoding: $input => $expected')]
     #[TestWith(['http://example.com/%61bc', 'http://example.com/abc'])]
@@ -672,8 +665,6 @@ final class UriReferenceTest extends TestCase
 
     /**
      * Path segment normalization per RFC 3986 §6.2.2.3.
-     *
-     * @throws InvalidArgumentException
      */
     #[TestDox('Normalize path segment: $input => $expected')]
     #[TestWith(['http://a/b/c/./../../g', 'http://a/g'])]
@@ -774,7 +765,6 @@ final class UriReferenceTest extends TestCase
         ];
     }
 
-    /** @throws InvalidArgumentException */
     #[DataProvider('customUrlResolveProvider')]
     #[DataProvider('rfc3986SpecResolveProvider')]
     #[TestDox('Resolve URLs: base=$base, relative=$relative, expected=$expected')]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\TrigSerializer;
 use InvalidArgumentException;
@@ -79,16 +80,18 @@ final class TrigSerializerTest extends TestCase
     /**
      * @param string $ntFile  Path to the input N-Triples file.
      * @param string $ttlFile Path to the expected Turtle file.
-     */
-
-    /** @throws InvalidArgumentException */
+     *
+     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
+     * @throws RuntimeException
+    */
     #[DataProvider('turtleSerializeProvider')]
     public function testTurtleSerialize(string $ntFile, string $ttlFile): void
     {
         $ntContents = file_get_contents($ntFile);
         self::assertNotFalse($ntContents, 'Failed to read input file: ' . $ntFile);
 
-        $parser     = new NFormatParser();
+        $parser     = new NFormatParser(true);
         $statements = iterator_to_array($parser->parse($ntContents));
 
         $serializer = new TrigSerializer(false);
@@ -114,17 +117,18 @@ final class TrigSerializerTest extends TestCase
     /**
      * @param string $nqFile   Path to the input N-Quads file.
      * @param string $trigFile Path to the expected TriG file.
+     *
+     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
+     * @throws RuntimeException
      */
-
-    /** @throws InvalidArgumentException */
     #[DataProvider('trigSerializeProvider')]
     public function testTrigSerialize(string $nqFile, string $trigFile): void
     {
         $nqContents = file_get_contents($nqFile);
         self::assertNotFalse($nqContents, 'Failed to read input file: ' . $nqFile);
 
-        $parser     = new NFormatParser();
-        $statements = iterator_to_array($parser->parse($nqContents));
+        $statements = iterator_to_array((new NFormatParser(true))->parse($nqContents));
 
         $serializer = new TrigSerializer(true);
 
@@ -145,12 +149,16 @@ final class TrigSerializerTest extends TestCase
         );
     }
 
-    /** @throws InvalidArgumentException */
+    /**
+     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
+     * @throws RuntimeException
+     */
     public function testTurtleRejectsGraphs(): void
     {
         $serializer = new TrigSerializer(false);
 
-        $parser = new NFormatParser();
+        $parser = new NFormatParser(true);
         $quad   = iterator_to_array($parser->parse('<http://example.org/s> <http://example.org/p> "o" <http://example.org/g> .'))[0] ?? null;
         self::assertNotNull($quad);
 
