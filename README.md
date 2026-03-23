@@ -41,15 +41,15 @@ The library provides several stream-based implementations of parsers and seriali
     - ✅ Serializer: [RdfXmlSerializer](src/Formats/RdfXmlSerializer.php)
     - ✅ passes W3C [Test Suite](https://www.w3.org/2013/RDFXMLTests/)
         - ✅ all positive tests parse correctly and produce equivalent N-Triples datasets
-        - ✅ all negative tests produce an assertion error in development mode.
-        - ✅ all negative tests do not produce errors in production mode.
+        - ✅ all negative tests produce an error in strict mode.
+        - ✅ all negative tests do not produce errors in loose mode.
 - [N-Triples](https://www.w3.org/TR/n-triples/) and [N-Quads](https://www.w3.org/TR/n-quads/)
     - ✅ Parser: [NFormatParser](src/Formats/NFormatParser.php)
     - ✅ Serializer: [NFormatSerializer](src/Formats/NFormatSerializer.php) producing [Canonical N-Quads](https://www.w3.org/TR/rdf-canon/#canonical-quads) and [Canonical N-Triples](https://www.w3.org/TR/n-triples/#canonical-ntriples)
     - ✅ can pass W3C [Test Suite for N-Triples](https://www.w3.org/2013/N-TriplesTests/) and [Test Suite for N-Quads](https://www.w3.org/2013/N-QuadsTests/)
         - ✅ all positive tests parse and round-trip correctly.
-        - ✅ all negative tests produce an assertion error in development mode.
-        - ✅ all negative tests do not produce errors in production mode. 
+        - ✅ all negative tests produce an error in strict mode.
+        - ✅ all negative tests do not produce errors in lenient mode. 
 - [Turtle](https://www.w3.org/TR/turtle/) and [Trig](https://www.w3.org/TR/trig/)
     - ✅ Tokenizer: [TrigReader](src/Formats/TrigReader/TrigReader.php)
     - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
@@ -57,10 +57,11 @@ The library provides several stream-based implementations of parsers and seriali
     - Test Suites:
         - ✅ passes W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/) and [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
         - ✅ all positive tests parse correctly and produce equivalent RDF datasets.
-        - ✅ all negative tests produce an assertion error in development mode.
-        - ✅ all negative tests do not produce errors in production mode.
+        - ✅ all negative tests produce an error in strict mode.
+        - ✅ all negative tests do not produce errors in lenient mode.
 
 ## TODO List
+- add missing Serializers
 
 - Implement Sparql Querying 
 
