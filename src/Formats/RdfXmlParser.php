@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
@@ -22,6 +23,9 @@ use function in_array;
 use function mb_substr;
 use function preg_match;
 use function str_contains;
+use function trigger_error;
+
+use const E_USER_WARNING;
 
 /**
  * A streaming RDF/XML parser that emits triples as they are encountered.
@@ -35,8 +39,12 @@ class RdfXmlParser extends FiberIterator
 
     public const string RDF_NAMESPACE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 
-    /** @param XMLReader $reader The XMLReader instance to parse from */
-    public function __construct(private XMLReader $reader)
+    /**
+     * @param bool      $strict
+     *   Whether to enable strict mode.
+     *   In strict mode, additional checks are performed to validate compliance with the standard, and appropriate NonCompliantInputErrors may be thrown.
+     * @param XMLReader $reader The XMLReader instance to parse from */
+    public function __construct(public readonly bool $strict, private readonly XMLReader $reader)
     {
         $this->subjectStack      = new SplStack();
         $this->pendingProperties = new SplStack();
@@ -55,14 +63,24 @@ class RdfXmlParser extends FiberIterator
      * @return non-empty-string
      *   The resolved absolute URI.
      *   The function asserts that the URI is resolvable, i.e. that the result is non-empty.
+     *
+     * @throws NonCompliantInputError
      */
     private function resolveURI(string $uri): string
     {
         $resolved = UriReference::resolveRelative($this->reader->baseURI, $uri);
-        assert(
-            $resolved !== '' && self::isValidRDFIri($resolved),
-            'resolved URI must be a valid absolute IRI: ' . $resolved,
-        );
+        if ($resolved === '') {
+            if ($this->strict) {
+                throw new NonCompliantInputError('resolved URI is empty');
+            }
+
+            // best-effort parsing: return some absolute URI.
+            return 'invalid://';
+        }
+
+        if ($this->strict && ! self::isValidRDFIri($resolved)) {
+            throw new NonCompliantInputError('resolved URI is not a valid absolute IRI: ' . $resolved);
+        }
 
         return $resolved;
     }
@@ -178,15 +196,20 @@ class RdfXmlParser extends FiberIterator
      * @param bool        $checkDuplicates Whether to check for duplicate rdf:ID values
      *
      * @return Iri|BlankNode The resolved subject Resource
+     *
+     * @throws NonCompliantInputError
      */
     private function resolveSubject(string|null $about, string|null $nodeId, string|null $idAttr, bool $checkDuplicates = false): Iri|BlankNode
     {
         if ($idAttr !== null) {
-            // Validate rdf:ID value matches XML Name production
-            assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
+            if ($this->strict && ! self::isValidXmlName($idAttr)) {
+                throw new NonCompliantInputError('rdf:ID value must match XML Name production: ' . $idAttr);
+            }
 
             $resolvedURI = $this->resolveURI('#' . $idAttr);
-            assert(! $checkDuplicates || ! $this->sawIdentifier($resolvedURI), 'Duplicate rdf:ID value: ' . $idAttr);
+            if ($this->strict && ($checkDuplicates && $this->sawIdentifier($resolvedURI))) {
+                throw new NonCompliantInputError('Duplicate rdf:ID value: ' . $idAttr);
+            }
 
             return new Iri($resolvedURI);
         }
@@ -199,8 +222,9 @@ class RdfXmlParser extends FiberIterator
         }
 
         if ($nodeId !== null) {
-            // Validate rdf:nodeID value matches XML Name production
-            assert(self::isValidXmlName($nodeId), 'rdf:nodeID value must match XML Name production: ' . $nodeId);
+            if ($this->strict && ! self::isValidXmlName($nodeId)) {
+                throw new NonCompliantInputError('rdf:nodeID value must match XML Name production: ' . $nodeId);
+            }
 
             // rdf:nodeID creates a blank node with the given ID
             return $this->blankNode($nodeId);
@@ -216,6 +240,8 @@ class RdfXmlParser extends FiberIterator
      * @param Iri|BlankNode         $subject        The subject of the collection property
      * @param Iri                   $predicate      The predicate of the collection property
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
+     *
+     * @throws NonCompliantInputError
      */
     private function handleParseTypeCollection(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI): void
     {
@@ -342,12 +368,14 @@ class RdfXmlParser extends FiberIterator
      * @param string|null           $resourceAttr   The rdf:resource attribute value (must be null)
      *
      * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     private function handleParseTypeLiteral(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI, string|null $resourceAttr): void
     {
         // Error: rdf:parseType="Literal" cannot be combined with rdf:resource
-        assert($resourceAttr === null, 'rdf:parseType="Literal" cannot be combined with rdf:resource attribute');
+        if ($this->strict && $resourceAttr !== null) {
+            throw new NonCompliantInputError('rdf:parseType="Literal" cannot be combined with rdf:resource attribute');
+        }
 
         // Error: rdf:parseType="Literal" cannot be combined with non-RDF attributes
         if ($this->reader->hasAttributes) {
@@ -356,14 +384,17 @@ class RdfXmlParser extends FiberIterator
                 $attrNamespace = $this->reader->namespaceURI;
                 $attrLocalName = $this->reader->localName;
                 // Check if it's a non-RDF, non-XML attribute
-                assert(
+                if (
+                    $this->strict && ! (
                     $attrNamespace === self::RDF_NAMESPACE
                     || $attrNamespace === XMLUtils::XML_NAMESPACE
                     || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
                     || $attrNamespace === ''
-                    || in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true),
-                    'rdf:parseType="Literal" cannot be combined with non-RDF attributes',
-                );
+                    || in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
+                    )
+                ) {
+                    throw new NonCompliantInputError('rdf:parseType="Literal" cannot be combined with non-RDF attributes');
+                }
             } while ($this->reader->moveToNextAttribute());
 
             $this->reader->moveToElement();
@@ -371,8 +402,18 @@ class RdfXmlParser extends FiberIterator
 
         $outerXml = $this->reader->readOuterXml();
 
-        $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
-        $object       = new Literal($canonicalXml, null, new Iri(self::RDF_NAMESPACE . 'XMLLiteral'));
+        try {
+            $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
+        } catch (InvalidArgumentException $e) {
+            if ($this->strict) {
+                throw new NonCompliantInputError('Failed to serialize inner XML: ' . $e->getMessage(), previous: $e);
+            }
+
+            trigger_error('Failed to serialize inner XML: ' . $e->getMessage(), E_USER_WARNING);
+            $canonicalXml = $this->reader->readInnerXml();
+        }
+
+        $object = Literal::typed($canonicalXml, self::RDF_NAMESPACE . 'XMLLiteral');
 
         $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
 
@@ -385,8 +426,6 @@ class RdfXmlParser extends FiberIterator
      *
      * @param Iri|BlankNode         $object The object (IRI or Blank Node) to add properties to
      * @param non-empty-string|null $lang   The language for literal values
-     *
-     * @throws InvalidArgumentException
      */
     private function processPropertyElementAttributes(Iri|BlankNode $object, string|null $lang): void
     {
@@ -411,7 +450,7 @@ class RdfXmlParser extends FiberIterator
             }
 
             $attrPredicate = new Iri($attrNamespace . $attrLocalName);
-            $attrObject    = new Literal($attrValue, $lang);
+            $attrObject    = Literal::langOrXSDString($attrValue, $lang);
 
             $this->emit([
                 $object,
@@ -426,6 +465,9 @@ class RdfXmlParser extends FiberIterator
 
     /**
      * Function that does the actual parsing.
+     *
+     * @throws NonCompliantInputError
+     * @throws RuntimeException
      */
     #[Override]
     protected function doIterate(): void
@@ -445,7 +487,14 @@ class RdfXmlParser extends FiberIterator
                         && $this->pendingProperties->top()['depth'] === $this->reader->depth
                     ) {
                         $thePendingProperty = $this->pendingProperties->pop();
-                        assert($this->subject !== null, 'subject must be set for pending property');
+                        if ($this->subject === null) {
+                            if ($this->strict) {
+                                throw new NonCompliantInputError('subject must be set for pending property');
+                            }
+
+                            continue;
+                        }
+
                         $object = $this->subject;
                         $this->emitTripleWithReification(
                             $thePendingProperty['subject'],
@@ -475,6 +524,7 @@ class RdfXmlParser extends FiberIterator
             }
 
             $localName = $this->reader->localName;
+            assert($localName !== '', 'XMLReader::localName cannot be empty if we have an element');
             $namespace = $this->reader->namespaceURI;
 
             // Property element (check first, as property elements can have rdf:ID for reification)
@@ -483,12 +533,20 @@ class RdfXmlParser extends FiberIterator
             // Error: Certain RDF namespace elements cannot be used as property elements
             // NOTE: rdf:Description is only forbidden as a property element when it has rdf:resource
             if ($this->subject !== null && $namespace === self::RDF_NAMESPACE) {
-                assert($localName !== 'RDF', 'rdf:RDF cannot be used as a property element');
+                if ($this->strict && $localName === 'RDF') {
+                    throw new NonCompliantInputError('rdf:RDF cannot be used as a property element');
+                }
+
                 // rdf:ID, rdf:about, rdf:resource, rdf:parseType, rdf:datatype, rdf:nodeID, rdf:bagID, rdf:aboutEach, rdf:aboutEachPrefix are attributes/elements that cannot be property elements
                 // Note: rdf:Description is handled separately below
-                assert(! in_array($localName, ['ID', 'about', 'resource', 'parseType', 'datatype', 'nodeID', 'bagID', 'aboutEach', 'aboutEachPrefix'], true), 'rdf:' . $localName . ' cannot be used as a property element');
-                // rdf:Description cannot be used as a property element (only when it has rdf:resource)
-                assert($localName !== 'Description' || $this->reader->getAttribute('rdf:resource') === null, 'rdf:Description cannot be used as a property element');
+                if ($this->strict && in_array($localName, ['ID', 'about', 'resource', 'parseType', 'datatype', 'nodeID', 'bagID', 'aboutEach', 'aboutEachPrefix'], true)) {
+                    throw new NonCompliantInputError('rdf:' . $localName . ' cannot be used as a property element');
+                }
+
+                if ($this->strict && $localName === 'Description' && $this->reader->getAttribute('rdf:resource') !== null) {
+                    // rdf:Description cannot be used as a property element (only when it has rdf:resource)
+                    throw new NonCompliantInputError('rdf:Description cannot be used as a property element when it has rdf:resource');
+                }
             }
 
             // rdf:Description block starting
@@ -501,21 +559,32 @@ class RdfXmlParser extends FiberIterator
                 unset($this->liCounters[$descriptionDepth + 1]);
 
                 // Check for deprecated rdf:aboutEach and rdf:aboutEachPrefix attributes
-                assert($this->reader->getAttribute('rdf:aboutEach') === null, 'rdf:aboutEach has been removed from RDF specifications');
-                assert($this->reader->getAttribute('rdf:aboutEachPrefix') === null, 'rdf:aboutEachPrefix has been removed from RDF specifications');
+                if ($this->strict && $this->reader->getAttribute('rdf:aboutEach') !== null) {
+                    throw new NonCompliantInputError('rdf:aboutEach has been removed from RDF specifications');
+                }
+
+                if ($this->strict && $this->reader->getAttribute('rdf:aboutEachPrefix') !== null) {
+                    throw new NonCompliantInputError('rdf:aboutEachPrefix has been removed from RDF specifications');
+                }
 
                 // Check for deprecated rdf:bagID attribute
-                assert($this->reader->getAttribute('rdf:bagID') === null, 'rdf:bagID has been removed from RDF specifications');
+                if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
+                    throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
+                }
 
                 $about  = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
                 $nodeId = $this->reader->getAttribute('rdf:nodeID');
                 $idAttr = $this->reader->getAttribute('rdf:ID');
 
                 // Error: rdf:nodeID and rdf:ID cannot be used together
-                assert($nodeId === null || $idAttr === null, 'Cannot have rdf:nodeID and rdf:ID');
+                if ($this->strict && ! ($nodeId === null || $idAttr === null)) {
+                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:ID');
+                }
 
-                // Error: rdf:nodeID and rdf:about cannot be used together
-                assert($nodeId === null || $about === null, 'Cannot have rdf:nodeID and rdf:about');
+                // Error: rdf:nodeID and rdf:about cannot be used togeth
+                if ($this->strict && ! ($nodeId === null || $about === null)) {
+                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:about');
+                }
 
                 $this->subject = $this->resolveSubject($about, $nodeId, $idAttr, true);
 
@@ -523,7 +592,9 @@ class RdfXmlParser extends FiberIterator
                 $descriptionLang = $descriptionLang !== '' ? $descriptionLang : null;
 
                 // Check for rdf:li used as an attribute on Description (only allowed as element)
-                assert($this->reader->getAttribute('rdf:li') === null, 'rdf:li cannot be used as an attribute');
+                if ($this->strict && $this->reader->getAttribute('rdf:li') !== null) {
+                    throw new NonCompliantInputError('rdf:li cannot be used as an attribute');
+                }
 
                 // Process attributes on Description element as property-value pairs
                 if ($this->reader->hasAttributes) {
@@ -556,7 +627,7 @@ class RdfXmlParser extends FiberIterator
                             $resolvedURI = $this->resolveURI($value);
                             $object      = new Iri($resolvedURI);
                         } else {
-                            $object = new Literal($value, $descriptionLang);
+                            $object = Literal::langOrXSDString($value, $descriptionLang);
                         }
 
                         $this->emit([
@@ -592,12 +663,12 @@ class RdfXmlParser extends FiberIterator
                 if ($namespace === self::RDF_NAMESPACE && $localName === 'li') {
                     $predicate = $this->nextLiProperty();
                 } else {
-                    assert($localName !== '', 'local name must be non-empty');
                     $predicate = new Iri($namespace . $localName);
                 }
 
-                // Check for deprecated rdf:bagID attribute on property elements
-                assert($this->reader->getAttribute('rdf:bagID') === null, 'rdf:bagID has been removed from RDF specifications');
+                if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
+                    throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
+                }
 
                 $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
                 $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
@@ -608,15 +679,20 @@ class RdfXmlParser extends FiberIterator
                 $propertyLang = $propertyLang !== '' ? $propertyLang : null;
 
                 // Error: rdf:nodeID and rdf:resource cannot be used together
-                assert($nodeIdAttr === null || $resourceAttr === null, 'rdf:nodeID and rdf:resource cannot be used together');
+                if ($this->strict && ! ($nodeIdAttr === null || $resourceAttr === null)) {
+                    throw new NonCompliantInputError('rdf:nodeID and rdf:resource cannot be used together');
+                }
 
-                assert($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr), 'rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
+                if ($this->strict && ! ($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr))) {
+                    throw new NonCompliantInputError('rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
+                }
 
                 // Handle rdf:ID on property element (reification)
                 $reificationURI = null;
                 if ($idAttr !== null) {
-                    // Validate rdf:ID value matches XML Name production
-                    assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
+                    if ($this->strict && ! self::isValidXmlName($idAttr)) {
+                        throw new NonCompliantInputError('rdf:ID value must match XML Name production: ' . $idAttr);
+                    }
 
                     $reificationURI = $this->resolveURI('#' . $idAttr);
                 }
@@ -697,7 +773,7 @@ class RdfXmlParser extends FiberIterator
                 // Check if element is empty (self-closing)
                 if ($this->reader->isEmptyElement) {
                     // Empty property element creates empty string literal
-                    $object = new Literal('', $propertyLang);
+                    $object = Literal::langOrXSDString('', $propertyLang);
                     $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                     continue;
@@ -712,7 +788,7 @@ class RdfXmlParser extends FiberIterator
                     // Check if we're at the end of the element (empty content)
                     if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
                         // Empty property element creates empty string literal
-                        $object = new Literal('', $propertyLang);
+                        $object = Literal::langOrXSDString('', $propertyLang);
                         $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                         continue;
@@ -731,8 +807,8 @@ class RdfXmlParser extends FiberIterator
                 }
 
                 $object = $datatypeAttr !== null
-                    ? new Literal($this->reader->value, null, new Iri($this->resolveURI($datatypeAttr)))
-                    : new Literal($this->reader->value, $propertyLang);
+                    ? Literal::typed($this->reader->value, $this->resolveURI($datatypeAttr))
+                    : Literal::langOrXSDString($this->reader->value, $propertyLang);
 
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
@@ -743,13 +819,23 @@ class RdfXmlParser extends FiberIterator
             // Also includes typed nodes without node-identifying attributes (creates blank node)
             // Must check after property elements, as property elements can have rdf:ID for reification
             // Check for deprecated rdf:aboutEach and rdf:aboutEachPrefix attributes on typed nodes
-            assert($this->reader->getAttribute('rdf:aboutEach') === null, 'rdf:aboutEach has been removed from RDF specifications');
-            assert($this->reader->getAttribute('rdf:aboutEachPrefix') === null, 'rdf:aboutEachPrefix has been removed from RDF specifications');
+            if ($this->strict && $this->reader->getAttribute('rdf:aboutEach') !== null) {
+                throw new NonCompliantInputError('rdf:aboutEach has been removed from RDF specifications');
+            }
+
+            if ($this->strict && $this->reader->getAttribute('rdf:aboutEachPrefix') !== null) {
+                throw new NonCompliantInputError('rdf:aboutEachPrefix has been removed from RDF specifications');
+            }
+
             // Check for rdf:li used as an attribute (only allowed as element)
-            assert($this->reader->getAttribute('rdf:li') === null, 'rdf:li cannot be used as an attribute');
+            if ($this->strict && $this->reader->getAttribute('rdf:li') !== null) {
+                throw new NonCompliantInputError('rdf:li cannot be used as an attribute');
+            }
 
             // Check for deprecated rdf:bagID attribute on typed nodes
-            assert($this->reader->getAttribute('rdf:bagID') === null, 'rdf:bagID has been removed from RDF specifications');
+            if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
+                throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
+            }
 
             $about         = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
             $nodeId        = $this->reader->getAttribute('rdf:nodeID');
@@ -765,12 +851,15 @@ class RdfXmlParser extends FiberIterator
                 $typedNodeDepth = $this->reader->depth;
 
                 // Check for duplicate rdf:ID values on typed nodes (before resolving)
-                if ($idAttr !== null) {
-                    // Validate rdf:ID value matches XML Name production
-                    assert(self::isValidXmlName($idAttr), 'rdf:ID value must match XML Name production: ' . $idAttr);
+                if ($this->strict && $idAttr !== null) {
+                    if (! self::isValidXmlName($idAttr)) {
+                        throw new NonCompliantInputError('rdf:ID value must match XML Name production: ' . $idAttr);
+                    }
 
                     $resolvedURI = $this->resolveURI('#' . $idAttr);
-                    assert(! $this->sawIdentifier($resolvedURI), 'Duplicate rdf:ID value: ' . $idAttr);
+                    if ($this->sawIdentifier($resolvedURI)) {
+                        throw new NonCompliantInputError('Duplicate rdf:ID value: ' . $idAttr);
+                    }
                 }
 
                 $subject = $this->resolveSubject($about, $nodeId, $idAttr, false);
@@ -779,7 +868,6 @@ class RdfXmlParser extends FiberIterator
                 $this->subject = $subject;
 
                 $object = $namespace . $localName;
-                assert($object !== '', 'object may not be empty');
 
                 $this->emit([
                     $subject,
@@ -821,7 +909,7 @@ class RdfXmlParser extends FiberIterator
                         $this->emit([
                             $subject,
                             $predicate,
-                            new Literal($value, $typedNodeLang),
+                            Literal::langOrXSDString($value, $typedNodeLang),
                             null,
                         ]);
                     } while ($this->reader->moveToNextAttribute());
@@ -841,8 +929,7 @@ class RdfXmlParser extends FiberIterator
                 continue;
             }
 
-            $iri = $namespace . $localName;
-            assert($iri !== '', 'iri must be non-empty');
+            $iri          = $namespace . $localName;
             $predicate    = new Iri($iri);
             $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
             $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
@@ -861,34 +948,30 @@ class RdfXmlParser extends FiberIterator
 
             // Handle rdf:parseType="Collection" - create list structure
             if ($parseType === 'Collection') {
-                assert($this->subject !== null, 'subject must be set for collection');
-                $this->handleParseTypeCollection($this->subject, $predicate, $reificationURI);
+                $this->handleParseTypeCollection($this->subjectOrFallback('subject must be set for collection'), $predicate, $reificationURI);
 
                 continue;
             }
 
             // Handle rdf:parseType="Resource" - create blank node and process nested content
             if ($parseType === 'Resource') {
-                assert($this->subject !== null, 'subject must be set for resource');
-                $this->handleParseTypeResource($this->subject, $predicate, $reificationURI);
+                $this->handleParseTypeResource($this->subjectOrFallback('subject must be set for resource'), $predicate, $reificationURI);
 
                 continue;
             }
 
             // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
             if ($parseType === 'Literal') {
-                assert($this->subject !== null, 'subject must be set for literal');
-                $this->handleParseTypeLiteral($this->subject, $predicate, $reificationURI, $resourceAttr);
+                $this->handleParseTypeLiteral($this->subjectOrFallback('subject must be set for literal'), $predicate, $reificationURI, $resourceAttr);
 
                 continue;
             }
 
             if ($resourceAttr !== null) {
-                assert($this->subject !== null, 'subject must be set');
                 $resolvedURI = $this->resolveURI($resourceAttr);
                 $object      = new Iri($resolvedURI);
 
-                $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                $this->emitTripleWithReification($this->subjectOrFallback('subject must be set'), $predicate, $object, $reificationURI);
 
                 // Process non-RDF attributes as properties of the object
                 $this->processPropertyElementAttributes($object, $elementLang);
@@ -897,9 +980,8 @@ class RdfXmlParser extends FiberIterator
             }
 
             if ($nodeIdAttr !== null) {
-                assert($this->subject !== null, 'subject must be set');
                 $object = $this->blankNode($nodeIdAttr);
-                $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                $this->emitTripleWithReification($this->subjectOrFallback('subject must be set'), $predicate, $object, $reificationURI);
 
                 continue;
             }
@@ -929,9 +1011,8 @@ class RdfXmlParser extends FiberIterator
 
             // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
             if ($hasNonRdfAttributes) {
-                assert($this->subject !== null, 'subject must be set');
                 $object = $this->blankNode(null);
-                $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                $this->emitTripleWithReification($this->subjectOrFallback('subject must be set'), $predicate, $object, $reificationURI);
 
                 // Process non-RDF attributes as properties of the object
                 $this->processPropertyElementAttributes($object, $elementLang);
@@ -941,10 +1022,9 @@ class RdfXmlParser extends FiberIterator
 
             // Check if element is empty (self-closing)
             if ($this->reader->isEmptyElement) {
-                assert($this->subject !== null, 'subject must be set');
                 // Empty property element creates empty string literal
-                $object = new Literal('', $elementLang);
-                $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                $object = Literal::langOrXSDString('', $elementLang);
+                $this->emitTripleWithReification($this->subjectOrFallback('subject must be set'), $predicate, $object, $reificationURI);
 
                 continue;
             }
@@ -957,10 +1037,9 @@ class RdfXmlParser extends FiberIterator
             ) {
                 // Check if we're at the end of the element (empty content)
                 if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
-                    assert($this->subject !== null, 'subject must be set');
                     // Empty property element creates empty string literal
-                    $object = new Literal('', $elementLang);
-                    $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                    $object = Literal::langOrXSDString('', $elementLang);
+                    $this->emitTripleWithReification($this->subjectOrFallback('subject must be set'), $predicate, $object, $reificationURI);
 
                     continue;
                 }
@@ -979,10 +1058,14 @@ class RdfXmlParser extends FiberIterator
                 continue;
             }
 
-            assert($this->subject !== null, 'subject must be set');
-            $object = $datatypeAttr !== null
-                ? new Literal($this->reader->value, null, new Iri($this->resolveURI($datatypeAttr)))
-                : new Literal($this->reader->value, $elementLang);
+            $object = match (true) {
+                $datatypeAttr !== null => Literal::typed($this->reader->value, $this->resolveURI($datatypeAttr)),
+                default => Literal::langOrXSDString($this->reader->value, $elementLang),
+            };
+
+            if ($this->strict && $this->subject === null) {
+                throw new NonCompliantInputError('subject must be set');
+            }
 
             $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
         }
@@ -1021,5 +1104,25 @@ class RdfXmlParser extends FiberIterator
         // Allow letters, digits, underscores, hyphens, periods, and Unicode characters
         // This is a simplified check - for full XML Name validation, we'd need more complex logic
         return (bool) preg_match('/^[\p{L}_][\p{L}\p{N}_\\.\\-]*$/u', $name);
+    }
+
+    /**
+     * Returns the current subject
+     *
+     * @return Iri|BlankNode The current subject, or a fallback node if in loose mode.
+     *
+     * @throws NonCompliantInputError if in strict mode and subject is not set.
+     */
+    private function subjectOrFallback(string $message): Iri|BlankNode
+    {
+        if ($this->subject !== null) {
+            return $this->subject;
+        }
+
+        if ($this->strict) {
+            throw new NonCompliantInputError($message);
+        }
+
+        return $this->blankNode(null);
     }
 }

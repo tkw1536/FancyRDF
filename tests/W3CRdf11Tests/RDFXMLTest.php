@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
-use AssertionError;
 use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\RdfXmlParser;
 use Generator;
@@ -12,7 +11,6 @@ use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
 use RuntimeException;
 use XMLReader;
@@ -58,7 +56,7 @@ final class RDFXMLTest extends TestBase
     }
 
     /**
-     * @return Generator<string, array{action: string, result: string}, mixed, void>
+     * @return Generator<string, array{strict: bool, action: string, result: string}, mixed, void>
      *
      * @throws RuntimeException
      * @throws NonCompliantInputError
@@ -70,7 +68,14 @@ final class RDFXMLTest extends TestBase
                 throw new RuntimeException('result is required for evaluation tests');
             }
 
-            yield $info['iri'] => [
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
+                'action' => $info['action'],
+                'result' => $info['result'],
+            ];
+
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
                 'action' => $info['action'],
                 'result' => $info['result'],
             ];
@@ -101,6 +106,7 @@ final class RDFXMLTest extends TestBase
     #[TestDox('$_dataname')]
     #[Group('positive-evaluation')]
     public function testXMLTestEvaluation(
+        bool $strict,
         string $action,
         string $result,
     ): void {
@@ -110,7 +116,7 @@ final class RDFXMLTest extends TestBase
 
         try {
             $reader = XMLReader::fromStream($source, null, 0, $action);
-            $parser = new RdfXmlParser($reader);
+            $parser = new RdfXmlParser($strict, $reader);
 
             $got = iterator_to_array($parser);
             self::assertThat($got, $evaluation);
@@ -127,18 +133,17 @@ final class RDFXMLTest extends TestBase
      */
     #[DataProvider('xmlTestNegativeSyntaxProvider')]
     #[TestDox('$_dataname asserts with assertions enabled')]
-    #[RequiresSetting('zend.assertions', '1')]
     #[Group('negative-syntax-strict')]
-    public function testXMLTestNegativeSyntaxWithAssertions(
+    public function testXMLTestNegativeSyntaxStrict(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
-        self::expectException(AssertionError::class);
+        self::expectException(NonCompliantInputError::class);
 
         try {
             $reader = XMLReader::fromStream($source, null, 0, $action);
-            $parser = new RdfXmlParser($reader);
+            $parser = new RdfXmlParser(true, $reader);
 
             iterator_to_array($parser);
         } finally {
@@ -154,16 +159,15 @@ final class RDFXMLTest extends TestBase
      */
     #[DataProvider('xmlTestNegativeSyntaxProvider')]
     #[TestDox('$_dataname does not assert with assertions enabled')]
-    #[RequiresSetting('zend.assertions', '0')]
     #[Group('negative-syntax-lenient')]
-    public function testXMLTestNegativeSyntaxWithoutAssertions(
+    public function testXMLTestNegativeSyntaxLenient(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
             $reader = XMLReader::fromStream($source, null, 0, $action);
-            $parser = new RdfXmlParser($reader);
+            $parser = new RdfXmlParser(false, $reader);
 
             iterator_to_array($parser);
         } finally {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats;
 
+use FancyRDF\Exceptions\NonCompliantInputError;
 use Fiber;
 use InvalidArgumentException;
 use IteratorAggregate;
@@ -93,6 +94,7 @@ abstract class FiberIterator implements IteratorAggregate
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     abstract protected function doIterate(): void;
 }

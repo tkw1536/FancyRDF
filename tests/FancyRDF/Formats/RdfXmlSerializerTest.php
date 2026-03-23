@@ -29,7 +29,7 @@ use const DIRECTORY_SEPARATOR;
 final class RdfXmlSerializerTest extends TestCase
 {
     /**
-     * @return array<string, array{string, string}>
+     * @return array<string, array{bool, string, string}>
      *
      * @throws RuntimeException
      */
@@ -45,7 +45,8 @@ final class RdfXmlSerializerTest extends TestCase
                 continue;
             }
 
-            $cases[$name] = [$paths['rdf'], $paths['rdf_serialized']];
+            $cases['loose/' . $name]  = [false, $paths['rdf'], $paths['rdf_serialized']];
+            $cases['strict/' . $name] = [true, $paths['rdf'], $paths['rdf_serialized']];
         }
 
         return $cases;
@@ -60,12 +61,12 @@ final class RdfXmlSerializerTest extends TestCase
      */
     #[DataProvider('serializeProvider')]
     #[TestDox('serialize {name}')]
-    public function testSerialize(string $rdfFile, string $serializedFile): void
+    public function testSerialize(bool $strict, string $rdfFile, string $serializedFile): void
     {
         $rdfSource = file_get_contents($rdfFile);
         self::assertNotFalse($rdfSource, 'Failed to read input file: ' . $rdfFile);
 
-        $parser  = new RdfXmlParser(XMLReader::fromString($rdfSource));
+        $parser  = new RdfXmlParser($strict, XMLReader::fromString($rdfSource));
         $triples = iterator_to_array($parser);
 
         $actual = self::serializeTriples($triples);

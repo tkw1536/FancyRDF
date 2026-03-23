@@ -101,6 +101,18 @@ final class Literal extends Term
     }
 
     /**
+     * Returns either a new XSDString literal or a new LangString literal.
+     *
+     * @param non-empty-string|null $language
+     *
+     * @return Literal
+     */
+    public static function langOrXSDString(string $lexical, string|null $language = null): self
+    {
+        return $language === null ? self::XSDString($lexical) : self::langString($lexical, $language);
+    }
+
+    /**
      * Creates a new LangString literal.
      *
      * As opposed to the constructor, this method never throws an exception.

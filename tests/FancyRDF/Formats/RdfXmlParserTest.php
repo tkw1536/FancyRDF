@@ -25,7 +25,7 @@ use const DIRECTORY_SEPARATOR;
 final class RdfXmlParserTest extends TestCase
 {
     /**
-     * @return array<string, array{string, string}>
+     * @return array<string, array{bool, string, string}>
      *
      * @throws RuntimeException
      */
@@ -38,7 +38,8 @@ final class RdfXmlParserTest extends TestCase
                 continue;
             }
 
-            $cases['parser/' . $name] = [$paths['rdf'], $paths['nt']];
+            $cases['parser/strict/' . $name] = [true, $paths['rdf'], $paths['nt']];
+            $cases['parser/loose/' . $name]  = [false, $paths['rdf'], $paths['nt']];
         }
 
         return $cases;
@@ -58,7 +59,8 @@ final class RdfXmlParserTest extends TestCase
                 continue;
             }
 
-            $cases['parser/' . $name . '-serialized'] = [$paths['rdf_serialized'], $paths['nt']];
+            $cases['parser/strict/' . $name . '-serialized'] = [true, $paths['rdf_serialized'], $paths['nt']];
+            $cases['parser/loose/' . $name . '-serialized']  = [false, $paths['rdf_serialized'], $paths['nt']];
         }
 
         return $cases;
@@ -104,13 +106,13 @@ final class RdfXmlParserTest extends TestCase
     #[DataProvider('rdfParsesToTriplesProvider')]
     #[DataProvider('serializedParsesToTriplesProvider')]
     #[TestDox('parser/{_dataName}')]
-    public function testParsesRdfAsTriples(string $rdfFile, string $ntFile): void
+    public function testParsesRdfAsTriples(bool $strict, string $rdfFile, string $ntFile): void
     {
         $rdfSource = file_get_contents($rdfFile);
         self::assertNotFalse($rdfSource, 'Failed to read RDF/XML file: ' . $rdfFile);
 
         $reader = XMLReader::fromString($rdfSource);
-        $parser = new RdfXmlParser($reader);
+        $parser = new RdfXmlParser($strict, $reader);
 
         $triples = iterator_to_array($parser);
 

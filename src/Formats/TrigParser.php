@@ -58,6 +58,7 @@ final class TrigParser extends FiberIterator
     ) {
     }
 
+    /** @throws InvalidArgumentException|RuntimeException */
     #[Override]
     protected function doIterate(): void
     {
