@@ -40,6 +40,10 @@ class RdfXmlParser extends FiberIterator
 
     public const string RDF_NAMESPACE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 
+    private const array STRUCTURAL_RDF_PROPERTY_ATTRS = ['about', 'ID', 'nodeID', 'resource', 'parseType', 'datatype'];
+
+    private const array RDF_PROPERTY_ELEMENT_ATTR_LOCAL_NAMES = ['resource', 'ID', 'nodeID', 'parseType', 'datatype'];
+
     /**
      * @param bool      $strict
      *   Whether to enable strict mode.
@@ -264,7 +268,7 @@ class RdfXmlParser extends FiberIterator
                 continue;
             }
 
-            $itemAbout  = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+            $itemAbout  = $this->aboutAttribute();
             $itemNodeId = $this->reader->getAttribute('rdf:nodeID');
             $itemId     = $this->reader->getAttribute('rdf:ID');
 
@@ -308,12 +312,7 @@ class RdfXmlParser extends FiberIterator
                 $currentList = $nextList;
             } else {
                 // Last item - point rest to nil
-                $this->emit([
-                    $currentList,
-                    new Iri(self::RDF_NAMESPACE . 'rest'),
-                    new Iri(self::RDF_NAMESPACE . 'nil'),
-                    null,
-                ]);
+                $this->emitRestNil($currentList);
             }
         }
 
@@ -322,12 +321,7 @@ class RdfXmlParser extends FiberIterator
             return;
         }
 
-        $this->emit([
-            $currentList,
-            new Iri(self::RDF_NAMESPACE . 'rest'),
-            new Iri(self::RDF_NAMESPACE . 'nil'),
-            null,
-        ]);
+        $this->emitRestNil($currentList);
     }
 
     /**
@@ -348,16 +342,7 @@ class RdfXmlParser extends FiberIterator
         $this->subject = $resourceObject;
 
         // Skip past this element's opening tag - nested content will be processed in main loop
-        if (! $this->reader->isEmptyElement) {
-            return;
-        }
-
-        if ($this->subjectStack->isEmpty() || $this->subjectStack->top()['depth'] !== $resourceDepth) {
-            return;
-        }
-
-        $popped        = $this->subjectStack->pop();
-        $this->subject = $popped['subject'];
+        $this->restoreSubjectAfterSelfClosingIfAtDepth($resourceDepth);
     }
 
     /**
@@ -390,7 +375,7 @@ class RdfXmlParser extends FiberIterator
                     || $attrNamespace === XMLUtils::XML_NAMESPACE
                     || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
                     || $attrNamespace === ''
-                    || in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
+                    || in_array($attrLocalName, self::RDF_PROPERTY_ELEMENT_ATTR_LOCAL_NAMES, true)
                     )
                 ) {
                     throw new NonCompliantInputError('rdf:parseType="Literal" cannot be combined with non-RDF attributes');
@@ -460,6 +445,119 @@ class RdfXmlParser extends FiberIterator
         } while ($this->reader->moveToNextAttribute());
 
         $this->reader->moveToElement();
+    }
+
+    /**
+     * Normalized xml:lang for the current node (empty string becomes null).
+     *
+     * @return non-empty-string|null
+     */
+    private function currentXmlLang(): string|null
+    {
+        $lang = $this->reader->xmlLang;
+
+        return $lang !== '' ? $lang : null;
+    }
+
+    private function aboutAttribute(): string|null
+    {
+        return $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+    }
+
+    private function resourceAttribute(): string|null
+    {
+        return $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
+    }
+
+    private function datatypeAttribute(): string|null
+    {
+        return $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
+    }
+
+    /** @throws NonCompliantInputError */
+    private function throwIfStrictDeprecatedAboutEach(): void
+    {
+        if ($this->strict && $this->reader->getAttribute('rdf:aboutEach') !== null) {
+            throw new NonCompliantInputError('rdf:aboutEach has been removed from RDF specifications');
+        }
+    }
+
+    /** @throws NonCompliantInputError */
+    private function throwIfStrictDeprecatedAboutEachPrefix(): void
+    {
+        if ($this->strict && $this->reader->getAttribute('rdf:aboutEachPrefix') !== null) {
+            throw new NonCompliantInputError('rdf:aboutEachPrefix has been removed from RDF specifications');
+        }
+    }
+
+    /** @throws NonCompliantInputError */
+    private function throwIfStrictDeprecatedBagId(): void
+    {
+        if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
+            throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
+        }
+    }
+
+    /** @throws NonCompliantInputError */
+    private function throwIfStrictRdfLiAsAttribute(): void
+    {
+        if ($this->strict && $this->reader->getAttribute('rdf:li') !== null) {
+            throw new NonCompliantInputError('rdf:li cannot be used as an attribute');
+        }
+    }
+
+    /**
+     * Whether the current element has a non-RDF, non-XML attribute (excluding common rdf: property attrs).
+     * Leaves the reader positioned on the element.
+     */
+    private function propertyElementHasNonRdfAttributes(): bool
+    {
+        $hasNonRdfAttributes = false;
+        if ($this->reader->hasAttributes) {
+            $this->reader->moveToFirstAttribute();
+            do {
+                $attrNamespace = $this->reader->namespaceURI;
+                $attrLocalName = $this->reader->localName;
+                if (
+                    $attrNamespace !== self::RDF_NAMESPACE
+                    && $attrNamespace !== XMLUtils::XML_NAMESPACE
+                    && $attrNamespace !== XMLUtils::XMLNS_NAMESPACE
+                    && $attrNamespace !== ''
+                    && ! in_array($attrLocalName, self::RDF_PROPERTY_ELEMENT_ATTR_LOCAL_NAMES, true)
+                ) {
+                    $hasNonRdfAttributes = true;
+                    break;
+                }
+            } while ($this->reader->moveToNextAttribute());
+
+            $this->reader->moveToElement();
+        }
+
+        return $hasNonRdfAttributes;
+    }
+
+    private function emitRestNil(Iri|BlankNode $listNode): void
+    {
+        $this->emit([
+            $listNode,
+            new Iri(self::RDF_NAMESPACE . 'rest'),
+            new Iri(self::RDF_NAMESPACE . 'nil'),
+            null,
+        ]);
+    }
+
+    private function restoreSubjectAfterSelfClosingIfAtDepth(int $depth): void
+    {
+        if (! $this->reader->isEmptyElement) {
+            return;
+        }
+
+        if ($this->subjectStack->isEmpty() || $this->subjectStack->top()['depth'] !== $depth) {
+            return;
+        }
+
+        $popped        = $this->subjectStack->pop();
+        $this->subject = $popped['subject'];
     }
 
     /**
@@ -556,21 +654,11 @@ class RdfXmlParser extends FiberIterator
                 // Reset at the depth where rdf:li elements will appear (one level deeper)
                 unset($this->liCounters[$descriptionDepth + 1]);
 
-                // Check for deprecated rdf:aboutEach and rdf:aboutEachPrefix attributes
-                if ($this->strict && $this->reader->getAttribute('rdf:aboutEach') !== null) {
-                    throw new NonCompliantInputError('rdf:aboutEach has been removed from RDF specifications');
-                }
+                $this->throwIfStrictDeprecatedAboutEach();
+                $this->throwIfStrictDeprecatedAboutEachPrefix();
+                $this->throwIfStrictDeprecatedBagId();
 
-                if ($this->strict && $this->reader->getAttribute('rdf:aboutEachPrefix') !== null) {
-                    throw new NonCompliantInputError('rdf:aboutEachPrefix has been removed from RDF specifications');
-                }
-
-                // Check for deprecated rdf:bagID attribute
-                if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
-                    throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
-                }
-
-                $about  = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+                $about  = $this->aboutAttribute();
                 $nodeId = $this->reader->getAttribute('rdf:nodeID');
                 $idAttr = $this->reader->getAttribute('rdf:ID');
 
@@ -583,15 +671,12 @@ class RdfXmlParser extends FiberIterator
                     throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:about together');
                 }
 
-                $this->subject = $this->resolveSubject($about, $nodeId, $idAttr, true);
+                $subject       = $this->resolveSubject($about, $nodeId, $idAttr, true);
+                $this->subject = $subject;
 
-                $descriptionLang = $this->reader->xmlLang;
-                $descriptionLang = $descriptionLang !== '' ? $descriptionLang : null;
+                $descriptionLang = $this->currentXmlLang();
 
-                // Check for rdf:li used as an attribute on Description (only allowed as element)
-                if ($this->strict && $this->reader->getAttribute('rdf:li') !== null) {
-                    throw new NonCompliantInputError('rdf:li cannot be used as an attribute');
-                }
+                $this->throwIfStrictRdfLiAsAttribute();
 
                 // Process attributes on Description element as property-value pairs
                 if ($this->reader->hasAttributes) {
@@ -604,7 +689,7 @@ class RdfXmlParser extends FiberIterator
                         // Note: rdf:type is NOT skipped - it's processed as a property attribute
                         $skipRdfAttr = $attrNamespace === self::RDF_NAMESPACE && in_array(
                             $attrLocalName,
-                            ['about', 'ID', 'nodeID', 'resource', 'parseType', 'datatype'],
+                            self::STRUCTURAL_RDF_PROPERTY_ATTRS,
                             true,
                         );
                         if (
@@ -628,7 +713,7 @@ class RdfXmlParser extends FiberIterator
                         }
 
                         $this->emit([
-                            $this->subject,
+                            $subject,
                             $predicate,
                             $object,
                             null,
@@ -638,200 +723,154 @@ class RdfXmlParser extends FiberIterator
                     $this->reader->moveToElement();
                 }
 
-                // If self-closing, pop stacks immediately
-                if ($this->reader->isEmptyElement) {
-                    if (! $this->subjectStack->isEmpty() && $this->subjectStack->top()['depth'] === $descriptionDepth) {
-                        $popped        = $this->subjectStack->pop();
-                        $this->subject = $popped['subject'];
-                    }
-                }
+                $this->restoreSubjectAfterSelfClosingIfAtDepth($descriptionDepth);
 
                 continue;
             }
 
-            // Property element (check first, as property elements can have rdf:ID for reification)
-            // Also handle rdf:li elements which should be converted to numbered properties
-            // RDF container elements (Bag, Seq, Alt, List) can be property elements when there's a subject
-            // NOTE: The check for forbidden property element names was moved above, before the rdf:Description check
-
-            $isRdfContainerProperty = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true) && $this->subject !== null;
-            if ($this->subject !== null && (($namespace !== '' && $namespace !== self::RDF_NAMESPACE) || ($namespace === self::RDF_NAMESPACE && $localName === 'li') || $isRdfContainerProperty)) {
-                // For rdf:li, convert to numbered property
-                if ($namespace === self::RDF_NAMESPACE && $localName === 'li') {
-                    $predicate = $this->nextLiProperty();
-                } else {
-                    $predicate = new Iri($namespace . $localName);
-                }
-
-                if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
-                    throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
-                }
-
-                $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
-                $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
-                $parseType    = $this->reader->getAttribute('rdf:parseType');
-                $idAttr       = $this->reader->getAttribute('rdf:ID');
-                $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
-                $propertyLang = $this->reader->xmlLang;
-                $propertyLang = $propertyLang !== '' ? $propertyLang : null;
-
-                // Error: rdf:nodeID and rdf:resource cannot be used together
-                if ($this->strict && ! ($nodeIdAttr === null || $resourceAttr === null)) {
-                    throw new NonCompliantInputError('rdf:nodeID and rdf:resource cannot be used together');
-                }
-
-                if ($this->strict && ! ($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr))) {
-                    throw new NonCompliantInputError('rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
-                }
-
-                // Handle rdf:ID on property element (reification)
-                $reificationURI = null;
-                if ($idAttr !== null) {
-                    if ($this->strict && ! self::isValidXmlName($idAttr)) {
-                        throw new NonCompliantInputError('rdf:ID value must match XML Name production: ' . $idAttr);
+            if ($this->subject !== null) {
+                $subject                = $this->subject;
+                $isRdfContainerProperty = $namespace === self::RDF_NAMESPACE && in_array($localName, ['Bag', 'Seq', 'Alt', 'List'], true);
+                if (($namespace !== '' && $namespace !== self::RDF_NAMESPACE) || ($namespace === self::RDF_NAMESPACE && $localName === 'li') || $isRdfContainerProperty) {
+                    // For rdf:li, convert to numbered property
+                    if ($namespace === self::RDF_NAMESPACE && $localName === 'li') {
+                        $predicate = $this->nextLiProperty();
+                    } else {
+                        $predicate = new Iri($namespace . $localName);
                     }
 
-                    $reificationURI = $this->resolveURI('#' . $idAttr);
-                }
+                    $this->throwIfStrictDeprecatedBagId();
 
-                // Handle rdf:parseType="Collection" - create list structure
-                if ($parseType === 'Collection') {
-                    $this->handleParseTypeCollection($this->subject, $predicate, $reificationURI);
-                    continue;
-                }
+                    $resourceAttr = $this->resourceAttribute();
+                    $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
+                    $parseType    = $this->reader->getAttribute('rdf:parseType');
+                    $idAttr       = $this->reader->getAttribute('rdf:ID');
+                    $datatypeAttr = $this->datatypeAttribute();
+                    $propertyLang = $this->currentXmlLang();
 
-                // Handle rdf:parseType="Resource" - create blank node and process nested content
-                if ($parseType === 'Resource') {
-                    $this->handleParseTypeResource($this->subject, $predicate, $reificationURI);
+                    // Error: rdf:nodeID and rdf:resource cannot be used together
+                    if ($this->strict && ! ($nodeIdAttr === null || $resourceAttr === null)) {
+                        throw new NonCompliantInputError('rdf:nodeID and rdf:resource cannot be used together');
+                    }
 
-                    continue;
-                }
+                    if ($this->strict && ! ($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr))) {
+                        throw new NonCompliantInputError('rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
+                    }
 
-                // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
-                if ($parseType === 'Literal') {
-                    $this->handleParseTypeLiteral($this->subject, $predicate, $reificationURI, $resourceAttr);
-
-                    continue;
-                }
-
-                if ($resourceAttr !== null) {
-                    $resolvedURI = $this->resolveURI($resourceAttr);
-                    $object      = new Iri($resolvedURI);
-
-                    $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
-
-                    // Process non-RDF attributes as properties of the object
-                    $this->processPropertyElementAttributes($object, $propertyLang);
-
-                    continue;
-                }
-
-                if ($nodeIdAttr !== null) {
-                    $object = $this->blankNode($nodeIdAttr);
-                    $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
-
-                    continue;
-                }
-
-                // Check for non-RDF attributes on property element
-                $hasNonRdfAttributes = false;
-                if ($this->reader->hasAttributes) {
-                    $this->reader->moveToFirstAttribute();
-                    do {
-                        $attrNamespace = $this->reader->namespaceURI;
-                        $attrLocalName = $this->reader->localName;
-                        // Check if it's a non-RDF, non-XML attribute
-                        if (
-                            $attrNamespace !== self::RDF_NAMESPACE
-                            && $attrNamespace !== XMLUtils::XML_NAMESPACE
-                            && $attrNamespace !== XMLUtils::XMLNS_NAMESPACE
-                            && $attrNamespace !== ''
-                            && ! in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
-                        ) {
-                            $hasNonRdfAttributes = true;
-                            break;
+                    // Handle rdf:ID on property element (reification)
+                    $reificationURI = null;
+                    if ($idAttr !== null) {
+                        if ($this->strict && ! self::isValidXmlName($idAttr)) {
+                            throw new NonCompliantInputError('rdf:ID value must match XML Name production: ' . $idAttr);
                         }
-                    } while ($this->reader->moveToNextAttribute());
 
-                    $this->reader->moveToElement();
-                }
+                        $reificationURI = $this->resolveURI('#' . $idAttr);
+                    }
 
-                // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
-                if ($hasNonRdfAttributes) {
-                    $object = $this->blankNode(null);
-                    $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                    // Handle rdf:parseType="Collection" - create list structure
+                    if ($parseType === 'Collection') {
+                        $this->handleParseTypeCollection($subject, $predicate, $reificationURI);
+                        continue;
+                    }
 
-                    // Process non-RDF attributes as properties of the object
-                    $this->processPropertyElementAttributes($object, $propertyLang);
-
-                    continue;
-                }
-
-                // Check if element is empty (self-closing)
-                if ($this->reader->isEmptyElement) {
-                    // Empty property element creates empty string literal
-                    $object = Literal::langOrXSDString('', $propertyLang);
-                    $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
-
-                    continue;
-                }
-
-                // Read text content
-                $this->reader->read();
-                if (
-                    $this->reader->nodeType !== XMLReader::TEXT &&
-                    $this->reader->nodeType !== XMLReader::CDATA
-                ) {
-                    // Check if we're at the end of the element (empty content)
-                    if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
-                        // Empty property element creates empty string literal
-                        $object = Literal::langOrXSDString('', $propertyLang);
-                        $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
+                    // Handle rdf:parseType="Resource" - create blank node and process nested content
+                    if ($parseType === 'Resource') {
+                        $this->handleParseTypeResource($subject, $predicate, $reificationURI);
 
                         continue;
                     }
 
-                    // Nested content - store property info to emit when nested element closes
-                    // This handles both cases: with and without rdf:ID
-                    $this->pendingProperties->push([
-                        'subject' => $this->subject,
-                        'predicate' => $predicate,
-                        'depth' => $this->reader->depth,
-                        'reificationURI' => $reificationURI,
-                    ]);
+                    // Handle rdf:parseType="Literal" - read inner XML content and canonicalize
+                    if ($parseType === 'Literal') {
+                        $this->handleParseTypeLiteral($subject, $predicate, $reificationURI, $resourceAttr);
+
+                        continue;
+                    }
+
+                    if ($resourceAttr !== null) {
+                        $resolvedURI = $this->resolveURI($resourceAttr);
+                        $object      = new Iri($resolvedURI);
+
+                        $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
+
+                        // Process non-RDF attributes as properties of the object
+                        $this->processPropertyElementAttributes($object, $propertyLang);
+
+                        continue;
+                    }
+
+                    if ($nodeIdAttr !== null) {
+                        $object = $this->blankNode($nodeIdAttr);
+                        $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
+
+                        continue;
+                    }
+
+                    $hasNonRdfAttributes = $this->propertyElementHasNonRdfAttributes();
+
+                    // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
+                    if ($hasNonRdfAttributes) {
+                        $object = $this->blankNode(null);
+                        $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
+
+                        // Process non-RDF attributes as properties of the object
+                        $this->processPropertyElementAttributes($object, $propertyLang);
+
+                        continue;
+                    }
+
+                    // Check if element is empty (self-closing)
+                    if ($this->reader->isEmptyElement) {
+                        // Empty property element creates empty string literal
+                        $object = Literal::langOrXSDString('', $propertyLang);
+                        $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
+
+                        continue;
+                    }
+
+                    // Read text content
+                    $this->reader->read();
+                    if (
+                        $this->reader->nodeType !== XMLReader::TEXT &&
+                        $this->reader->nodeType !== XMLReader::CDATA
+                    ) {
+                        // Check if we're at the end of the element (empty content)
+                        if ($this->reader->nodeType === XMLReader::END_ELEMENT) {
+                            // Empty property element creates empty string literal
+                            $object = Literal::langOrXSDString('', $propertyLang);
+                            $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
+
+                            continue;
+                        }
+
+                        // Nested content - store property info to emit when nested element closes
+                        // This handles both cases: with and without rdf:ID
+                        $this->pendingProperties->push([
+                            'subject' => $subject,
+                            'predicate' => $predicate,
+                            'depth' => $this->reader->depth,
+                            'reificationURI' => $reificationURI,
+                        ]);
+
+                        continue;
+                    }
+
+                    $object = $this->makeObjectLiteral($datatypeAttr, $propertyLang);
+                    $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
 
                     continue;
                 }
-
-                $object = $this->makeObjectLiteral($datatypeAttr, $propertyLang);
-                $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
-
-                continue;
             }
 
             // Typed node (e.g. <ex:Book rdf:about="..."> or <rdf:Property rdf:about="...">)
             // Also includes typed nodes without node-identifying attributes (creates blank node)
             // Must check after property elements, as property elements can have rdf:ID for reification
-            // Check for deprecated rdf:aboutEach and rdf:aboutEachPrefix attributes on typed nodes
-            if ($this->strict && $this->reader->getAttribute('rdf:aboutEach') !== null) {
-                throw new NonCompliantInputError('rdf:aboutEach has been removed from RDF specifications');
-            }
+            $this->throwIfStrictDeprecatedAboutEach();
+            $this->throwIfStrictDeprecatedAboutEachPrefix();
+            $this->throwIfStrictRdfLiAsAttribute();
+            $this->throwIfStrictDeprecatedBagId();
 
-            if ($this->strict && $this->reader->getAttribute('rdf:aboutEachPrefix') !== null) {
-                throw new NonCompliantInputError('rdf:aboutEachPrefix has been removed from RDF specifications');
-            }
-
-            // Check for rdf:li used as an attribute (only allowed as element)
-            if ($this->strict && $this->reader->getAttribute('rdf:li') !== null) {
-                throw new NonCompliantInputError('rdf:li cannot be used as an attribute');
-            }
-
-            // Check for deprecated rdf:bagID attribute on typed nodes
-            if ($this->strict && $this->reader->getAttribute('rdf:bagID') !== null) {
-                throw new NonCompliantInputError('rdf:bagID has been removed from RDF specifications');
-            }
-
-            $about         = $this->reader->getAttribute('rdf:about') ?? $this->reader->getAttribute('about');
+            $about         = $this->aboutAttribute();
             $nodeId        = $this->reader->getAttribute('rdf:nodeID');
             $idAttr        = $this->reader->getAttribute('rdf:ID');
             $isNodeElement = $about !== null || $nodeId !== null || ($idAttr !== null && $this->subject === null);
@@ -872,8 +911,7 @@ class RdfXmlParser extends FiberIterator
 
                 // Process attributes on typed node element as property-value pairs
                 // This handles attributes like rdf:_3, rdf:value on container elements
-                $typedNodeLang = $this->reader->xmlLang;
-                $typedNodeLang = $typedNodeLang !== '' ? $typedNodeLang : null;
+                $typedNodeLang = $this->currentXmlLang();
                 if ($this->reader->hasAttributes) {
                     $this->reader->moveToFirstAttribute();
                     do {
@@ -885,7 +923,7 @@ class RdfXmlParser extends FiberIterator
                         // Also, numbered properties (rdf:_1, rdf:_2, etc.) and rdf:value are NOT skipped
                         $skipRdfAttr = $attrNamespace === self::RDF_NAMESPACE && in_array(
                             $attrLocalName,
-                            ['about', 'ID', 'nodeID', 'resource', 'parseType', 'datatype'],
+                            self::STRUCTURAL_RDF_PROPERTY_ATTRS,
                             true,
                         );
                         if (
@@ -911,28 +949,20 @@ class RdfXmlParser extends FiberIterator
                     $this->reader->moveToElement();
                 }
 
-                // If self-closing, pop stacks immediately
-                if ($this->reader->isEmptyElement) {
-                    // we know the subject stack is non-empty because we pushed to it above!
-                    if (! $this->subjectStack->isEmpty() && $this->subjectStack->top()['depth'] === $typedNodeDepth) {
-                        $popped        = $this->subjectStack->pop();
-                        $this->subject = $popped['subject'];
-                    }
-                }
+                $this->restoreSubjectAfterSelfClosingIfAtDepth($typedNodeDepth);
 
                 continue;
             }
 
             $iri          = $namespace . $localName;
             $predicate    = new Iri($iri);
-            $resourceAttr = $this->reader->getAttribute('rdf:resource') ?? $this->reader->getAttribute('resource');
+            $resourceAttr = $this->resourceAttribute();
             $nodeIdAttr   = $this->reader->getAttribute('rdf:nodeID');
             $parseType    = $this->reader->getAttribute('rdf:parseType');
             $idAttr       = $this->reader->getAttribute('rdf:ID');
-            $datatypeAttr = $this->reader->getAttribute('rdf:datatype') ?? $this->reader->getAttribute('datatype');
+            $datatypeAttr = $this->datatypeAttribute();
 
-            $elementLang = $this->reader->xmlLang;
-            $elementLang = $elementLang !== '' ? $elementLang : null;
+            $elementLang = $this->currentXmlLang();
 
             // Handle rdf:ID on property element (reification)
             $reificationURI = null;
@@ -980,28 +1010,7 @@ class RdfXmlParser extends FiberIterator
                 continue;
             }
 
-            // Check for non-RDF attributes on property element
-            $hasNonRdfAttributes = false;
-            if ($this->reader->hasAttributes) {
-                $this->reader->moveToFirstAttribute();
-                do {
-                    $attrNamespace = $this->reader->namespaceURI;
-                    $attrLocalName = $this->reader->localName;
-                    // Check if it's a non-RDF, non-XML attribute
-                    if (
-                        $attrNamespace !== self::RDF_NAMESPACE
-                        && $attrNamespace !== XMLUtils::XML_NAMESPACE
-                        && $attrNamespace !== XMLUtils::XMLNS_NAMESPACE
-                        && $attrNamespace !== ''
-                        && ! in_array($attrLocalName, ['resource', 'ID', 'nodeID', 'parseType', 'datatype'], true)
-                    ) {
-                        $hasNonRdfAttributes = true;
-                        break;
-                    }
-                } while ($this->reader->moveToNextAttribute());
-
-                $this->reader->moveToElement();
-            }
+            $hasNonRdfAttributes = $this->propertyElementHasNonRdfAttributes();
 
             // If there are non-RDF attributes and no rdf:resource/rdf:nodeID, create blank node object
             if ($hasNonRdfAttributes) {
