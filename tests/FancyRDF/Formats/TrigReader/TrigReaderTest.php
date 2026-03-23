@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\FancyRDF\Formats\TrigReader;
 
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigToken;
 use FancyRDF\Streaming\ResourceStreamReader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -46,13 +48,36 @@ final class TrigReaderTest extends TestCase
      * @param list<array{TrigToken, string}> $expected
      *
      * @throws RuntimeException
+     * @throws NonCompliantInputError
     */
     #[DataProvider('tokenizeProvider')]
-    #[TestDox('tokenizes input to expected token sequence')]
-    public function testTokenize(string $input, array $expected): void
+    #[TestDox('tokenizes input to expected token sequence (loose mode)')]
+    public function testTokenizeLoose(string $input, array $expected): void
     {
         $stream = self::openString($input);
-        $reader = new TrigReader(new ResourceStreamReader($stream));
+        $reader = new TrigReader(false, new ResourceStreamReader($stream));
+        $tokens = [];
+
+        while ($reader->next()) {
+            $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];
+        }
+
+        $tokens[] = [TrigToken::EndOfInput, $reader->getTokenValue()];
+        self::assertSame($expected, $tokens);
+    }
+
+    /**
+     * @param list<array{TrigToken, string}> $expected
+     *
+     * @throws RuntimeException
+     * @throws NonCompliantInputError
+    */
+    #[DataProvider('tokenizeProvider')]
+    #[TestDox('tokenizes input to expected token sequence (strict mode)')]
+    public function testTokenizeStrict(string $input, array $expected): void
+    {
+        $stream = self::openString($input);
+        $reader = new TrigReader(true, new ResourceStreamReader($stream));
         $tokens = [];
 
         while ($reader->next()) {
@@ -196,13 +221,18 @@ TRIG;
         ];
     }
 
-    /** @throws RuntimeException */
-    #[TestDox('streaming reader yields same token sequence when using small chunk size')]
-    public function testStreamingReadsInChunks(): void
+    /**
+     * @throws RuntimeException
+     * @throws NonCompliantInputError
+    */
+    #[TestDox('streaming reader yields same token sequence when using small chunk size (strict: $strict)')]
+    #[TestWith([false])]
+    #[TestWith([true])]
+    public function testStreamingReadsInChunks(bool $strict): void
     {
         $chunk  = str_repeat(' ', 500) . '.' . str_repeat(' ', 500);
         $stream = self::openString($chunk);
-        $reader = new TrigReader(new ResourceStreamReader($stream, 256));
+        $reader = new TrigReader($strict, new ResourceStreamReader($stream, 256));
         $tokens = [];
         while ($reader->next()) {
             $tokens[] = [$reader->getTokenType(), $reader->getTokenValue()];

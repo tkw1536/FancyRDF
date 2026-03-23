@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\FancyRDF\Formats;
 
-use AssertionError;
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Streaming\ResourceStreamReader;
@@ -52,7 +52,7 @@ final class TrigParserTest extends TestCase
     }
 
     /**
-     * @return array<string, array{string, string}>
+     * @return array<string, array{bool, string, string}>
      *
      * @throws RuntimeException
      */
@@ -68,7 +68,8 @@ final class TrigParserTest extends TestCase
                 continue;
             }
 
-            $cases[$name] = [$paths['ttl'], $paths['nt']];
+            $cases['strict/' . $name] = [true, $paths['ttl'], $paths['nt']];
+            $cases['loose/' . $name]  = [false, $paths['ttl'], $paths['nt']];
         }
 
         return $cases;
@@ -114,7 +115,7 @@ final class TrigParserTest extends TestCase
                 continue;
             }
 
-            $cases[$name] = [$paths['nq'], AssertionError::class];
+            $cases[$name] = [$paths['nq'], NonCompliantInputError::class];
         }
 
         return $cases;
@@ -123,14 +124,14 @@ final class TrigParserTest extends TestCase
     /** @throws RuntimeException */
     #[DataProvider('turtleProvider')]
     #[TestDox('parses Turtle as triples: {_dataName}')]
-    public function testParseTurtle(string $ttlFile, string $ntFile): void
+    public function testParseTurtle(bool $strict, string $ttlFile, string $ntFile): void
     {
         $ttlSource = file_get_contents($ttlFile);
         self::assertNotFalse($ttlSource, 'Failed to read Turtle file: ' . $ttlFile);
 
         $stream = self::openString($ttlSource);
-        $reader = new TrigReader(new ResourceStreamReader($stream));
-        $parser = new TrigParser($reader, false);
+        $reader = new TrigReader($strict, new ResourceStreamReader($stream));
+        $parser = new TrigParser($strict, $reader, false);
 
         $parsed = iterator_to_array($parser);
 
@@ -138,8 +139,8 @@ final class TrigParserTest extends TestCase
         self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
 
         $ntStream = self::openString($ntSource);
-        $ntReader = new TrigReader(new ResourceStreamReader($ntStream));
-        $ntParser = new TrigParser($ntReader, false);
+        $ntReader = new TrigReader($strict, new ResourceStreamReader($ntStream));
+        $ntParser = new TrigParser($strict, $ntReader, false);
         $expected = iterator_to_array($ntParser);
 
         self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));
@@ -148,14 +149,14 @@ final class TrigParserTest extends TestCase
     /** @throws RuntimeException */
     #[DataProvider('turtleProvider')]
     #[TestDox('parses Turtle as TriG (no graphs): {_dataName}')]
-    public function testParseTurtleAsTrig(string $ttlFile, string $ntFile): void
+    public function testParseTurtleAsTrig(bool $strict, string $ttlFile, string $ntFile): void
     {
         $ttlSource = file_get_contents($ttlFile);
         self::assertNotFalse($ttlSource, 'Failed to read Turtle file: ' . $ttlFile);
 
         $stream = self::openString($ttlSource);
-        $reader = new TrigReader(new ResourceStreamReader($stream));
-        $parser = new TrigParser($reader, true);
+        $reader = new TrigReader($strict, new ResourceStreamReader($stream));
+        $parser = new TrigParser($strict, $reader, true);
 
         $parsed = iterator_to_array($parser);
 
@@ -163,8 +164,8 @@ final class TrigParserTest extends TestCase
         self::assertNotFalse($ntSource, 'Failed to read N-Triples file: ' . $ntFile);
 
         $ntStream = self::openString($ntSource);
-        $ntReader = new TrigReader(new ResourceStreamReader($ntStream));
-        $ntParser = new TrigParser($ntReader, true);
+        $ntReader = new TrigReader($strict, new ResourceStreamReader($ntStream));
+        $ntParser = new TrigParser($strict, $ntReader, true);
         $expected = iterator_to_array($ntParser);
 
         self::assertThat($parsed, new IsomorphicAsDatasetsConstraint($expected));

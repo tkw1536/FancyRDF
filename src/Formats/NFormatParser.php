@@ -11,9 +11,9 @@ use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
-use RuntimeException;
 use Traversable;
 
+use function assert;
 use function fclose;
 use function fgets;
 use function hexdec;
@@ -65,14 +65,11 @@ final class NFormatParser
      * @return Traversable<TripleOrQuadArray>
      *
      * @throws NonCompliantInputError if strict mode is enabled and the input is not compliant with the standard.
-     * @throws RuntimeException
      */
     public function parse(string $source): Traversable
     {
         $lines = preg_split('/\r\n|\r|\n/', $source, -1, PREG_SPLIT_NO_EMPTY);
-        if ($lines === false) {
-            throw new RuntimeException('failed to split lines from source');
-        }
+        assert($lines !== false, 'splitting input into lines cannot fail');
 
         foreach ($lines as $line) {
             $term = $this->parseLine($line);
@@ -387,7 +384,7 @@ final class NFormatParser
                 return Literal::XSDString($lexical);
             }
 
-            return Literal::typed($lexical, $datatype->iri);
+            return Literal::typed($lexical, $datatype);
         }
 
         return Literal::XSDString($lexical);

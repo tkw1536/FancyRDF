@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
-use AssertionError;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigParser;
@@ -15,7 +14,6 @@ use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
 use RuntimeException;
 
@@ -62,7 +60,7 @@ final class TurtleTest extends TestBase
     }
 
     /**
-     * @return Generator<string, array{action: string}, mixed, void>
+     * @return Generator<string, array{strict: bool, action: string}, mixed, void>
      *
      * @throws RuntimeException
      * @throws NonCompliantInputError
@@ -70,14 +68,20 @@ final class TurtleTest extends TestBase
     public static function turtlePositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTurtlePositiveSyntax') as $info) {
-            yield $info['iri'] => [
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
+                'action' => $info['action'],
+            ];
+
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
                 'action' => $info['action'],
             ];
         }
     }
 
     /**
-     * @return Generator<string, array{action: string, result: string}, mixed, void>
+     * @return Generator<string, array{strict: bool, action: string, result: string}, mixed, void>
      *
      * @throws RuntimeException
      * @throws NonCompliantInputError
@@ -89,7 +93,14 @@ final class TurtleTest extends TestBase
                 throw new RuntimeException('result is required for evaluation tests');
             }
 
-            yield $info['iri'] => [
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
+                'action' => $info['action'],
+                'result' => $info['result'],
+            ];
+
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
                 'action' => $info['action'],
                 'result' => $info['result'],
             ];
@@ -130,13 +141,14 @@ final class TurtleTest extends TestBase
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
     public function testTurtlePositiveSyntax(
+        bool $strict,
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, false);
+            $reader = new TrigReader($strict, new ResourceStreamReader($source));
+            $parser = new TrigParser($strict, $reader, false);
 
             foreach ($parser as $statement) {
                 self::assertSame(3, Quad::size($statement));
@@ -157,6 +169,7 @@ final class TurtleTest extends TestBase
     #[TestDox('$_dataname evaluates correctly')]
     #[Group('positive-evaluation')]
     public function testTurtleEvaluation(
+        bool $strict,
         string $action,
         string $result,
     ): void {
@@ -165,8 +178,8 @@ final class TurtleTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, false, $action);
+            $reader = new TrigReader($strict, new ResourceStreamReader($source));
+            $parser = new TrigParser($strict, $reader, false, $action);
 
             $got = iterator_to_array($parser);
             self::assertThat($got, $evaluation);
@@ -182,19 +195,18 @@ final class TurtleTest extends TestBase
      * @throws NonCompliantInputError
     */
     #[DataProvider('turtleNegativeSyntaxProvider')]
-    #[TestDox('$_dataname asserts with assertions enabled')]
-    #[RequiresSetting('zend.assertions', '1')]
+    #[TestDox('$_dataname fails with strict mode enabled')]
     #[Group('negative-syntax-strict')]
-    public function testTurtleNegativeSyntaxWithAssertions(
+    public function testTurtleNegativeSyntaxStrict(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
-        self::expectException(AssertionError::class);
+        self::expectException(NonCompliantInputError::class);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, false, $action);
+            $reader = new TrigReader(true, new ResourceStreamReader($source));
+            $parser = new TrigParser(true, $reader, false, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -208,17 +220,16 @@ final class TurtleTest extends TestBase
      * @throws NonCompliantInputError
     */
     #[DataProvider('turtleNegativeSyntaxProvider')]
-    #[RequiresSetting('zend.assertions', '0')]
-    #[TestDox('$_dataname does not assert with assertions disabled')]
+    #[TestDox('$_dataname does not assert with strict mode disabled')]
     #[Group('negative-syntax-lenient')]
-    public function testTurtleNegativeSyntaxWithoutAssertions(
+    public function testTurtleNegativeSyntaxLoose(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, false, $action);
+            $reader = new TrigReader(false, new ResourceStreamReader($source));
+            $parser = new TrigParser(false, $reader, false, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {

@@ -59,8 +59,8 @@ class Rdf11TestCases
 
         try {
             $stream = new ResourceStreamReader($turtleStream);
-            $reader = new TrigReader($stream);
-            $parser = new TrigParser($reader, false, $manifestIri);
+            $reader = new TrigReader(true, $stream);
+            $parser = new TrigParser(true, $reader, false, $manifestIri);
 
             $cache = [];
             foreach ($parser as [$s, $p, $o]) {

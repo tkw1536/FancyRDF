@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FancyRDF\Formats;
 
 use FancyRDF\Dataset\Quad;
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigReader\TrigReader;
 use FancyRDF\Formats\TrigReader\TrigToken;
 use FancyRDF\Term\BlankNode;
@@ -12,11 +13,8 @@ use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
-use InvalidArgumentException;
 use Override;
-use RuntimeException;
 
-use function assert;
 use function in_array;
 use function preg_match;
 use function strpos;
@@ -51,14 +49,22 @@ final class TrigParser extends FiberIterator
     /** @var Iri|BlankNode|null (TriG only) */
     private Iri|BlankNode|null $curGraph = null;
 
+    /**
+     * Constructs a new TrigParser.
+     *
+     * @param bool $strict
+     *   Enable strict mode.
+     *   In strict mode, additional checks are performed to validate compliance with the standard, and appropriate NonCompliantInputErrors may be thrown.
+     */
     public function __construct(
+        public readonly bool $strict,
         private readonly TrigReader $reader,
         public readonly bool $isTrig = false,
         private string $base = '',
     ) {
     }
 
-    /** @throws InvalidArgumentException|RuntimeException */
+    /** @throws NonCompliantInputError */
     #[Override]
     protected function doIterate(): void
     {
@@ -81,17 +87,27 @@ final class TrigParser extends FiberIterator
         }
     }
 
-    /** @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX */
+    /**
+     * @param bool $isAtDirective true for @prefix (expect DOT after), false for PREFIX
+     *
+     * @throws NonCompliantInputError
+     */
     private function parsePrefixDirective(bool $isAtDirective): void
     {
         $this->reader->next();
         $type = $this->reader->getTokenType();
-        assert($type === TrigToken::PnameNs, 'expected PNAME_NS after \'@prefix\'');
+        if ($this->strict && $type !== TrigToken::PnameNs) {
+            throw new NonCompliantInputError('expected PNAME_NS after \'@prefix\'');
+        }
+
         $name = $this->reader->getTokenValue();
 
         $this->reader->next();
         $type = $this->reader->getTokenType();
-        assert($type === TrigToken::IriRef, 'expected IRIREF after PNAME_NS');
+        if ($this->strict && $type !== TrigToken::IriRef) {
+            throw new NonCompliantInputError('expected IRIREF after PNAME_NS');
+        }
+
         $iriRef = $this->reader->getTokenValue();
 
         $iri                     = $this->resolveIriRef($iriRef);
@@ -101,16 +117,24 @@ final class TrigParser extends FiberIterator
             return;
         }
 
-        $this->reader->next();
-        assert($this->reader->getTokenType() === TrigToken::Dot, 'expected \'.\' after @prefix');
+        $next = $this->reader->next();
+        if ($this->strict && (! $next || $this->reader->getTokenType() !== TrigToken::Dot)) {
+            throw new NonCompliantInputError('expected \'.\' after @prefix');
+        }
     }
 
-    /** @param bool $isAtDirective true for @base (expect DOT after), false for BASE */
+    /**
+     * @param bool $isAtDirective true for @base (expect DOT after), false for BASE
+     *
+     * @throws NonCompliantInputError
+     */
     private function parseBaseDirective(bool $isAtDirective): void
     {
         $this->reader->next();
         $type = $this->reader->getTokenType();
-        assert($type === TrigToken::IriRef, 'expected IRIREF after \'@base\'');
+        if ($this->strict && $type !== TrigToken::IriRef) {
+            throw new NonCompliantInputError('expected IRIREF after \'@base\'');
+        }
 
         $iriRef     = $this->reader->getTokenValue();
         $this->base = $this->resolveIriRef($iriRef);
@@ -119,18 +143,18 @@ final class TrigParser extends FiberIterator
             return;
         }
 
-        $hasNext = $this->reader->next();
-        assert($hasNext, 'expected DOT after @base');
-        assert($this->reader->getTokenType() === TrigToken::Dot, 'expected DOT');
+        $next = $this->reader->next();
+        if ($this->strict && (! $next || $this->reader->getTokenType() !== TrigToken::Dot)) {
+            throw new NonCompliantInputError('expected \'.\' after @prefix');
+        }
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseWrappedGraphDefault(): void
     {
-        assert($this->isTrig, 'UNEXPECTED \'{\' in Turtle mode');
+        if ($this->strict && ! $this->isTrig) {
+            throw new NonCompliantInputError('UNEXPECTED \'{\' in Turtle mode');
+        }
 
         $this->curGraph = null;
         $this->parseTriplesBlock();
@@ -148,32 +172,32 @@ final class TrigParser extends FiberIterator
 
     private bool $lastBlankNodePropertyListWasEmpty = true;
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseGraphKeywordBlock(): void
     {
-        assert($this->isTrig, 'GRAPH keyword not allowed in Turtle mode');
+        if ($this->strict && ! $this->isTrig) {
+            throw new NonCompliantInputError('GRAPH keyword not allowed in Turtle mode');
+        }
 
         $this->reader->next();
         $type = $this->reader->getTokenType();
 
         $label = $type !== TrigToken::LParen ? $this->parseResource($type) : null;
-        assert($label !== null || $type !== TrigToken::EndOfInput, 'expected label after GRAPH');
+        if ($this->strict && ($label === null || $type === TrigToken::EndOfInput)) {
+            throw new NonCompliantInputError('expected label after GRAPH');
+        }
 
         $this->curGraph = $label;
 
-        $this->reader->next();
-        assert($this->reader->getTokenType() === TrigToken::LCurly, 'expected {');
+        $next = $this->reader->next();
+        if ($this->strict && (! $next || $this->reader->getTokenType() !== TrigToken::LCurly)) {
+            throw new NonCompliantInputError('expected \'{\' after GRAPH');
+        }
 
         $this->parseTriplesBlock();
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseTriplesOrGraphBlock(): void
     {
         $type            = $this->reader->getTokenType();
@@ -187,12 +211,10 @@ final class TrigParser extends FiberIterator
 
         // We have a graph block: <subject> { ... }
         if ($type === TrigToken::LCurly) {
-            assert(
-                $maybeGraphBlock || (
-                    $allowSoleSubject && $this->lastBlankNodePropertyListWasEmpty
-                ),
-                'blank node property list not allowed as graph label',
-            );
+            if ($this->strict && ! $maybeGraphBlock && ! ($allowSoleSubject && $this->lastBlankNodePropertyListWasEmpty)) {
+                throw new NonCompliantInputError('blank node property list not allowed as graph label');
+            }
+
             $this->curGraph = $subject;
             $this->parseTriplesBlock();
 
@@ -204,10 +226,7 @@ final class TrigParser extends FiberIterator
         $this->parsePredicateObjectList(null, $allowSoleSubject);
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseTriplesBlock(): void
     {
         while (
@@ -220,14 +239,19 @@ final class TrigParser extends FiberIterator
                 break;
             }
 
-            assert($type !== TrigToken::Dot, 'unexpected .');
+            if ($this->strict && $type === TrigToken::Dot) {
+                throw new NonCompliantInputError('unexpected .');
+            }
 
             $this->curSubject = $this->parseSubject($type);
             $allowSoleSubject = $type === TrigToken::LSquare;
 
             $this->reader->next();
             $type = $this->reader->getTokenType();
-            assert($type !== TrigToken::RCurly || $allowSoleSubject, 'expected verb or }');
+            if ($this->strict && ! ($type !== TrigToken::RCurly || $allowSoleSubject)) {
+                throw new NonCompliantInputError('expected verb or }');
+            }
+
             if ($type === TrigToken::RCurly) {
                 break;
             }
@@ -244,10 +268,7 @@ final class TrigParser extends FiberIterator
             || $type === $endToken;
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parsePredicateObjectList(TrigToken|null $endToken = null, bool $allowSoleSubject = false): void
     {
         $type = $this->reader->getTokenType();
@@ -259,12 +280,20 @@ final class TrigParser extends FiberIterator
                 $this->reader->next();
                 $type = $this->reader->getTokenType();
 
-                assert($type !== TrigToken::EndOfInput, 'expected verb or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
+                if ($this->strict && $type === TrigToken::EndOfInput) {
+                    throw new NonCompliantInputError('expected verb or .' . ($endToken !== null ? ' or ' . $endToken->value : ''));
+                }
             }
 
             if ($this->isPredicateObjectListTerminator($type, $endToken)) {
-                assert($type !== TrigToken::EndOfInput, 'unexpected end of input, expected ' . $endToken?->value);
-                assert($hasPredicate || $allowSoleSubject || $type !== TrigToken::Dot, 'expected verb');
+                if ($this->strict && $type === TrigToken::EndOfInput) {
+                    throw new NonCompliantInputError('unexpected end of input, expected ' . $endToken?->value);
+                }
+
+                if ($this->strict && ! ($hasPredicate || $allowSoleSubject || $type !== TrigToken::Dot)) {
+                    throw new NonCompliantInputError('expected verb');
+                }
+
                 break;
             }
 
@@ -272,7 +301,9 @@ final class TrigParser extends FiberIterator
             $this->curPredicate = $predicate;
 
             $hasNext = $this->reader->next();
-            assert($hasNext, 'expected object after verb');
+            if ($this->strict && ! $hasNext) {
+                throw new NonCompliantInputError('expected object after verb');
+            }
 
             $this->parseObjectList();
             $hasPredicate = true;
@@ -286,24 +317,28 @@ final class TrigParser extends FiberIterator
                 break;
             }
 
-            assert($next === TrigToken::Semicolon, 'expected ;');
+            if ($this->strict && $next !== TrigToken::Semicolon) {
+                throw new NonCompliantInputError('expected ;');
+            }
 
             $hasNext = $this->reader->next();
-            assert($hasNext, 'expected verb or object after ;');
+            if ($this->strict && ! $hasNext) {
+                throw new NonCompliantInputError('expected verb or object after ;');
+            }
+
             $type = $this->reader->getTokenType();
         }
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseObjectList(): void
     {
         while (true) {
             $object = $this->parseObject();
 
-            assert($this->curSubject !== null && $this->curPredicate !== null, 'subject and predicate must be set');
+            if ($this->strict && ($this->curSubject === null || $this->curPredicate === null)) {
+                throw new NonCompliantInputError('subject and predicate must be set');
+            }
 
             $nextType         = $this->reader->getTokenType();
             $graphForThisItem = $this->isTrig ? $this->curGraph : null;
@@ -312,8 +347,9 @@ final class TrigParser extends FiberIterator
             // label in a top-level triple is non-standard. Keep the extension
             // for production (where assertions may be disabled), but signal a
             // failure under assertions so the W3C negative test passes.
-            assert(
-                ! (
+            if (
+                $this->strict && (
+                (
                     $this->isTrig
                     && $this->curGraph === null
                     && $nextType !== TrigToken::Comma
@@ -323,18 +359,27 @@ final class TrigParser extends FiberIterator
                         [TrigToken::IriRef, TrigToken::PnameLn, TrigToken::PnameNs, TrigToken::BlankNodeLabel],
                         true,
                     )
-                ),
-                'TriG input must not use N-Quads graph term',
-            );
+                )
+                )
+            ) {
+                throw new NonCompliantInputError('TriG input must not use N-Quads graph term');
+            }
 
-            $this->emit([$this->curSubject, $this->curPredicate, $object, $graphForThisItem]);
+            $this->emit([
+                $this->curSubject ?? $this->neverReachedFallback('subject', false),
+                $this->curPredicate ?? $this->neverReachedFallback('predicate', false),
+                $object,
+                $graphForThisItem,
+            ]);
 
             if ($nextType !== TrigToken::Comma) {
                 break;
             }
 
-            $this->reader->next();
-            assert($this->reader->getTokenType() !== TrigToken::EndOfInput, 'expected object after ,');
+            $next = $this->reader->next();
+            if ($this->strict && ! $next) {
+                throw new NonCompliantInputError('expected object after ,');
+            }
         }
     }
 
@@ -345,11 +390,14 @@ final class TrigParser extends FiberIterator
      *
      * @param string $expected
      *   String in error message.
+     *
+     * @throws NonCompliantInputError
      */
     private function neverReachedFallback(string $expected, bool $advance): Iri
     {
-        /** @phpstan-ignore function.impossibleType (GIGO) */
-        assert(false, 'expected ' . $expected . ', got ' . $this->reader->getTokenType()->value);
+        if ($this->strict) {
+            throw new NonCompliantInputError('expected ' . $expected . ', got ' . $this->reader->getTokenType()->value);
+        }
 
         if ($advance) {
             $this->reader->next();
@@ -358,15 +406,13 @@ final class TrigParser extends FiberIterator
         return new Iri(self::FALLBACK_IRI);
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseSubject(TrigToken $type): Iri|BlankNode
     {
         return $this->parseResource($type) ?? $this->neverReachedFallback('subject', false);
     }
 
+    /** @throws NonCompliantInputError */
     private function parsePredicate(): Iri
     {
         $type = $this->reader->getTokenType();
@@ -382,8 +428,7 @@ final class TrigParser extends FiberIterator
     /**
      * Parses an iri or blank node
      *
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     private function parseResource(TrigToken $type): Iri|BlankNode|null
     {
@@ -397,10 +442,7 @@ final class TrigParser extends FiberIterator
         };
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseObject(): Iri|BlankNode|Literal
     {
         $type = $this->reader->getTokenType();
@@ -420,6 +462,7 @@ final class TrigParser extends FiberIterator
         };
     }
 
+    /** @throws NonCompliantInputError */
     private function parseIriRef(): Iri
     {
         $value    = $this->reader->getTokenValue();
@@ -428,17 +471,31 @@ final class TrigParser extends FiberIterator
         return new Iri($resolved);
     }
 
+    /** @throws NonCompliantInputError */
     private function parsePName(): Iri
     {
         $value = $this->reader->getTokenValue();
 
         $colonPos = strpos($value, ':');
-        assert($colonPos !== false, 'PNAME must contain :');
+        if ($colonPos === false) {
+            if ($this->strict) {
+                throw new NonCompliantInputError('PNAME must contain :');
+            }
+
+            return new Iri(self::FALLBACK_IRI);
+        }
+
         $prefix = substr($value, 0, $colonPos + 1);
         $local  = substr($value, $colonPos + 1);
 
         $ns = $this->namespaces[$prefix] ?? null;
-        assert($ns !== null, 'undefined prefix: ' . $prefix);
+        if ($ns === null) {
+            if ($this->strict) {
+                throw new NonCompliantInputError('undefined prefix: ' . $prefix);
+            }
+
+            return new Iri(self::FALLBACK_IRI);
+        }
 
         $full = $ns . $local;
 
@@ -446,26 +503,51 @@ final class TrigParser extends FiberIterator
             $full = UriReference::resolveRelative($this->base, $full);
         }
 
-        assert($full !== '', 'expanded IRI is empty');
+        if ($full === '') {
+            if ($this->strict) {
+                throw new NonCompliantInputError('expanded IRI is empty');
+            }
+
+            return new Iri(self::FALLBACK_IRI);
+        }
 
         return new Iri($full);
     }
 
-    /** @return non-empty-string */
+    /**
+     * @return non-empty-string
+     *
+     * @throws NonCompliantInputError
+     */
     private function resolveIriRef(string $decodedIri): string
     {
-        assert(preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $decodedIri) !== 1, 'IRIREF contains disallowed character');
+        if ($this->strict && preg_match('/[\x00-\x20<>"{}|^`\\\\]/u', $decodedIri) === 1) {
+            throw new NonCompliantInputError('IRIREF contains disallowed character');
+        }
 
         $iri = $this->base !== '' ? UriReference::resolveRelative($this->base, $decodedIri) : $decodedIri;
-        assert($iri !== '', 'resolved IRI is empty');
+        if ($iri === '') {
+            if ($this->strict) {
+                throw new NonCompliantInputError('resolved IRI is empty');
+            }
+
+            return self::FALLBACK_IRI;
+        }
 
         return $iri;
     }
 
+    /** @throws NonCompliantInputError */
     private function parseBlankNodeLabel(): BlankNode
     {
         $label = $this->reader->getTokenValue();
-        assert($label !== '', 'BLANK_NODE_LABEL is empty');
+        if ($label === '') {
+            if ($this->strict) {
+                throw new NonCompliantInputError('BLANK_NODE_LABEL is empty');
+            }
+
+            return $this->blankNode(null);
+        }
 
         return $this->blankNode($label);
     }
@@ -473,8 +555,7 @@ final class TrigParser extends FiberIterator
     /**
      * Parse a blank node property list: [ predicateObjectList ].
      *
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
+     * @throws NonCompliantInputError
      */
     private function parseBlankNodePropertyList(bool $mayBeEmpty = true): BlankNode
     {
@@ -485,7 +566,9 @@ final class TrigParser extends FiberIterator
 
         $this->reader->next();
         $type = $this->reader->getTokenType();
-        assert($type !== TrigToken::EndOfInput, 'expected predicateObjectList or ]');
+        if ($this->strict && $type === TrigToken::EndOfInput) {
+            throw new NonCompliantInputError('expected predicateObjectList or ]');
+        }
 
         $this->lastBlankNodePropertyListWasEmpty = $type === TrigToken::RSquare;
         if ($type !== TrigToken::RSquare) {
@@ -498,10 +581,7 @@ final class TrigParser extends FiberIterator
         return $bnode;
     }
 
-    /**
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
-     */
+    /** @throws NonCompliantInputError */
     private function parseCollection(): Iri|BlankNode
     {
         $this->reader->next();
@@ -547,6 +627,7 @@ final class TrigParser extends FiberIterator
         return $headNode;
     }
 
+    /** @throws NonCompliantInputError */
     private function parseStringLiteral(): Literal
     {
         $lexical  = $this->reader->getTokenValue();
@@ -560,10 +641,17 @@ final class TrigParser extends FiberIterator
         $token = $this->reader->getTokenType();
         if ($token === TrigToken::AtKeyword) {
             $lang = $this->reader->getTokenValue();
-            assert($lang !== '', 'LANGTAG is empty');
+            if ($lang === '') {
+                if ($this->strict) {
+                    throw new NonCompliantInputError('LANGTAG is empty');
+                }
+
+                $lang = null;
+            }
+
             $this->reader->next();
 
-            return Literal::langString($lexical, $lang);
+            return Literal::langOrXSDString($lexical, $lang);
         }
 
         if ($token === TrigToken::HatHat) {
@@ -575,7 +663,13 @@ final class TrigParser extends FiberIterator
             };
             $this->reader->next();
 
-            assert($datatype !== LangString::IRI, 'LangString literals cannot be created with a datatype IRI');
+            if ($datatype === LangString::IRI) {
+                if ($this->strict) {
+                    throw new NonCompliantInputError('LangString literals cannot be created with a datatype IRI');
+                }
+
+                return Literal::XSDString($lexical);
+            }
 
             return Literal::typed($lexical, $datatype);
         }
@@ -583,6 +677,7 @@ final class TrigParser extends FiberIterator
         return Literal::XSDString($lexical);
     }
 
+    /** @throws NonCompliantInputError */
     private function parseNumericLiteral(): Literal
     {
         $type     = $this->reader->getTokenType();
@@ -599,6 +694,7 @@ final class TrigParser extends FiberIterator
         return Literal::typed($value, $datatype);
     }
 
+    /** @throws NonCompliantInputError */
     private function parseBooleanLiteral(): Literal
     {
         $value = $this->reader->getTokenValue();

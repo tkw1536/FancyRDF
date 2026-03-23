@@ -7,6 +7,7 @@ namespace FancyRDF\Formats;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Term\BlankNode;
+use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
 use FancyRDF\Uri\UriReference;
@@ -367,7 +368,6 @@ class RdfXmlParser extends FiberIterator
      * @param non-empty-string|null $reificationURI The URI for reification, or null if none
      * @param string|null           $resourceAttr   The rdf:resource attribute value (must be null)
      *
-     * @throws RuntimeException
      * @throws NonCompliantInputError
      */
     private function handleParseTypeLiteral(Iri|BlankNode $subject, Iri $predicate, string|null $reificationURI, string|null $resourceAttr): void
@@ -404,16 +404,15 @@ class RdfXmlParser extends FiberIterator
 
         try {
             $canonicalXml = XMLUtils::serializerInnerXML($outerXml);
-        } catch (InvalidArgumentException $e) {
+        } catch (InvalidArgumentException | RuntimeException $e) {
             if ($this->strict) {
                 throw new NonCompliantInputError('Failed to serialize inner XML: ' . $e->getMessage(), previous: $e);
             }
 
             trigger_error('Failed to serialize inner XML: ' . $e->getMessage(), E_USER_WARNING);
-            $canonicalXml = $this->reader->readInnerXml();
         }
 
-        $object = Literal::typed($canonicalXml, self::RDF_NAMESPACE . 'XMLLiteral');
+        $object = Literal::typed($canonicalXml ?? $this->reader->readInnerXml(), self::RDF_NAMESPACE . 'XMLLiteral');
 
         $this->emitTripleWithReification($subject, $predicate, $object, $reificationURI);
 
@@ -467,7 +466,6 @@ class RdfXmlParser extends FiberIterator
      * Function that does the actual parsing.
      *
      * @throws NonCompliantInputError
-     * @throws RuntimeException
      */
     #[Override]
     protected function doIterate(): void
@@ -806,10 +804,7 @@ class RdfXmlParser extends FiberIterator
                     continue;
                 }
 
-                $object = $datatypeAttr !== null
-                    ? Literal::typed($this->reader->value, $this->resolveURI($datatypeAttr))
-                    : Literal::langOrXSDString($this->reader->value, $propertyLang);
-
+                $object = $this->makeObjectLiteral($datatypeAttr, $propertyLang);
                 $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
 
                 continue;
@@ -1058,17 +1053,35 @@ class RdfXmlParser extends FiberIterator
                 continue;
             }
 
-            $object = match (true) {
-                $datatypeAttr !== null => Literal::typed($this->reader->value, $this->resolveURI($datatypeAttr)),
-                default => Literal::langOrXSDString($this->reader->value, $elementLang),
-            };
-
+            $object = $this->makeObjectLiteral($datatypeAttr, $elementLang);
             if ($this->strict && $this->subject === null) {
                 throw new NonCompliantInputError('subject must be set');
             }
 
             $this->emitTripleWithReification($this->subject, $predicate, $object, $reificationURI);
         }
+    }
+
+    /**
+     * @param non-empty-string|null $propertyLang
+     *
+     * @throws NonCompliantInputError
+     */
+    private function makeObjectLiteral(string|null $datatypeAttr, string|null $propertyLang): Literal
+    {
+        $objectDatatype = $datatypeAttr !== null ? $this->resolveURI($datatypeAttr) : null;
+        if ($objectDatatype === LangString::IRI) {
+            if ($this->strict) {
+                throw new NonCompliantInputError('LangString literals cannot be created with a datatype IRI');
+            }
+
+            $objectDatatype = null;
+        }
+
+        return match (true) {
+            $objectDatatype !== null => Literal::typed($this->reader->value, $objectDatatype),
+            default => Literal::langOrXSDString($this->reader->value, $propertyLang),
+        };
     }
 
     /**

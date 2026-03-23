@@ -46,7 +46,7 @@ final class RdfXmlParserTest extends TestCase
     }
 
     /**
-     * @return array<string, array{string, string}>
+     * @return array<string, array{bool, string, string}>
      *
      * @throws RuntimeException
      */

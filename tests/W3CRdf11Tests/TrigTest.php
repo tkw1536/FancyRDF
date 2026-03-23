@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
-use AssertionError;
 use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\TrigParser;
 use FancyRDF\Formats\TrigReader\TrigReader;
@@ -14,7 +13,6 @@ use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\RequiresSetting;
 use PHPUnit\Framework\Attributes\TestDox;
 use RuntimeException;
 
@@ -61,7 +59,7 @@ final class TrigTest extends TestBase
     }
 
     /**
-     * @return Generator<string, array{action: string}, mixed, void>
+     * @return Generator<string, array{strict: bool, action: string}, mixed, void>
      *
      * @throws RuntimeException
      * @throws NonCompliantInputError
@@ -69,14 +67,20 @@ final class TrigTest extends TestBase
     public static function trigPositiveSyntaxProvider(): Generator
     {
         foreach (self::cases('http://www.w3.org/ns/rdftest#TestTrigPositiveSyntax') as $info) {
-            yield $info['iri'] => [
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
+                'action' => $info['action'],
+            ];
+
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
                 'action' => $info['action'],
             ];
         }
     }
 
     /**
-     * @return Generator<string, array{action: string, result: string}, mixed, void>
+     * @return Generator<string, array{strict: bool, action: string, result: string}, mixed, void>
      *
      * @throws RuntimeException
      * @throws NonCompliantInputError
@@ -88,7 +92,14 @@ final class TrigTest extends TestBase
                 throw new RuntimeException('result is required for evaluation tests');
             }
 
-            yield $info['iri'] => [
+            yield 'strict/' . $info['iri'] => [
+                'strict' => true,
+                'action' => $info['action'],
+                'result' => $info['result'],
+            ];
+
+            yield 'loose/' . $info['iri'] => [
+                'strict' => false,
                 'action' => $info['action'],
                 'result' => $info['result'],
             ];
@@ -128,13 +139,14 @@ final class TrigTest extends TestBase
     #[TestDox('$_dataname parses')]
     #[Group('positive-syntax')]
     public function testTrigPositiveSyntax(
+        bool $strict,
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true, $action);
+            $reader = new TrigReader($strict, new ResourceStreamReader($source));
+            $parser = new TrigParser($strict, $reader, true, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -148,18 +160,17 @@ final class TrigTest extends TestBase
      * @throws NonCompliantInputError
      */
     #[DataProvider('trigNegativeSyntaxProvider')]
-    #[TestDox('$_dataname asserts with assertions enabled')]
-    #[RequiresSetting('zend.assertions', '1')]
+    #[TestDox('$_dataname asserts with strict mode enabled')]
     #[Group('negative-syntax-strict')]
-    public function testTrigNegativeSyntaxWithAssertions(
+    public function testTrigNegativeSyntaxWithAssertionsStrict(
         string $action,
     ): void {
         $source = self::assertOpen($action);
-        self::expectException(AssertionError::class);
+        self::expectException(NonCompliantInputError::class);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true, $action);
+            $reader = new TrigReader(true, new ResourceStreamReader($source));
+            $parser = new TrigParser(true, $reader, true, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -173,17 +184,16 @@ final class TrigTest extends TestBase
      * @throws NonCompliantInputError
     */
     #[DataProvider('trigNegativeSyntaxProvider')]
-    #[TestDox('$_dataname does not throw with assertions disabled')]
-    #[RequiresSetting('zend.assertions', '0')]
+    #[TestDox('$_dataname does not throw without strict mode disabled')]
     #[Group('negative-syntax-lenient')]
-    public function testTrigNegativeSyntaxWithoutAssertions(
+    public function testTrigNegativeSyntaxLoose(
         string $action,
     ): void {
         $source = self::assertOpen($action);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true, $action);
+            $reader = new TrigReader(false, new ResourceStreamReader($source));
+            $parser = new TrigParser(false, $reader, true, $action);
             iterator_to_array($parser);
         } finally {
             if (is_resource($source)) {
@@ -201,6 +211,7 @@ final class TrigTest extends TestBase
     #[TestDox('$_dataname evaluates correctly')]
     #[Group('positive-evaluation')]
     public function testTrigEvaluation(
+        bool $strict,
         string $action,
         string $result,
     ): void {
@@ -208,8 +219,8 @@ final class TrigTest extends TestBase
         $source     = self::assertOpen($action);
 
         try {
-            $reader = new TrigReader(new ResourceStreamReader($source));
-            $parser = new TrigParser($reader, true, $action);
+            $reader = new TrigReader($strict, new ResourceStreamReader($source));
+            $parser = new TrigParser($strict, $reader, true, $action);
 
             $got = iterator_to_array($parser);
 

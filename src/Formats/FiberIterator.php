@@ -6,10 +6,8 @@ namespace FancyRDF\Formats;
 
 use FancyRDF\Exceptions\NonCompliantInputError;
 use Fiber;
-use InvalidArgumentException;
 use IteratorAggregate;
 use Override;
-use RuntimeException;
 use Traversable;
 
 use function trigger_error;
@@ -92,8 +90,6 @@ abstract class FiberIterator implements IteratorAggregate
      *
      * It should call the emit() function at any point to suspend itself and emit a value.
      *
-     * @throws RuntimeException
-     * @throws InvalidArgumentException
      * @throws NonCompliantInputError
      */
     abstract protected function doIterate(): void;

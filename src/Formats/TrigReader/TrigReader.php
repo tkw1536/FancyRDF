@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace FancyRDF\Formats\TrigReader;
 
+use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Streaming\StreamReader;
 
 use function array_key_exists;
-use function assert;
 use function hexdec;
 use function is_string;
 use function mb_chr;
@@ -22,9 +22,9 @@ use function substr;
  * Tokenizer for TriG / Turtle format.
  *
  * Reads from a stream and yields tokens (type + decoded value where applicable).
- * Whitespace and comments are skipped. Invalid input is asserted; when assertions
- * are disabled, the tokenizer makes a best-effort guess so it still yields a token
- * sequence (GIGO).
+ * Whitespace and comments are skipped. When strict mode is enabled, invalid input is rejected.
+ * Otherwise, the tokenizer makes a best-effort guess so it still yields a token
+ * sequence.
  *
  * The client must call next() at least once before getTokenType() / getTokenValue().
  * Initially, after the first next() that returns true, the current token is set;
@@ -49,11 +49,20 @@ final class TrigReader
         return $this->currentTokenValue;
     }
 
+    /**
+     * Constructs a new TrigReader.
+     *
+     * @param bool $strict
+     *   Enable strict mode.
+     *   In strict mode, additional checks are performed to validate compliance with the standard, and appropriate NonCompliantInputErrors may be thrown.
+     */
     public function __construct(
+        public readonly bool $strict,
         public readonly StreamReader $stream,
     ) {
     }
 
+    /** @throws NonCompliantInputError */
     public function next(): bool
     {
         [$this->currentTokenType, $this->currentTokenValue] = $this->process();
@@ -124,6 +133,8 @@ final class TrigReader
      *
      * @return array{TrigToken, string}
      *   The token type and its (decoded) value.
+     *
+     * @throws NonCompliantInputError
      */
     private function process(): array
     {
@@ -154,7 +165,9 @@ final class TrigReader
 
         if ($ch === '^') {
             $hatHat = $this->stream->consume(strlen('^^'));
-            assert($hatHat === '^^', 'expected two hats');
+            if ($this->strict && $hatHat !== '^^') {
+                throw new NonCompliantInputError('expected two hats');
+            }
 
             return [TrigToken::HatHat, $hatHat];
         }
@@ -211,7 +224,9 @@ final class TrigReader
         }
 
         $this->stream->consume(strlen($ch));
-        assert($ch === '.', 'expected dot, got ' . $ch);
+        if ($this->strict && $ch !== '.') {
+            throw new NonCompliantInputError('expected dot, got ' . $ch);
+        }
 
         return [TrigToken::Dot, $ch];
     }
@@ -535,6 +550,8 @@ final class TrigReader
      * Consumes and returns an IRIREF from the start of the stream (decoded).
      *
      * If there isn't any IRIREF, returns null.
+     *
+     * @throws NonCompliantInputError
      */
     private function processIriRef(): string|null
     {
@@ -589,6 +606,8 @@ final class TrigReader
      * Reads $hexLen hex digits at $offset using only peekChar($offset).
      *
      * @return array{int, string} [new offset after the hex digits, string of hex chars read]
+     *
+     * @throws NonCompliantInputError
      */
     private function consumeUcharAt(int $offset, int $hexLen): array
     {
@@ -603,7 +622,9 @@ final class TrigReader
             $offset  += strlen($c);
         }
 
-        assert(strlen($hexPart) === $hexLen, 'incomplete \\u or \\U escape');
+        if ($this->strict && strlen($hexPart) !== $hexLen) {
+            throw new NonCompliantInputError('incomplete \\u or \\U escape');
+        }
 
         return [$offset, $hexPart];
     }
@@ -612,6 +633,8 @@ final class TrigReader
      * Decodes a UCHAR at $offset (offset points at first hex digit after \u or \U).
      *
      * @return array{int, string} [new offset after the hex digits, decoded character]
+     *
+     * @throws NonCompliantInputError
      */
     private function decodeUcharAtOffset(int $offset, int $hexLen): array
     {
@@ -620,15 +643,17 @@ final class TrigReader
         return [$newOffset, $this->hexPartToDecodedChar($hexPart)];
     }
 
+    /** @throws NonCompliantInputError */
     private function hexPartToDecodedChar(string $hex): string
     {
-        assert(preg_match('/^[0-9A-Fa-f]+$/', $hex) === 1, 'invalid hex in escape');
+        if ($this->strict && preg_match('/^[0-9A-Fa-f]+$/', $hex) !== 1) {
+            throw new NonCompliantInputError('invalid hex in escape');
+        }
+
         $ord = (int) @hexdec($hex);
-        assert(
-            $ord <= 0x10FFFF &&
-            ($ord < 0xD800 || $ord > 0xDFFF),
-            'code point out of range',
-        );
+        if ($this->strict && ! ($ord <= 0x10FFFF && ($ord < 0xD800 || $ord > 0xDFFF))) {
+            throw new NonCompliantInputError('code point out of range');
+        }
 
         $res = mb_chr($ord, 'UTF-8');
 
@@ -642,6 +667,8 @@ final class TrigReader
      *
      * @return string|null
      *     Decoded string content, or null if there isn't a string literal.
+     *
+     * @throws NonCompliantInputError
      */
     private function processString(): string|null
     {
@@ -668,6 +695,8 @@ final class TrigReader
      * Decodes the body of a string literal starting at $offset (after opening quotes).
      *
      * @return string Decoded string content
+     *
+     * @throws NonCompliantInputError
      */
     private function decodeStringBody(int $offset, string $delim, bool $isLong): string
     {
@@ -723,7 +752,10 @@ final class TrigReader
             $offset += strlen($ch);
         }
 
-        assert(! $unexpectedEOF, 'unexpected end of string');
+        if ($this->strict && $unexpectedEOF) {
+            throw new NonCompliantInputError('unexpected end of string');
+        }
+
         $this->stream->consume($offset);
 
         return $result;
@@ -792,7 +824,11 @@ final class TrigReader
     // Decoding helpers
     // ================================
 
-    /** @param non-empty-string $char */
+    /**
+     * @param non-empty-string $char
+     *
+     * @throws NonCompliantInputError
+     */
     private function decodeEchar(string $char): string
     {
         $result = match ($char) {
@@ -807,7 +843,9 @@ final class TrigReader
             default => '',
         };
 
-        assert($result !== '', 'invalid string escape \\' . $char);
+        if ($this->strict && $result === '') {
+            throw new NonCompliantInputError('invalid string escape \\' . $char);
+        }
 
         return $result;
     }
