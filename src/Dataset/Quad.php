@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FancyRDF\Dataset;
 
+use Closure;
 use FancyRDF\Term\BlankNode;
 use FancyRDF\Term\Iri;
 use FancyRDF\Term\Literal;
@@ -27,41 +28,54 @@ final class Quad
     }
 
     /**
-     * Applies a renaming to a quad.
+     * Applies a renaming to a triple or quad.
      *
-     * @param TripleOrQuadArray                            $quad
+     * @see Quad::renameTerm()
+     *
+     * @param TripleOrQuadArray                                                     $quad
      *   The quad to apply the renaming to.
-     * @param callable(non-empty-string): non-empty-string $mapper
+     * @param (Closure(non-empty-string): string)|(array<non-empty-string, string>) $renaming
      *   A renaming of blank node identifiers.
      *
-     * @return TripleOrQuadArray
+     * @return ($quad is QuadArray ? QuadArray : TripleArray)
      */
-    public static function rename(array $quad, callable $mapper): array
+    public static function rename(array $quad, callable|array $renaming): array
     {
         return [
-            self::renameTerm($quad[0], $mapper),
+            self::renameTerm($quad[0], $renaming),
             $quad[1],
-            self::renameTerm($quad[2], $mapper),
-            $quad[3] === null ? null : self::renameTerm($quad[3], $mapper),
+            self::renameTerm($quad[2], $renaming),
+            $quad[3] === null ? null : self::renameTerm($quad[3], $renaming),
         ];
     }
 
     /**
-     * Renames a single term according to the given mapper.
+     * Renames the identifier of a blank node according to the given renaming.
      *
-     * @param callable(non-empty-string): non-empty-string $mapper
+     * @param (Closure(non-empty-string): string)|(array<non-empty-string, string>) $renaming
      *   A renaming of blank node identifiers.
+     *   If callable, the old identifier is passed to the callable, and the new identifier should be returned.
+     *   If an array, indexed by the old identifier.
+     *   If the new identifier is empty, the term is not renamed.
      *
      * @return ($term is Iri ? Iri : ($term is Literal ? Literal : BlankNode))
+     *   The renamed term.
+     *   If the term is not a blank node, the term is returned unchanged.
      */
-    public static function renameTerm(Iri|Literal|BlankNode $term, callable $mapper): Iri|Literal|BlankNode
+    public static function renameTerm(Iri|Literal|BlankNode $term, Closure|array $renaming): Iri|Literal|BlankNode
     {
         if (! $term instanceof BlankNode) {
             return $term;
         }
 
-        $identifier = $mapper($term->identifier);
-        if ($identifier === $term->identifier) {
+        // Call the renaming function
+        if ($renaming instanceof Closure) {
+            $identifier = $renaming($term->identifier);
+        } else {
+            $identifier = $renaming[$term->identifier] ?? '';
+        }
+
+        if ($identifier === '' || $identifier === $term->identifier) {
             return $term;
         }
 

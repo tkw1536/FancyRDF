@@ -208,7 +208,7 @@ final class RdfCanonicalizer
 
         $canonicalized = [];
         foreach ($inputDataset as $quad) {
-            $canonicalized[] = Quad::rename($quad, static fn (string $id): string => $blankNodeMap[$id]);
+            $canonicalized[] = Quad::rename($quad, $blankNodeMap);
         }
 
         $canonicalized = new Dataset($canonicalized);
@@ -259,9 +259,7 @@ final class RdfCanonicalizer
         // Serialize the quad in canonical n-quads form with the following special rule:
         // If any component in quad is an blank node, then serialize it using a special identifier as follows:
         // If the blank node's existing blank node identifier matches the reference blank node identifier then use the blank node identifier a, otherwise, use the blank node identifier z.
-        $mapper = static function (string $id) use ($reference): string {
-            return $id === $reference ? 'a' : 'z';
-        };
+        $mapper = static fn (string $id): string => $id === $reference ? 'a' : 'z';
 
         foreach ($quads as $quad) {
             $nquads[] = NFormatSerializer::serialize(Quad::rename($quad, $mapper));
