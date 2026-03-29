@@ -55,6 +55,28 @@ class RdfXmlParser extends FiberIterator
         $this->pendingProperties = new SplStack();
     }
 
+    /**
+     * Creates a new RdfXmlParser from a string.
+     */
+    public static function openString(bool $strict, string $data, string $encoding = 'UTF-8'): self
+    {
+        $reader = XMlReader::fromString($data, $encoding);
+
+        return new self($strict, $reader);
+    }
+
+    /**
+     * Creates a new RdfXmlParser from a stream.
+     *
+     * @param resource $stream
+     */
+    public static function openStream(bool $strict, mixed $stream, string|null $documentUri = null, string $encoding = 'UTF-8'): self
+    {
+        $reader = XMLReader::fromStream($stream, $encoding, 0, $documentUri);
+
+        return new self($strict, $reader);
+    }
+
     // =================================
     // URI handling
     // =================================

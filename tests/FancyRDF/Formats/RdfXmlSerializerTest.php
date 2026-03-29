@@ -14,7 +14,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use XMLReader;
 use XMLWriter;
 
 use function file_get_contents;
@@ -66,7 +65,7 @@ final class RdfXmlSerializerTest extends TestCase
         $rdfSource = file_get_contents($rdfFile);
         self::assertNotFalse($rdfSource, 'Failed to read input file: ' . $rdfFile);
 
-        $parser  = new RdfXmlParser($strict, XMLReader::fromString($rdfSource));
+        $parser  = RdfXmlParser::openString($strict, $rdfSource);
         $triples = iterator_to_array($parser);
 
         $actual = self::serializeTriples($triples);
