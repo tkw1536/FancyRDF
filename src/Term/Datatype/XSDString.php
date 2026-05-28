@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace FancyRDF\Term\Datatype;
 
+use FancyRDF\Exceptions\InvalidLexicalValueError;
 use Override;
+
+use function mb_check_encoding;
 
 /** @extends Datatype<string> */
 final class XSDString extends Datatype
@@ -18,17 +21,21 @@ final class XSDString extends Datatype
         return [self::IRI];
     }
 
-    /** @throws void */
+    /** @throws InvalidLexicalValueError */
     #[Override]
     public function toValue(): string
     {
+        if (! mb_check_encoding($this->lexical, 'UTF-8')) {
+            throw new InvalidLexicalValueError('string is not valid UTF-8', $this->iri, $this->lexical, $this->language);
+        }
+
         return $this->lexical;
     }
 
-    /** @throws void */
+    /** @throws InvalidLexicalValueError */
     #[Override]
     public function toCanonicalForm(): string
     {
-        return $this->lexical;
+        return $this->toValue();
     }
 }

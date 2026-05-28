@@ -6,7 +6,9 @@ namespace FancyRDF\Term;
 
 use FancyRDF\Term\Datatype\Datatype;
 use FancyRDF\Term\Datatype\LangString;
+use FancyRDF\Term\Datatype\Unsupported;
 use FancyRDF\Term\Datatype\XMLLiteral;
+use FancyRDF\Term\Datatype\XSDBoolean;
 use FancyRDF\Term\Datatype\XSDString;
 
 use function sprintf;
@@ -44,16 +46,22 @@ final class Datatypes
 
         self::register(XSDString::class);
         self::register(LangString::class);
+        self::register(XSDBoolean::class);
         self::register(XMLLiteral::class);
     }
 
-    /** @return Datatype<mixed> */
+    /**
+     * Create a new specialized datatype instance for a literal with the given iri, lexical, and language.
+     *
+     * If the datatype is unsupported, an instance of {@see Unsupported} is returned.
+     *
+     * @return Datatype<mixed> */
     public static function getDatatype(string $iri, string $lexical, string|null $language = null): Datatype
     {
         self::registerAll();
 
-        $class = self::$dataClasses[$iri] ?? XSDString::class;
+        $class = self::$dataClasses[$iri] ?? Unsupported::class;
 
-        return new $class($lexical, $language);
+        return new $class($lexical, $language, $iri);
     }
 }

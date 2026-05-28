@@ -19,6 +19,7 @@ final class XSDBoolean extends Datatype
         return [self::IRI];
     }
 
+    /** @throws InvalidLexicalValueError */
     #[Override]
     public function toValue(): bool
     {
@@ -32,9 +33,10 @@ final class XSDBoolean extends Datatype
                 return false;
         }
 
-        throw new InvalidLexicalValueError('invalid boolean literal', $this->lexical, $this->language);
+        throw new InvalidLexicalValueError('invalid boolean literal', $this->iri, $this->lexical, $this->language);
     }
 
+    /** @throws InvalidLexicalValueError */
     #[Override]
     public function toCanonicalForm(): string
     {

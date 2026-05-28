@@ -23,6 +23,7 @@ final class XMLLiteral extends Datatype
         return [self::IRI];
     }
 
+    /** @throws InvalidLexicalValueError */
     #[Override]
     public function toCanonicalForm(): string
     {
@@ -30,7 +31,7 @@ final class XMLLiteral extends Datatype
         foreach ($this->toValue() as $node) {
             $norm = $node->C14N(false, true);
             if ($norm === false) {
-                throw new InvalidLexicalValueError('failed to canonicalize node', $this->lexical, $this->language);
+                throw new InvalidLexicalValueError('failed to canonicalize node', $this->iri, $this->lexical, $this->language);
             }
 
             $result .= $norm;
@@ -39,14 +40,21 @@ final class XMLLiteral extends Datatype
         return $result;
     }
 
-    /** @return list<DOMNode> */
+    /**
+     * @return list<DOMNode>
+     *
+     * @throws InvalidLexicalValueError
+     */
     #[Override]
     public function toValue(): array
     {
         $dom = new DOMDocument();
-        $ok  = $dom->loadXML('<root>' . $this->lexical . '</root>');
+        $ok  = @$dom->loadXML('<root>' . $this->lexical . '</root>');
         if (! $ok) {
-            throw new InvalidLexicalValueError('failed to parse XML', $this->lexical, $this->language);
+            // TODO: We don't actually know if this is a valid XML document.
+            // DOMDocument::loadXML() === false only tells us that it cannot be parsed.
+            // So not sure which exception to throw here.
+            throw new InvalidLexicalValueError('failed to parse XML', $this->iri, $this->lexical, $this->language);
         }
 
         return iterator_to_array($dom->documentElement->childNodes ?? [], false);

@@ -8,6 +8,7 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 use FancyRDF\Exceptions\InvalidLexicalValueError;
+use FancyRDF\Exceptions\UnsupportedLexicalValueError;
 use FancyRDF\Term\Datatype\Datatype;
 use FancyRDF\Term\Datatype\LangString;
 use FancyRDF\Term\Datatype\XSDString;
@@ -178,6 +179,9 @@ final class Literal extends Term
      * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal-value
      *
      * @throws InvalidLexicalValueError
+     *   If the datatype is an invalid lexical value.
+     * @throws UnsupportedLexicalValueError
+     *   If the datatype is unsupported by this implementation.
      */
     public function getValue(): mixed
     {
@@ -239,11 +243,7 @@ final class Literal extends Term
         }
 
         // if not, compare their values
-        try {
-            return $this->getDatatypeInstance()->equals($other->getDatatypeInstance());
-        } catch (InvalidLexicalValueError) {
-            return false;
-        }
+        return $this->getDatatypeInstance()->equals($other->getDatatypeInstance());
     }
 
     #[Override]

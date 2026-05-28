@@ -19,12 +19,16 @@ final class LangString extends Datatype
         return [self::IRI];
     }
 
-    /** @return array{string, string} */
+    /**
+     * @return array{string, string}
+     *
+     * @throws InvalidLexicalValueError if the language is required and not set.
+    */
     #[Override]
     public function toValue(): array
     {
         if ($this->language === null || $this->language === '') {
-            throw new InvalidLexicalValueError('language is required for LangString literal', $this->lexical, $this->language);
+            throw new InvalidLexicalValueError('language is required for LangString literal', $this->iri, $this->lexical, $this->language);
         }
 
         return [$this->lexical, $this->language];
