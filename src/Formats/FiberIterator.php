@@ -10,6 +10,7 @@ use IteratorAggregate;
 use Override;
 use Traversable;
 
+use function assert;
 use function trigger_error;
 
 use const E_USER_NOTICE;
@@ -55,11 +56,12 @@ abstract class FiberIterator implements IteratorAggregate
         //
         // [1]: https://www.php.net/manual/en/language.fibers.php
 
-        /** @var Fiber<T, void, void, T> $fiber */
         $fiber = new Fiber([$this, 'doIterate']);
 
         $value = $fiber->start();
         if ($value !== null) {
+            assert($this->isType($value));
+
             yield $value;
         }
 
@@ -69,8 +71,18 @@ abstract class FiberIterator implements IteratorAggregate
                 continue;
             }
 
+            assert($this->isType($value), 'must be of type T');
+
             yield $value;
         }
+    }
+
+    /** @phpstan-assert-if-true T $value */
+    private function isType(mixed $value): bool
+    {
+        // The type T doesn't actually exist as a fixed type at runtime.
+        // So we can't really check for it - this function just exists as a placeholder to satisfy the type checker.
+        return true;
     }
 
     /**

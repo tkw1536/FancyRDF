@@ -54,7 +54,7 @@ final class NQuadsTest extends TestBase
     }
 
     /**
-     * @return Generator<string, array{action: string}, mixed, void>
+     * @return Generator<string, array{strict: bool, action: string}, mixed, void>
      *
      * @throws RuntimeException
      * @throws NonCompliantInputError

@@ -34,7 +34,7 @@ use const E_USER_WARNING;
  *
  * @see https://www.w3.org/TR/rdf11-concepts/#dfn-literal
  *
- * @phpstan-type LiteralArray array{'type': 'literal', 'value': string, 'datatype'?: non-empty-string, 'xml:lang'?: non-empty-string}
+ * @phpstan-type LiteralArray array{'type': 'literal', 'value': string, 'datatype'?: non-empty-string}|array{'type': 'literal', 'value': string, 'language': non-empty-string}
  */
 final class Literal extends Term
 {
@@ -204,7 +204,7 @@ final class Literal extends Term
     /**
      * Callers should use this method to check for special literals.
      *
-     * @return string|Iri|null
+     * @return non-empty-string|Iri|null
      *   If this literal is of type LangString, returns the language tag as a string.
      *   If this literal does not have datatype XSDString, returns the datatype IRI.
      *   Otherwise, returns null.
