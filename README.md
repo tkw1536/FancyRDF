@@ -37,8 +37,8 @@ The library provides several stream-based implementations of parsers and seriali
 > This approach saves memory usage and improves efficiency, in particular when working with large datasets.
 
 - [RDF/XML](https://www.w3.org/TR/rdf-xml/)
-    - ✅ Parser: [RdfXmlParser](src/Formats/RdfXmlParser.php) 
-    - [ ] Serializer: TODO
+    - ✅ Parser: [RdfXmlParser](src/Formats/RdfXmlParser.php)
+    - ✅ Serializer: [RdfXmlSerializer](src/Formats/RdfXmlSerializer.php)
     - ✅ passes W3C [Test Suite](https://www.w3.org/2013/RDFXMLTests/)
         - ✅ all positive tests parse correctly and produce equivalent N-Triples datasets
         - ✅ all negative tests produce an assertion error in development mode.
@@ -53,7 +53,7 @@ The library provides several stream-based implementations of parsers and seriali
 - [Turtle](https://www.w3.org/TR/turtle/) and [Trig](https://www.w3.org/TR/trig/)
     - ✅ Tokenizer: [TrigReader](src/Formats/TrigReader/TrigReader.php)
     - ✅ Parser: [TrigParser](src/Formats/TrigParser.php)
-    - [ ] Serializer: TODO
+    - ✅ Serializer: [TrigSerializer](src/Formats/TrigSerializer.php)
     - Test Suites:
         - ✅ passes W3C [Test Suite for Turtle](https://www.w3.org/2013/TurtleTests/) and [Test Suite for Trig](https://www.w3.org/2013/TrigTests/)
         - ✅ all positive tests parse correctly and produce equivalent RDF datasets.
@@ -61,9 +61,8 @@ The library provides several stream-based implementations of parsers and seriali
         - ✅ all negative tests do not produce errors in production mode.
 
 ## TODO List
-- add missing Serializers
-- consider moving from assertions to an explicit "strict" flag
 
+- Implement Sparql Querying 
 
 ## Dependencies
 
