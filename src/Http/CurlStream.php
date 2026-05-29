@@ -142,10 +142,7 @@ final class CurlStream
             $key   = strtolower(trim($parts[0]));
             $value = trim($parts[1]);
 
-            if (! isset($headersMap[$key])) {
-                $headersMap[$key] = [];
-            }
-
+            $headersMap[$key] ??= [];
             $headersMap[$key][] = $value;
         }
 

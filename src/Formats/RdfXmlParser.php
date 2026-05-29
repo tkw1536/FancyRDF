@@ -152,10 +152,8 @@ class RdfXmlParser extends FiberIterator
     private function nextLiProperty(): Iri
     {
         $depth = $this->reader->depth;
-        if (! isset($this->liCounters[$depth])) {
-            $this->liCounters[$depth] = 0;
-        }
 
+        $this->liCounters[$depth] ??= 0;
         $this->liCounters[$depth]++;
 
         return new Iri(self::RDF_NAMESPACE . '_' . $this->liCounters[$depth]);

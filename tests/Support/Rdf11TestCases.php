@@ -67,14 +67,8 @@ class Rdf11TestCases
                 $sKey = $s instanceof BlankNode ? $s->label : $s->iri;
                 $pKey = $p->iri;
 
-                if (! isset($cache[$sKey])) {
-                    $cache[$sKey] = [];
-                }
-
-                if (! isset($cache[$sKey][$pKey])) {
-                    $cache[$sKey][$pKey] = [];
-                }
-
+                $cache[$sKey]        ??= [];
+                $cache[$sKey][$pKey] ??= [];
                 $cache[$sKey][$pKey][] = $o;
             }
         } finally {
