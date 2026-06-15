@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FancyRDF\Tests\W3CRdf11Tests;
 
-use AssertionError;
 use FancyRDF\Dataset\Quad;
 use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\NFormatParser;
@@ -94,7 +93,6 @@ final class NTriplesTest extends TestBase
     /**
      * @throws RuntimeException
      * @throws NonCompliantInputError
-     * @throws AssertionError
      */
     #[DataProvider('ntriplesPositiveSyntaxProvider')]
     #[TestDox('$_dataname parses')]
