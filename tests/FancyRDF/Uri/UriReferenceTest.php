@@ -309,7 +309,7 @@ final class UriReferenceTest extends TestCase
         $cases = [];
         foreach ($examples as $uri => $data) {
             [$expected, $isRelativeReference, $isAbsoluteURI, $isSuffixReference, $isRFC3986, $isRFC3987] = $data;
-            $cases[$uri]                                                                                  = [
+            $cases[$uri === '' ? 'empty' : $uri]                                                          = [
                 $uri,
                 $expected,
                 $isRelativeReference,
