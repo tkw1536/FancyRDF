@@ -114,14 +114,7 @@ abstract class FrameSerializer
 
         // Graphs are treated as top-level, non-nestable frames directly under the root.
         // At most one graph frame is open at a time.
-        $graphChanged = false;
-        if ($graph === null && $this->currentGraph !== null) {
-            $graphChanged = true;
-        } elseif ($graph !== null && $this->currentGraph === null) {
-            $graphChanged = true;
-        } elseif ($graph !== null && $this->currentGraph !== null && ! $this->currentGraph->equals($graph, true)) {
-            $graphChanged = true;
-        }
+        $graphChanged = $graph === null ? $this->currentGraph !== null : ($this->currentGraph === null || ! $this->currentGraph->equals($graph, true));
 
         if ($graphChanged) {
             // Close any open subject/property (and previous graph, if any) down to the root.

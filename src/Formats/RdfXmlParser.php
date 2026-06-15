@@ -631,13 +631,14 @@ class RdfXmlParser extends FiberIterator
                 $nodeId = $this->reader->getAttribute('rdf:nodeID');
                 $idAttr = $this->reader->getAttribute('rdf:ID');
 
-                // Error: rdf:nodeID and rdf:ID cannot be used together
-                if ($this->strict && ! ($nodeId === null || $idAttr === null)) {
-                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:ID together');
-                }
+                if ($this->strict) {
+                    if (! ($nodeId === null || $idAttr === null)) {
+                        throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:ID together');
+                    }
 
-                if ($this->strict && ! ($nodeId === null || $about === null)) {
-                    throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:about together');
+                    if (! ($nodeId === null || $about === null)) {
+                        throw new NonCompliantInputError('Cannot have rdf:nodeID and rdf:about together');
+                    }
                 }
 
                 $subject       = $this->resolveSubject($about, $nodeId, $idAttr, true);
@@ -718,12 +719,14 @@ class RdfXmlParser extends FiberIterator
                     $propertyLang = $this->currentXmlLang();
 
                     // Error: rdf:nodeID and rdf:resource cannot be used together
-                    if ($this->strict && ! ($nodeIdAttr === null || $resourceAttr === null)) {
-                        throw new NonCompliantInputError('rdf:nodeID and rdf:resource cannot be used together');
-                    }
+                    if ($this->strict) {
+                        if (! ($nodeIdAttr === null || $resourceAttr === null)) {
+                            throw new NonCompliantInputError('rdf:nodeID and rdf:resource cannot be used together');
+                        }
 
-                    if ($this->strict && ! ($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr))) {
-                        throw new NonCompliantInputError('rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
+                        if (! ($nodeIdAttr === null || self::isValidXmlName($nodeIdAttr))) {
+                            throw new NonCompliantInputError('rdf:nodeID value must match XML Name production: ' . $nodeIdAttr);
+                        }
                     }
 
                     // Handle rdf:ID on property element (reification)
