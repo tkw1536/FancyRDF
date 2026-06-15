@@ -425,6 +425,56 @@ class RdfXmlParser extends FiberIterator
     }
 
     /**
+     * Emit property attributes on a subject element (Description or typed node).
+     *
+     * @param non-empty-string|null $lang
+     *
+     * @throws NonCompliantInputError if in strict mode.
+     */
+    private function processSubjectElementAttributes(
+        Iri|BlankNode $subject,
+        string|null $lang,
+        bool $resolveRdfTypeAsUri = false,
+    ): void {
+        if (! $this->reader->hasAttributes) {
+            return;
+        }
+
+        $this->reader->moveToFirstAttribute();
+        do {
+            $attrLocalName = $this->reader->localName;
+            $attrNamespace = $this->reader->namespaceURI;
+
+            if (
+                ($attrNamespace === self::RDF_NAMESPACE && in_array($attrLocalName, self::STRUCTURAL_RDF_PROPERTY_ATTRS, true))
+                || $attrNamespace === XMLUtils::XML_NAMESPACE
+                || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
+                || $attrNamespace === ''
+            ) {
+                continue;
+            }
+
+            $predicate = new Iri($attrNamespace . $attrLocalName);
+            $value     = $this->reader->value;
+
+            if ($resolveRdfTypeAsUri && $attrNamespace === self::RDF_NAMESPACE && $attrLocalName === 'type') {
+                $object = new Iri($this->resolveURI($value));
+            } else {
+                $object = Literal::langOrXSDString($value, $lang);
+            }
+
+            $this->emit([
+                $subject,
+                $predicate,
+                $object,
+                null,
+            ]);
+        } while ($this->reader->moveToNextAttribute());
+
+        $this->reader->moveToElement();
+    }
+
+    /**
      * Normalized xml:lang for the current node (empty string becomes null).
      *
      * @return non-empty-string|null
@@ -649,50 +699,7 @@ class RdfXmlParser extends FiberIterator
                 $this->throwIfStrictRdfLiAsAttribute();
 
                 // Process attributes on Description element as property-value pairs
-                if ($this->reader->hasAttributes) {
-                    $this->reader->moveToFirstAttribute();
-                    do {
-                        $attrLocalName = $this->reader->localName;
-                        $attrNamespace = $this->reader->namespaceURI;
-
-                        // Skip structural RDF namespace attributes, xml:base, and xmlns declarations
-                        // Note: rdf:type is NOT skipped - it's processed as a property attribute
-                        $skipRdfAttr = $attrNamespace === self::RDF_NAMESPACE && in_array(
-                            $attrLocalName,
-                            self::STRUCTURAL_RDF_PROPERTY_ATTRS,
-                            true,
-                        );
-                        if (
-                            $skipRdfAttr
-                            || $attrNamespace === XMLUtils::XML_NAMESPACE
-                            || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
-                            || $attrNamespace === ''
-                        ) {
-                            continue;
-                        }
-
-                        $predicate = new Iri($attrNamespace . $attrLocalName);
-                        $value     = $this->reader->value;
-
-                        // rdf:type attribute values are URIs, not literals
-                        if ($attrNamespace === self::RDF_NAMESPACE && $attrLocalName === 'type') {
-                            $resolvedURI = $this->resolveURI($value);
-                            $object      = new Iri($resolvedURI);
-                        } else {
-                            $object = Literal::langOrXSDString($value, $descriptionLang);
-                        }
-
-                        $this->emit([
-                            $subject,
-                            $predicate,
-                            $object,
-                            null,
-                        ]);
-                    } while ($this->reader->moveToNextAttribute());
-
-                    $this->reader->moveToElement();
-                }
-
+                $this->processSubjectElementAttributes($subject, $descriptionLang, resolveRdfTypeAsUri: true);
                 $this->restoreSubjectAfterSelfClosingIfAtDepth($descriptionDepth);
 
                 continue;
@@ -883,44 +890,7 @@ class RdfXmlParser extends FiberIterator
 
                 // Process attributes on typed node element as property-value pairs
                 // This handles attributes like rdf:_3, rdf:value on container elements
-                $typedNodeLang = $this->currentXmlLang();
-                if ($this->reader->hasAttributes) {
-                    $this->reader->moveToFirstAttribute();
-                    do {
-                        $attrLocalName = $this->reader->localName;
-                        $attrNamespace = $this->reader->namespaceURI;
-
-                        // Skip structural RDF namespace attributes, xml:base, and xmlns declarations
-                        // Note: rdf:type is NOT skipped - it's processed as a property attribute
-                        // Also, numbered properties (rdf:_1, rdf:_2, etc.) and rdf:value are NOT skipped
-                        $skipRdfAttr = $attrNamespace === self::RDF_NAMESPACE && in_array(
-                            $attrLocalName,
-                            self::STRUCTURAL_RDF_PROPERTY_ATTRS,
-                            true,
-                        );
-                        if (
-                            $skipRdfAttr
-                            || $attrNamespace === XMLUtils::XML_NAMESPACE
-                            || $attrNamespace === XMLUtils::XMLNS_NAMESPACE
-                            || $attrNamespace === ''
-                        ) {
-                            continue;
-                        }
-
-                        $predicate = new Iri($attrNamespace . $attrLocalName);
-                        $value     = $this->reader->value;
-
-                        $this->emit([
-                            $subject,
-                            $predicate,
-                            Literal::langOrXSDString($value, $typedNodeLang),
-                            null,
-                        ]);
-                    } while ($this->reader->moveToNextAttribute());
-
-                    $this->reader->moveToElement();
-                }
-
+                $this->processSubjectElementAttributes($subject, $this->currentXmlLang());
                 $this->restoreSubjectAfterSelfClosingIfAtDepth($typedNodeDepth);
 
                 continue;
@@ -1045,7 +1015,7 @@ class RdfXmlParser extends FiberIterator
     /**
      * @param non-empty-string|null $propertyLang
      *
-     * @throws NonCompliantInputError
+     * @throws NonCompliantInputError if in strict mode and the object datatype is LangString.
      */
     private function makeObjectLiteral(string|null $datatypeAttr, string|null $propertyLang): Literal
     {
@@ -1092,7 +1062,7 @@ class RdfXmlParser extends FiberIterator
         // Use a simple regex to check if it's a valid XML name
         // Allow letters, digits, underscores, hyphens, periods, and Unicode characters
         // This is a simplified check - for full XML Name validation, we'd need more complex logic
-        return (bool) preg_match('/^[\p{L}_][\p{L}\p{N}_\\.\\-]*$/u', $name);
+        return preg_match('/^[\p{L}_][\p{L}\p{N}_\\.\\-]*$/u', $name) === 1;
     }
 
     /**
@@ -1104,14 +1074,10 @@ class RdfXmlParser extends FiberIterator
      */
     private function subjectOrFallback(string $message): Iri|BlankNode
     {
-        if ($this->subject !== null) {
-            return $this->subject;
-        }
-
-        if ($this->strict) {
+        if ($this->strict && $this->subject === null) {
             throw new NonCompliantInputError($message);
         }
 
-        return $this->blankNode(null);
+        return $this->subject ?? $this->blankNode(null);
     }
 }
