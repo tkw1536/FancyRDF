@@ -6,6 +6,7 @@ namespace FancyRDF\Tests\W3CRdf11Tests;
 
 use FancyRDF\Exceptions\NonCompliantInputError;
 use FancyRDF\Formats\RdfXmlParser;
+use FancyRDF\Xml\XMLUtils;
 use Generator;
 use InvalidArgumentException;
 use Override;
@@ -115,7 +116,7 @@ final class RDFXMLTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $reader = XMLReader::fromStream($source, null, 0, $action);
+            $reader = XMLUtils::readerFromStreamSafe($source, null, 0, $action);
             $parser = new RdfXmlParser($strict, $reader);
 
             $got = iterator_to_array($parser);
@@ -166,7 +167,7 @@ final class RDFXMLTest extends TestBase
         $source = self::assertOpen($action);
 
         try {
-            $reader = XMLReader::fromStream($source, null, 0, $action);
+            $reader = XMLUtils::readerFromStreamSafe($source, null, 0, $action);
             $parser = new RdfXmlParser(false, $reader);
 
             iterator_to_array($parser);

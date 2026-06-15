@@ -60,7 +60,7 @@ class RdfXmlParser extends FiberIterator
      */
     public static function openString(bool $strict, string $data, string $encoding = 'UTF-8'): self
     {
-        $reader = XMlReader::fromString($data, $encoding);
+        $reader = XMLUtils::readerFromStringSafe($data, $encoding);
 
         return new self($strict, $reader);
     }
@@ -72,7 +72,7 @@ class RdfXmlParser extends FiberIterator
      */
     public static function openStream(bool $strict, mixed $stream, string|null $documentUri = null, string $encoding = 'UTF-8'): self
     {
-        $reader = XMLReader::fromStream($stream, $encoding, 0, $documentUri);
+        $reader = XMLUtils::readerFromStreamSafe($stream, $encoding, 0, $documentUri);
 
         return new self($strict, $reader);
     }

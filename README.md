@@ -72,6 +72,7 @@ A production installation of this library requires [PHP 8.4+](https://www.php.ne
 - [ext-curl](https://www.php.net/manual/en/book.curl.php)
 - [ext-dom](https://www.php.net/manual/en/book.dom.php)
 - [ext-json](https://www.php.net/manual/en/book.json.php)
+- [ext-libxml](https://www.php.net/manual/en/book.libxml.php)
 - [ext-mbstring](https://www.php.net/manual/en/book.mbstring.php)
 - [ext-pcre](https://www.php.net/manual/en/book.pcre.php)
 - [ext-xmlreader](https://www.php.net/manual/en/book.xmlreader.php)

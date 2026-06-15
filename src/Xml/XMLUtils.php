@@ -11,6 +11,7 @@ use DOMNode;
 use DOMXPath;
 use InvalidArgumentException;
 use RuntimeException;
+use XMLReader;
 
 use function htmlspecialchars;
 use function trigger_error;
@@ -18,6 +19,7 @@ use function trigger_error;
 use const E_USER_NOTICE;
 use const ENT_QUOTES;
 use const ENT_XML1;
+use const LIBXML_NONET;
 
 /**
  * A class that holds helper functions for XML.
@@ -34,6 +36,43 @@ final class XMLUtils
     }
 
     /**
+     * Enables default flags for XML parsing, making it safer for untrusted input.
+     *
+     * @param int $flags
+     *   Additional flags to enable.
+     *
+     * @return int
+     *   The combined flags.
+     */
+    public static function defaultFlags(int $flags = 0): int
+    {
+        return $flags | LIBXML_NONET;
+    }
+
+    /**
+     * Creates a new XMLReader from a string, enabling default flags.
+     *
+     * @see XMLReader::fromString()
+     */
+    public static function readerFromStringSafe(string $source, string|null $encoding = null, int $flags = 0): XMLReader
+    {
+        return XMLReader::fromString($source, $encoding, self::defaultFlags($flags));
+    }
+
+    /**
+     * Creates a new XMLReader from a stream, enabling default flags.
+     *
+     * @see XMLReader::fromStream()
+     *
+     * @param resource $stream
+     *   The stream to read from.
+     */
+    public static function readerFromStreamSafe(mixed $stream, string|null $encoding = null, int $flags = 0, string|null $documentUri = null): XMLReader
+    {
+        return XMLReader::fromStream($stream, $encoding, self::defaultFlags($flags), $documentUri);
+    }
+
+    /**
      * Parses the given XML source and returns the root element.
      *
      * @throws RuntimeException
@@ -41,7 +80,7 @@ final class XMLUtils
     public static function parseAndGetRootNode(string $source): DOMElement
     {
         $dom     = new DOMDocument();
-        $success = $dom->loadXML($source);
+        $success = $dom->loadXML($source, self::defaultFlags());
         if (! $success) {
             throw new RuntimeException('Failed to parse XML');
         }
@@ -120,7 +159,7 @@ final class XMLUtils
     public static function serializerInnerXML(string $outerXml): string
     {
         $doc = new DOMDocument();
-        if (! $doc->loadXML($outerXml)) {
+        if (! $doc->loadXML($outerXml, self::defaultFlags())) {
             throw new RuntimeException('failed to read XML inside node');
         }
 

@@ -9,6 +9,7 @@ use FancyRDF\Dataset\Quad;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Formats\RdfXmlSerializer;
 use FancyRDF\Tests\Support\LocalRdfTestCases;
+use FancyRDF\Xml\XMLUtils;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
@@ -112,7 +113,7 @@ final class RdfXmlSerializerTest extends TestCase
         $doc->preserveWhiteSpace = false;
         $doc->formatOutput       = false;
 
-        self::assertTrue($doc->loadXML($xml), 'failed to parse XML: ' . $xml);
+        self::assertTrue($doc->loadXML($xml, XMLUtils::defaultFlags()), 'failed to parse XML: ' . $xml);
 
         $canonical = $doc->C14N(true, false);
         self::assertNotFalse($canonical, 'Failed to canonicalize XML');

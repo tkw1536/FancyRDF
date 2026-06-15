@@ -10,11 +10,11 @@ use FancyRDF\Formats\NFormatParser;
 use FancyRDF\Formats\RdfXmlParser;
 use FancyRDF\Tests\Support\IsomorphicAsDatasetsConstraint;
 use FancyRDF\Tests\Support\LocalRdfTestCases;
+use FancyRDF\Xml\XMLUtils;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use XMLReader;
 
 use function file_get_contents;
 use function iterator_to_array;
@@ -111,7 +111,7 @@ final class RdfXmlParserTest extends TestCase
         $rdfSource = file_get_contents($rdfFile);
         self::assertNotFalse($rdfSource, 'Failed to read RDF/XML file: ' . $rdfFile);
 
-        $reader = XMLReader::fromString($rdfSource);
+        $reader = XMLUtils::readerFromStringSafe($rdfSource);
         $parser = new RdfXmlParser($strict, $reader);
 
         $triples = iterator_to_array($parser);

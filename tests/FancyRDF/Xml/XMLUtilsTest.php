@@ -158,11 +158,11 @@ final class XMLUtilsTest extends TestCase
         $actual = XMLUtils::serializerInnerXML($input);
 
         $expectedDom = new DOMDocument();
-        @$expectedDom->loadXML('<added-by-testcase>' . $expected . '</added-by-testcase>');
+        @$expectedDom->loadXML('<added-by-testcase>' . $expected . '</added-by-testcase>', XMLUtils::defaultFlags());
         $expectedDom = $expectedDom->C14N();
 
         $actualDom = new DOMDocument();
-        @$actualDom->loadXML('<added-by-testcase>' . $actual . '</added-by-testcase>');
+        @$actualDom->loadXML('<added-by-testcase>' . $actual . '</added-by-testcase>', XMLUtils::defaultFlags());
         $actualDom = $actualDom->C14N();
 
         $this->assertSame(
